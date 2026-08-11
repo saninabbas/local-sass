@@ -158,6 +158,7 @@ export function Dashboard() {
             {recommendations.map(rec => (
               <ActionPlanCard
                 key={rec.id}
+                id={rec.id}
                 title={rec.title}
                 description={rec.description}
                 priority={rec.priority}

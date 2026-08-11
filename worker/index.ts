@@ -381,6 +381,68 @@ export default {
         });
       }
       
+      // --- RECOMMENDATIONS: GET ALL ---
+      if (url.pathname === '/api/recommendations' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const business = await env.DB.prepare(
+          "SELECT id FROM businesses WHERE user_id = ? LIMIT 1"
+        ).bind(user.id as string).first();
+
+        if (!business) return jsonResponse({ success: true, data: [] });
+
+        const { results: recommendations } = await env.DB.prepare(
+          "SELECT * FROM recommendations WHERE business_id = ? ORDER BY created_at DESC"
+        ).bind(business.id as string).all();
+
+        return jsonResponse({
+          success: true,
+          data: recommendations.map((r: any) => ({
+            id: r.id,
+            title: r.title,
+            priority: r.priority,
+            priorityColor: r.priority_color,
+            description: r.description,
+            impact: r.impact,
+            estimatedTime: r.estimated_minutes,
+            status: r.status,
+            actionLink: r.action_link
+          }))
+        });
+      }
+
+      // --- RECOMMENDATIONS: UPDATE STATUS ---
+      if (url.pathname.startsWith('/api/recommendations/') && request.method === 'PATCH') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const id = url.pathname.split('/').pop();
+        if (!id) return errorResponse("Invalid ID", 400);
+
+        const { status } = await request.json() as any;
+        if (!status || !['pending', 'in-progress', 'completed'].includes(status)) {
+          return errorResponse("Invalid status", 400);
+        }
+
+        // Ensure the recommendation belongs to the user's business
+        const business = await env.DB.prepare(
+          "SELECT id FROM businesses WHERE user_id = ? LIMIT 1"
+        ).bind(user.id as string).first();
+
+        if (!business) return errorResponse("Unauthorized", 401);
+
+        const result = await env.DB.prepare(
+          "UPDATE recommendations SET status = ? WHERE id = ? AND business_id = ?"
+        ).bind(status, id, business.id as string).run();
+
+        if (result.meta.changes === 0) {
+          return errorResponse("Recommendation not found or unauthorized", 404);
+        }
+
+        return jsonResponse({ success: true, data: { id, status } });
+      }
+
       return errorResponse("Not found", 404);
 
     } catch (err: any) {

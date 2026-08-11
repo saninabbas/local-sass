@@ -7,6 +7,7 @@ import { Dashboard } from './pages/dashboard/Dashboard';
 import { PageLayout } from './components/layout/PageLayout';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { ActionPlan } from './pages/dashboard/ActionPlan';
 
 // Simple placeholder page component for remaining routes
 function PlaceholderPage({ title }: { title: string }) {
@@ -56,7 +57,7 @@ function App() {
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/dashboard/score" element={<DashboardPlaceholder title="Growth Score" />} />
-            <Route path="/dashboard/actions" element={<DashboardPlaceholder title="AI Action Plan" />} />
+            <Route path="/dashboard/actions" element={<ActionPlan />} />
             <Route path="/dashboard/website" element={<DashboardPlaceholder title="Website Analysis" />} />
             <Route path="/dashboard/reviews" element={<DashboardPlaceholder title="Reviews Manager" />} />
             <Route path="/dashboard/reports" element={<DashboardPlaceholder title="Custom Reports" />} />

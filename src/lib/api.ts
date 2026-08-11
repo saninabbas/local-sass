@@ -61,3 +61,11 @@ export async function getDashboard(): Promise<DashboardData> {
 export async function runAudit(): Promise<any> {
   return fetchApi('/api/audit', { method: 'POST' });
 }
+
+export async function getRecommendations(): Promise<any> {
+  return fetchApi('/api/recommendations');
+}
+
+export async function updateRecommendationStatus(id: string, status: 'pending' | 'in-progress' | 'completed'): Promise<any> {
+  return fetchApi(`/api/recommendations/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+}
