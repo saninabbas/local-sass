@@ -53,8 +53,8 @@ function parseCookies(cookieHeader: string | null) {
 // -----------------------------------------------------------------------------
 // MAIN WORKER
 // -----------------------------------------------------------------------------
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+export const onRequest: PagesFunction<Env> = async (context) => {
+    const { request, env } = context;
     const url = new URL(request.url);
 
     const jsonResponse = (data: any, status = 200, headers: HeadersInit = {}) => 
@@ -449,5 +449,4 @@ export default {
       console.error(err);
       return errorResponse(err.message || "Internal Server Error");
     }
-  }
 };
