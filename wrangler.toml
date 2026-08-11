@@ -1,0 +1,12 @@
+name = "local-growth-ai"
+main = "worker/index.ts"
+compatibility_date = "2024-02-08"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "local-growth-ai"
+database_id = "bc3a639e-ba3a-46d6-ac51-195478364992"
+
+
