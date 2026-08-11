@@ -53,7 +53,7 @@ function parseCookies(cookieHeader: string | null) {
 // -----------------------------------------------------------------------------
 // MAIN WORKER
 // -----------------------------------------------------------------------------
-export const onRequest: PagesFunction<Env> = async (context) => {
+export const onRequest = async (context: any) => {
     const { request, env } = context;
     const url = new URL(request.url);
 
