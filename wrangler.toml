@@ -1,7 +1,7 @@
-name = "local-growth-ai"
-main = "worker/index.ts"
+name = "local-sass"
 compatibility_date = "2024-02-08"
 compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist"
 
 # D1 Database binding
 [[d1_databases]]
