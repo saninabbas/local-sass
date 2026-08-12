@@ -94,10 +94,10 @@ export function PricingSection() {
               variant="primary" 
               className="w-full h-14 text-lg" 
               size="lg"
-              onClick={() => handleCheckout('47bdc1ba-789c-4a0c-88de-b7a7b5e43d21')}
-              disabled={loadingId === '47bdc1ba-789c-4a0c-88de-b7a7b5e43d21'}
+              onClick={() => handleCheckout('7594755d-5580-4b77-86ae-90baae0e20d8', 'growth')}
+              disabled={loadingId === '7594755d-5580-4b77-86ae-90baae0e20d8'}
             >
-              {loadingId === '47bdc1ba-789c-4a0c-88de-b7a7b5e43d21' ? 'Redirecting...' : 'Start Free Trial'}
+              {loadingId === '7594755d-5580-4b77-86ae-90baae0e20d8' ? 'Redirecting...' : 'Start Free Trial'}
             </Button>
           </div>
           
@@ -127,10 +127,10 @@ export function PricingSection() {
               variant="outline" 
               className="w-full h-14 text-lg" 
               size="lg"
-              onClick={() => handleCheckout('71c9c886-3ebb-4790-a87b-438694f22463')}
-              disabled={loadingId === '71c9c886-3ebb-4790-a87b-438694f22463'}
+              onClick={() => handleCheckout('97ffea75-9d0c-490f-b652-b2bfd360abe2', 'pro')}
+              disabled={loadingId === '97ffea75-9d0c-490f-b652-b2bfd360abe2'}
             >
-              {loadingId === '71c9c886-3ebb-4790-a87b-438694f22463' ? 'Redirecting...' : 'Start Free Trial'}
+              {loadingId === '97ffea75-9d0c-490f-b652-b2bfd360abe2' ? 'Redirecting...' : 'Start Free Trial'}
             </Button>
           </div>
         </div>

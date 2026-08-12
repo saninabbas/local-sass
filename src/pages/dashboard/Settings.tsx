@@ -126,7 +126,7 @@ export function Settings() {
 
               <button
                 disabled={currentPlan === 'growth' || isProcessing !== null}
-                onClick={() => handleCheckout('47bdc1ba-789c-4a0c-88de-b7a7b5e43d21', 'growth')}
+                onClick={() => handleCheckout('7594755d-5580-4b77-86ae-90baae0e20d8', 'growth')}
                 className={`w-full py-3 px-4 rounded-lg font-bold text-sm transition-all shadow-sm ${
                   currentPlan === 'growth'
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
@@ -178,7 +178,7 @@ export function Settings() {
 
               <button
                 disabled={currentPlan === 'pro' || isProcessing !== null}
-                onClick={() => handleCheckout('71c9c886-3ebb-4790-a87b-438694f22463', 'pro')}
+                onClick={() => handleCheckout('97ffea75-9d0c-490f-b652-b2bfd360abe2', 'pro')}
                 className={`w-full py-3 px-4 rounded-lg font-bold text-sm transition-all shadow-md ${
                   currentPlan === 'pro'
                     ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
