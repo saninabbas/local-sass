@@ -23,6 +23,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
     { name: 'Growth Score', icon: Target, href: '/dashboard/score' },
     { name: 'AI Action Plan', icon: Zap, href: '/dashboard/actions' },
     { name: 'Website', icon: Globe, href: '/dashboard/website' },
+    { name: 'Competitors', icon: Target, href: '/dashboard/competitors' },
     { name: 'Reviews', icon: Star, href: '/dashboard/reviews' },
     { name: 'Reports', icon: FileText, href: '/dashboard/reports' },
     { name: 'Settings', icon: Settings, href: '/dashboard/settings' },

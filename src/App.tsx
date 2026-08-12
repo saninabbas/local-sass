@@ -18,6 +18,7 @@ import { Terms } from './pages/marketing/Terms';
 import { Resources } from './pages/marketing/Resources';
 import { Website } from './pages/dashboard/Website';
 import { Reviews } from './pages/dashboard/Reviews';
+import { Competitors } from './pages/dashboard/Competitors';
 
 import { DashboardLayout } from './components/dashboard/DashboardLayout';
 
@@ -54,6 +55,7 @@ function App() {
             <Route path="/dashboard/score" element={<Score />} />
             <Route path="/dashboard/actions" element={<ActionPlan />} />
             <Route path="/dashboard/website" element={<Website />} />
+            <Route path="/dashboard/competitors" element={<Competitors />} />
             <Route path="/dashboard/reviews" element={<Reviews />} />
             <Route path="/dashboard/reports" element={<Reports />} />
             <Route path="/dashboard/settings" element={<Settings />} />

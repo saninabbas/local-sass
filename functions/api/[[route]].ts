@@ -432,6 +432,95 @@ export const onRequest = async (context: any) => {
         }
       }
 
+      // --- COMPETITOR ANALYSIS ---
+      if (url.pathname === '/api/competitors/analyze' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        let payload;
+        try { payload = await request.json(); } catch { return errorResponse("Invalid JSON", 400); }
+        if (!payload.competitorUrl) return errorResponse("Competitor URL required", 400);
+
+        const business = await env.DB.prepare(
+          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
+        ).bind(user.id as string).first();
+
+        if (!business || !business.website_url) return errorResponse("You must have a website to compare against", 400);
+
+        try {
+          const { fetchWithTimeout, Extractor, computeScores, compareWithNVIDIA } = await import('./auditEngine');
+          
+          // Fetch both concurrently
+          const [myRes, compRes] = await Promise.allSettled([
+            fetchWithTimeout(business.website_url as string, 8000),
+            fetchWithTimeout(payload.competitorUrl, 8000)
+          ]);
+
+          if (myRes.status === 'rejected' || compRes.status === 'rejected') {
+            throw new Error("Failed to fetch one or both websites.");
+          }
+
+          const myExtractor = new Extractor();
+          const compExtractor = new Extractor();
+
+          const myRewriter = new HTMLRewriter()
+            .on('title', myExtractor.handlers.title)
+            .on('meta', myExtractor.handlers.meta)
+            .on('h1', myExtractor.handlers.h1)
+            .on('h1, h2, h3, h4, h5, h6', myExtractor.handlers.heading)
+            .on('script', myExtractor.handlers.script)
+            .on('a', myExtractor.handlers.a);
+
+          const compRewriter = new HTMLRewriter()
+            .on('title', compExtractor.handlers.title)
+            .on('meta', compExtractor.handlers.meta)
+            .on('h1', compExtractor.handlers.h1)
+            .on('h1, h2, h3, h4, h5, h6', compExtractor.handlers.heading)
+            .on('script', compExtractor.handlers.script)
+            .on('a', compExtractor.handlers.a);
+
+          await Promise.all([
+            myRewriter.transform(myRes.value).text(),
+            compRewriter.transform(compRes.value).text()
+          ]);
+
+          const myScores = computeScores(myExtractor, business.website_url as string, (business.city as string) || '');
+          const compScores = computeScores(compExtractor, payload.competitorUrl, (business.city as string) || '');
+
+          // Get AI strategy
+          let aiStrategy = null;
+          if (env.NVIDIA_API_KEY) {
+            try {
+              aiStrategy = await compareWithNVIDIA(env.NVIDIA_API_KEY, myExtractor, myScores, compExtractor, compScores);
+            } catch (e) {
+              console.error("NVIDIA AI failed for competitor analysis", e);
+            }
+          }
+
+          const responseData = {
+            me: {
+              url: business.website_url,
+              https: (business.website_url as string).startsWith('https://'),
+              title: myExtractor.title.trim(),
+              h1: myExtractor.h1.trim(),
+              score: myScores.overall
+            },
+            competitor: {
+              url: payload.competitorUrl,
+              https: payload.competitorUrl.startsWith('https://'),
+              title: compExtractor.title.trim(),
+              h1: compExtractor.h1.trim(),
+              score: compScores.overall
+            },
+            strategy: aiStrategy || { summary: "AI currently unavailable.", action_plan: [] }
+          };
+
+          return jsonResponse({ success: true, data: responseData });
+        } catch (error: any) {
+          return errorResponse("Failed to analyze competitor: " + error.message, 500);
+        }
+      }
+
       // --- BACKGROUND CRON AUDITS ---
       if (url.pathname === '/api/cron/run-audits' && request.method === 'POST') {
         const authHeader = request.headers.get('Authorization');

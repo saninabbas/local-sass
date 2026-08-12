@@ -63,3 +63,7 @@ export async function createCheckout(productId: string): Promise<{ url: string }
 export async function analyzeWebsite(): Promise<any> {
   return fetchApi('/api/website/analyze', { method: 'GET' });
 }
+
+export async function analyzeCompetitor(competitorUrl: string): Promise<any> {
+  return fetchApi('/api/competitors/analyze', { method: 'POST', body: JSON.stringify({ competitorUrl }) });
+}

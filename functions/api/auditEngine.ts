@@ -133,6 +133,60 @@ Provide a JSON response strictly in this format:
   return JSON.parse(data.choices[0].message.content);
 }
 
+export async function compareWithNVIDIA(
+  apiKey: string,
+  myExtractor: Extractor,
+  myScores: any,
+  compExtractor: Extractor,
+  compScores: any
+) {
+  const prompt = `You are an expert SEO Competitor Analyst.
+Compare my website data against a competitor's website and provide a strategic plan to beat them.
+
+My Website:
+Title: ${myExtractor.title}
+H1: ${myExtractor.h1}
+Scores: SEO ${myScores.seo}/100, Tech ${myScores.website}/100
+
+Competitor's Website:
+Title: ${compExtractor.title}
+H1: ${compExtractor.h1}
+Scores: SEO ${compScores.seo}/100, Tech ${compScores.website}/100
+
+Provide a JSON response strictly in this format:
+{
+  "summary": "2-3 sentences summarizing why the competitor might be doing better or worse.",
+  "action_plan": [
+    {
+      "title": "Clear action title",
+      "description": "Specific instruction on what I need to change to beat them."
+    }
+  ]
+}`;
+
+  const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: "meta/llama-3.1-8b-instruct",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+      max_tokens: 1024,
+      response_format: { type: "json_object" }
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`NVIDIA API Error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return JSON.parse(data.choices[0].message.content);
+}
+
 export function getFallbackRecommendations() {
   return {
     summary: "We were unable to fully process your website with AI, but here is a standard growth plan.",
