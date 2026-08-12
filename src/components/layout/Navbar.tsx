@@ -8,9 +8,9 @@ export function Navbar() {
   const location = useLocation();
 
   const navigation = [
-    { name: 'Features', href: '/features' },
-    { name: 'How It Works', href: '/how-it-works' },
-    { name: 'Pricing', href: '/pricing' },
+    { name: 'Features', href: '/#features' },
+    { name: 'How It Works', href: '/#how-it-works' },
+    { name: 'Pricing', href: '/#pricing' },
     { name: 'Resources', href: '/resources' },
   ];
 

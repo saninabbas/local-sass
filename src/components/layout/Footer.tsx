@@ -6,8 +6,8 @@ export function Footer() {
 
   const footerLinks = {
     product: [
-      { name: 'Features', href: '/features' },
-      { name: 'Pricing', href: '/pricing' },
+      { name: 'Features', href: '/#features' },
+      { name: 'Pricing', href: '/#pricing' },
       { name: 'Resources', href: '/resources' },
     ],
     company: [
@@ -15,8 +15,8 @@ export function Footer() {
       { name: 'Contact', href: '/contact' },
     ],
     legal: [
-      { name: 'Privacy', href: '#' },
-      { name: 'Terms', href: '#' },
+      { name: 'Privacy', href: '/privacy' },
+      { name: 'Terms', href: '/terms' },
     ],
   };
 
@@ -99,8 +99,8 @@ export function Footer() {
             &copy; {currentYear} Rankora. All rights reserved.
           </p>
           <div className="flex space-x-6 text-sm text-gray-400">
-            <a href="#" className="hover:text-primary transition-colors">Terms of Service</a>
-            <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
+            <Link to="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
+            <Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
           </div>
         </div>
       </div>

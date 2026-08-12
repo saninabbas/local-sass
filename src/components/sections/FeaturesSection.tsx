@@ -12,7 +12,7 @@ export function FeaturesSection() {
   ];
 
   return (
-    <section className="py-24 sm:py-32 bg-white">
+    <section className="py-24 sm:py-32 bg-white" id="features">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-20">
           <h2 className="text-4xl font-extrabold tracking-tight text-primary sm:text-5xl">
