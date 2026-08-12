@@ -16,6 +16,20 @@ export function Navbar() {
 
   const isActive = (path: string) => location.pathname === path;
 
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (href.startsWith('/#') && location.pathname === '/') {
+      e.preventDefault();
+      const id = href.replace('/#', '');
+      const element = document.getElementById(id);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+      setIsMobileMenuOpen(false);
+    } else {
+      setIsMobileMenuOpen(false);
+    }
+  };
+
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white shadow-sm">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -37,6 +51,7 @@ export function Navbar() {
                 <Link
                   key={item.name}
                   to={item.href}
+                  onClick={(e) => handleNavClick(e, item.href)}
                   className={`text-sm font-semibold transition-colors hover:text-primary ${
                     isActive(item.href) ? 'text-primary' : 'text-secondary'
                   }`}
@@ -91,7 +106,7 @@ export function Navbar() {
                     ? 'bg-gray-50 text-primary'
                     : 'text-secondary hover:bg-gray-50 hover:text-primary'
                 }`}
-                onClick={() => setIsMobileMenuOpen(false)}
+                onClick={(e) => handleNavClick(e, item.href)}
               >
                 {item.name}
               </Link>
