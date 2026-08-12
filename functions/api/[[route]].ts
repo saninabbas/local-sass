@@ -377,6 +377,61 @@ export const onRequest = async (context: any) => {
         }
       }
 
+      // --- WEBSITE LIVE ANALYSIS ---
+      if (url.pathname === '/api/website/analyze' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const business = await env.DB.prepare(
+          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
+        ).bind(user.id as string).first();
+
+        if (!business) return errorResponse("No business found", 404);
+        if (!business.website_url) return errorResponse("Business has no website URL", 400);
+
+        try {
+          const { fetchWithTimeout, Extractor } = await import('./auditEngine');
+          
+          const websiteUrl = business.website_url as string;
+          let websiteResponse: Response;
+          try {
+            websiteResponse = await fetchWithTimeout(websiteUrl, 10000);
+          } catch {
+            throw new Error("Website fetch failed or timed out.");
+          }
+
+          if (!websiteResponse.ok || !websiteResponse.headers.get('content-type')?.includes('text/html')) {
+            throw new Error("Invalid or non-HTML website response.");
+          }
+
+          const extractor = new Extractor();
+          const rewriter = new HTMLRewriter()
+            .on('title', extractor.handlers.title)
+            .on('meta', extractor.handlers.meta)
+            .on('h1', extractor.handlers.h1)
+            .on('h1, h2, h3, h4, h5, h6', extractor.handlers.heading)
+            .on('script', extractor.handlers.script)
+            .on('a', extractor.handlers.a);
+
+          await rewriter.transform(websiteResponse).text();
+
+          const data = {
+            url: websiteUrl,
+            https: websiteUrl.startsWith('https://'),
+            title: extractor.title.trim(),
+            metaDescription: extractor.metaDescription.trim(),
+            h1: extractor.h1.trim(),
+            headingsCount: extractor.headingsCount,
+            scriptCount: extractor.scriptCount,
+            linkCount: extractor.linkCount,
+          };
+
+          return jsonResponse({ success: true, data });
+        } catch (error: any) {
+          return errorResponse("Failed to analyze website: " + error.message, 500);
+        }
+      }
+
       // --- DASHBOARD ---
       if (url.pathname === '/api/dashboard' && request.method === 'GET') {
         const user = await authenticate();

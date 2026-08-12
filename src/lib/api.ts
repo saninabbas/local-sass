@@ -59,3 +59,7 @@ export async function updateRecommendationStatus(id: string, status: 'pending' |
 export async function createCheckout(productId: string): Promise<{ url: string }> {
   return fetchApi('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ productId }) });
 }
+
+export async function analyzeWebsite(): Promise<any> {
+  return fetchApi('/api/website/analyze', { method: 'GET' });
+}

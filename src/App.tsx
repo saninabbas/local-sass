@@ -16,6 +16,7 @@ import { Contact } from './pages/marketing/Contact';
 import { Privacy } from './pages/marketing/Privacy';
 import { Terms } from './pages/marketing/Terms';
 import { Resources } from './pages/marketing/Resources';
+import { Website } from './pages/dashboard/Website';
 
 import { DashboardLayout } from './components/dashboard/DashboardLayout';
 
@@ -51,7 +52,7 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/dashboard/score" element={<Score />} />
             <Route path="/dashboard/actions" element={<ActionPlan />} />
-            <Route path="/dashboard/website" element={<div className="flex justify-center py-20 text-secondary">Website Analysis (Coming Soon)</div>} />
+            <Route path="/dashboard/website" element={<Website />} />
             <Route path="/dashboard/reviews" element={<div className="flex justify-center py-20 text-secondary">Reviews Manager (Coming Soon)</div>} />
             <Route path="/dashboard/reports" element={<Reports />} />
             <Route path="/dashboard/settings" element={<Settings />} />
