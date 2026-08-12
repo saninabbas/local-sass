@@ -768,7 +768,7 @@ export const onRequest = async (context: any) => {
           if (!polarRes.ok) {
             const errorText = await polarRes.text();
             console.error("Polar API error:", errorText);
-            return errorResponse("Failed to generate checkout session", 500);
+            return errorResponse(`Failed to generate checkout session: ${errorText}`, 500);
           }
 
           const checkoutData = await polarRes.json() as any;

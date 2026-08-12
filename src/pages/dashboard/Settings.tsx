@@ -21,9 +21,9 @@ export function Settings() {
       } else {
         alert("Could not generate checkout link. Please try again.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Checkout error:", error);
-      alert("Something went wrong securely redirecting to checkout.");
+      alert(`Checkout Error: ${error.message || 'Unknown error'}`);
     } finally {
       setIsProcessing(null);
     }
