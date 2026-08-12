@@ -46,7 +46,7 @@ export function PricingSection() {
             <h3 className="text-2xl font-bold text-white mb-3 mt-4 md:mt-0">Growth</h3>
             <p className="text-gray-400 text-base mb-10 h-12">Perfect for single-location businesses.</p>
             <div className="mb-10 flex items-baseline gap-1.5">
-              <span className="text-6xl font-black text-white tracking-tight">$49</span>
+              <span className="text-6xl font-black text-white tracking-tight">$15</span>
               <span className="text-gray-400 text-lg font-medium">/mo</span>
             </div>
             
@@ -71,7 +71,7 @@ export function PricingSection() {
             <h3 className="text-2xl font-bold text-primary mb-3">Pro</h3>
             <p className="text-secondary text-base mb-10 h-12">For growing businesses and agencies.</p>
             <div className="mb-10 flex items-baseline gap-1.5">
-              <span className="text-6xl font-black text-primary tracking-tight">$99</span>
+              <span className="text-6xl font-black text-primary tracking-tight">$30</span>
               <span className="text-secondary text-lg font-medium">/mo</span>
             </div>
             

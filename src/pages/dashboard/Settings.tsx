@@ -111,7 +111,7 @@ export function Settings() {
                   <p className="text-secondary text-sm mt-1">Perfect for small businesses</p>
                 </div>
                 <div className="text-right">
-                  <span className="text-3xl font-extrabold text-primary">$10</span>
+                  <span className="text-3xl font-extrabold text-primary">$15</span>
                 </div>
               </div>
 
