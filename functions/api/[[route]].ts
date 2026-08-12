@@ -297,7 +297,7 @@ export const onRequest = async (context: any) => {
           let websiteResponse: Response;
           try {
             websiteResponse = await fetchWithTimeout(websiteUrl, 10000);
-          } catch (e) {
+          } catch {
             throw new Error("Website fetch failed or timed out.");
           }
 

@@ -21,7 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const currentUser = await getCurrentUser();
         setUser(currentUser);
-      } catch (err) {
+      } catch {
         setUser(null);
       } finally {
         setIsLoading(false);

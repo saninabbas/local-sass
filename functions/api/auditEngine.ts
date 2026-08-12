@@ -24,29 +24,28 @@ export class Extractor {
   linkCount: number = 0;
 
   get handlers() {
-    const self = this;
     return {
       title: {
-        text(t: any) { self.title += t.text; }
+        text: (t: any) => { this.title += t.text; }
       },
       meta: {
-        element(e: any) {
+        element: (e: any) => {
           if (e.getAttribute('name')?.toLowerCase() === 'description') {
-            self.metaDescription = e.getAttribute('content') || '';
+            this.metaDescription = e.getAttribute('content') || '';
           }
         }
       },
       h1: {
-        text(t: any) { self.h1 += t.text; }
+        text: (t: any) => { this.h1 += t.text; }
       },
       heading: {
-        element() { self.headingsCount++; }
+        element: () => { this.headingsCount++; }
       },
       script: {
-        element() { self.scriptCount++; }
+        element: () => { this.scriptCount++; }
       },
       a: {
-        element() { self.linkCount++; }
+        element: () => { this.linkCount++; }
       }
     };
   }
