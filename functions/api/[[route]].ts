@@ -104,6 +104,19 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true, worker: "ok", database: "ok" });
       }
 
+      // --- SETUP DB (Temporary endpoint to fix schema) ---
+      if (url.pathname === '/api/setup-db') {
+        try {
+          await env.DB.prepare("ALTER TABLE users ADD COLUMN password_hash TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE users ADD COLUMN polar_customer_id TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE users ADD COLUMN subscription_status TEXT DEFAULT 'free'").run().catch(() => {});
+          await env.DB.prepare("CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at DATETIME NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))").run().catch(() => {});
+          return jsonResponse({ success: true, message: "Database tables updated successfully!" });
+        } catch (e: any) {
+          return jsonResponse({ success: false, error: e.message });
+        }
+      }
+
       // --- AUTH: SIGNUP ---
       if (url.pathname === '/api/auth/signup' && request.method === 'POST') {
         const { name, email, password } = await request.json() as any;
