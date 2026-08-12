@@ -187,6 +187,53 @@ Provide a JSON response strictly in this format:
   return JSON.parse(data.choices[0].message.content);
 }
 
+export async function generateBlogWithNVIDIA(
+  apiKey: string,
+  businessName: string,
+  city: string,
+  topic: string
+) {
+  const prompt = `You are an expert SEO Content Writer for local businesses.
+Write a highly engaging, professional, and SEO-optimized blog article for a business named "${businessName}" located in "${city}".
+
+Topic: ${topic}
+
+Requirements:
+- The article must be around 400-600 words.
+- It must naturally include the city name ("${city}") for local SEO.
+- Format the output EXACTLY in HTML using <h2>, <h3>, <p>, and <ul> tags where appropriate. Do NOT include <html>, <head>, or <body> tags, just the content itself.
+- Ensure the tone is professional and engaging, ending with a call to action to contact the business.
+- Output ONLY valid JSON in the exact format requested below.
+
+Provide a JSON response strictly in this format:
+{
+  "title": "A catchy, SEO-optimized H1 title",
+  "html_content": "The formatted HTML string containing the article content."
+}`;
+
+  const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: "meta/llama-3.1-8b-instruct",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+      max_tokens: 2000,
+      response_format: { type: "json_object" }
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`NVIDIA API Error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return JSON.parse(data.choices[0].message.content);
+}
+
 export function getFallbackRecommendations() {
   return {
     summary: "We were unable to fully process your website with AI, but here is a standard growth plan.",

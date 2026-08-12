@@ -432,6 +432,38 @@ export const onRequest = async (context: any) => {
         }
       }
 
+      // --- AI BLOG GENERATOR ---
+      if (url.pathname === '/api/content/generate' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        let payload;
+        try { payload = await request.json(); } catch { return errorResponse("Invalid JSON", 400); }
+        const topic = payload.topic || "The importance of our services in the local community";
+
+        const business = await env.DB.prepare(
+          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
+        ).bind(user.id as string).first();
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        if (!env.NVIDIA_API_KEY) {
+          return errorResponse("AI is not configured on the server.", 500);
+        }
+
+        try {
+          const { generateBlogWithNVIDIA } = await import('./auditEngine');
+          const businessName = (business.name as string) || "Our Local Business";
+          const city = (business.city as string) || "our city";
+
+          const blogData = await generateBlogWithNVIDIA(env.NVIDIA_API_KEY, businessName, city, topic);
+          
+          return jsonResponse({ success: true, data: blogData });
+        } catch (error: any) {
+          return errorResponse("Failed to generate blog content: " + error.message, 500);
+        }
+      }
+
       // --- COMPETITOR ANALYSIS ---
       if (url.pathname === '/api/competitors/analyze' && request.method === 'POST') {
         const user = await authenticate();

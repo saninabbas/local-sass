@@ -24,6 +24,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
     { name: 'AI Action Plan', icon: Zap, href: '/dashboard/actions' },
     { name: 'Website', icon: Globe, href: '/dashboard/website' },
     { name: 'Competitors', icon: Target, href: '/dashboard/competitors' },
+    { name: 'Blog Content', icon: FileText, href: '/dashboard/content' },
     { name: 'Reviews', icon: Star, href: '/dashboard/reviews' },
     { name: 'Reports', icon: FileText, href: '/dashboard/reports' },
     { name: 'Settings', icon: Settings, href: '/dashboard/settings' },

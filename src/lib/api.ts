@@ -67,3 +67,7 @@ export async function analyzeWebsite(): Promise<any> {
 export async function analyzeCompetitor(competitorUrl: string): Promise<any> {
   return fetchApi('/api/competitors/analyze', { method: 'POST', body: JSON.stringify({ competitorUrl }) });
 }
+
+export async function generateBlogArticle(topic?: string): Promise<any> {
+  return fetchApi('/api/content/generate', { method: 'POST', body: JSON.stringify({ topic }) });
+}
