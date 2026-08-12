@@ -8,7 +8,8 @@ import {
   FileText, 
   Settings, 
   HelpCircle, 
-  User 
+  User,
+  Users 
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -25,6 +26,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
     { name: 'Website', icon: Globe, href: '/dashboard/website' },
     { name: 'Competitors', icon: Target, href: '/dashboard/competitors' },
     { name: 'Blog Content', icon: FileText, href: '/dashboard/content' },
+    { name: 'Lead Gen Widget', icon: Users, href: '/dashboard/leads' },
     { name: 'Reviews', icon: Star, href: '/dashboard/reviews' },
     { name: 'Reports', icon: FileText, href: '/dashboard/reports' },
     { name: 'Settings', icon: Settings, href: '/dashboard/settings' },

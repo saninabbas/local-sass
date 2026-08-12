@@ -20,6 +20,7 @@ import { Website } from './pages/dashboard/Website';
 import { Reviews } from './pages/dashboard/Reviews';
 import { Competitors } from './pages/dashboard/Competitors';
 import { Content } from './pages/dashboard/Content';
+import { Leads } from './pages/dashboard/Leads';
 
 import { DashboardLayout } from './components/dashboard/DashboardLayout';
 
@@ -58,6 +59,7 @@ function App() {
             <Route path="/dashboard/website" element={<Website />} />
             <Route path="/dashboard/competitors" element={<Competitors />} />
             <Route path="/dashboard/content" element={<Content />} />
+            <Route path="/dashboard/leads" element={<Leads />} />
             <Route path="/dashboard/reviews" element={<Reviews />} />
             <Route path="/dashboard/reports" element={<Reports />} />
             <Route path="/dashboard/settings" element={<Settings />} />

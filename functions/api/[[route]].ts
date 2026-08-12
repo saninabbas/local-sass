@@ -840,6 +840,67 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true, received: true });
       }
 
+      // --- WIDGET CAPTURE (PUBLIC) ---
+      // Expected payload: { businessId: string, name: string, email: string, websiteUrl?: string }
+      if (url.pathname === '/api/widget/capture' && request.method === 'POST') {
+        // Handle CORS preflight in actual Cloudflare settings or append headers, but for basic implementation:
+        try {
+          const payload = await request.json() as any;
+          if (!payload.businessId || !payload.email || !payload.name) {
+            return errorResponse("Missing required fields", 400);
+          }
+          
+          // Verify business exists
+          const business = await env.DB.prepare("SELECT id FROM businesses WHERE id = ?").bind(payload.businessId).first();
+          if (!business) return errorResponse("Business not found", 404);
+
+          const leadId = crypto.randomUUID();
+          await env.DB.prepare(
+            "INSERT INTO leads (id, business_id, name, email, website_url) VALUES (?, ?, ?, ?, ?)"
+          ).bind(leadId, payload.businessId, payload.name, payload.email, payload.websiteUrl || '').run();
+
+          return new Response(JSON.stringify({ success: true }), {
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'POST, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type'
+            }
+          });
+        } catch (error: any) {
+          return new Response(JSON.stringify({ success: false, error: error.message }), {
+            status: 500,
+            headers: { 'Access-Control-Allow-Origin': '*' }
+          });
+        }
+      }
+
+      // Handle OPTIONS request for widget capture (CORS)
+      if (url.pathname === '/api/widget/capture' && request.method === 'OPTIONS') {
+        return new Response(null, {
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type'
+          }
+        });
+      }
+
+      // --- GET LEADS (PROTECTED) ---
+      if (url.pathname === '/api/leads' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const business = await env.DB.prepare("SELECT id FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        if (!business) return jsonResponse({ success: true, data: [] });
+
+        const { results } = await env.DB.prepare(
+          "SELECT id, name, email, website_url, created_at FROM leads WHERE business_id = ? ORDER BY created_at DESC"
+        ).bind(business.id).all();
+
+        return jsonResponse({ success: true, data: results });
+      }
+
       // --- DEBUG ENV ---
       if (url.pathname === '/api/debug/env') {
         const keys = Object.keys(env);

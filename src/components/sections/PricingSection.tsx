@@ -94,7 +94,7 @@ export function PricingSection() {
               variant="primary" 
               className="w-full h-14 text-lg" 
               size="lg"
-              onClick={() => handleCheckout('7594755d-5580-4b77-86ae-90baae0e20d8', 'growth')}
+              onClick={() => handleCheckout('7594755d-5580-4b77-86ae-90baae0e20d8')}
               disabled={loadingId === '7594755d-5580-4b77-86ae-90baae0e20d8'}
             >
               {loadingId === '7594755d-5580-4b77-86ae-90baae0e20d8' ? 'Redirecting...' : 'Start Free Trial'}
@@ -127,7 +127,7 @@ export function PricingSection() {
               variant="outline" 
               className="w-full h-14 text-lg" 
               size="lg"
-              onClick={() => handleCheckout('97ffea75-9d0c-490f-b652-b2bfd360abe2', 'pro')}
+              onClick={() => handleCheckout('97ffea75-9d0c-490f-b652-b2bfd360abe2')}
               disabled={loadingId === '97ffea75-9d0c-490f-b652-b2bfd360abe2'}
             >
               {loadingId === '97ffea75-9d0c-490f-b652-b2bfd360abe2' ? 'Redirecting...' : 'Start Free Trial'}
