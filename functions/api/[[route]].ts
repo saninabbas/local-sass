@@ -537,7 +537,7 @@ export const onRequest = async (context: any) => {
         }
 
         try {
-          const polarRes = await fetch('https://api.polar.sh/v1/checkouts/custom', {
+          const polarRes = await fetch('https://api.polar.sh/v1/checkouts/', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -561,7 +561,7 @@ export const onRequest = async (context: any) => {
           }
 
           const checkoutData = await polarRes.json() as any;
-          return jsonResponse({ success: true, url: checkoutData.url });
+          return jsonResponse({ success: true, data: { url: checkoutData.url } });
         } catch (e: any) {
           console.error("Polar fetch error:", e);
           return errorResponse("Failed to communicate with billing provider", 500);
@@ -570,28 +570,26 @@ export const onRequest = async (context: any) => {
 
       // --- BILLING: POLAR WEBHOOK ---
       if (url.pathname === '/api/webhooks/polar' && request.method === 'POST') {
-        // In a production environment, you should verify the webhook signature using env.POLAR_WEBHOOK_SECRET
         const payload = await request.json() as any;
 
-        // Check if the event is a successful order or subscription creation
+        // Polar sends a `type` for the event
         if (payload.type === 'order.created' || payload.type === 'subscription.created') {
-          const { metadata, customer_id } = payload.data;
+          const { metadata, customer_id, product_id } = payload.data;
           
           if (metadata && metadata.user_id) {
             let plan = 'pro';
-            // Simple logic: if the price/product corresponds to growth, set to growth
-            // Growth: 47bdc1ba-789c-4a0c-88de-b7a7b5e43d21
-            if (payload.data.product_id === '47bdc1ba-789c-4a0c-88de-b7a7b5e43d21') {
+            // Growth Package Product ID
+            if (product_id === '47bdc1ba-789c-4a0c-88de-b7a7b5e43d21') {
               plan = 'growth';
             }
 
             try {
-              // Note: Ensure the user database has polar_customer_id and subscription_status columns
+              // Update user's subscription in businesses table
               await env.DB.prepare(
-                "UPDATE users SET polar_customer_id = ?, subscription_status = ? WHERE id = ?"
-              ).bind(customer_id, plan, metadata.user_id).run();
+                "UPDATE businesses SET subscription_tier = ?, polar_customer_id = ? WHERE user_id = ?"
+              ).bind(plan, customer_id, metadata.user_id).run();
             } catch (e) {
-              console.error("Failed to update user billing status:", e);
+              console.error("Failed to update business billing status:", e);
             }
           }
         }

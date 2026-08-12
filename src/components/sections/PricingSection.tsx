@@ -1,7 +1,34 @@
 import { CheckCircle2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { createCheckout } from '../../lib/api';
+import { useState } from 'react';
 export function PricingSection() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+
+  const handleCheckout = async (productId: string) => {
+    if (!user) {
+      navigate('/signup');
+      return;
+    }
+
+    try {
+      setLoadingId(productId);
+      const res = await createCheckout(productId);
+      if (res.url) {
+        window.location.href = res.url;
+      }
+    } catch (err: any) {
+      alert("Checkout failed: " + err.message);
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
   return (
     <section className="py-24 sm:py-32 bg-white" id="pricing">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -35,7 +62,7 @@ export function PricingSection() {
                 </li>
               ))}
             </ul>
-            <Button variant="outline" className="w-full h-14 text-lg" size="lg">Run Free Audit</Button>
+            <Button variant="outline" className="w-full h-14 text-lg" size="lg" onClick={() => navigate(user ? '/dashboard' : '/signup')}>Run Free Audit</Button>
           </div>
 
           {/* Growth Plan (Recommended) */}
@@ -63,7 +90,15 @@ export function PricingSection() {
                 </li>
               ))}
             </ul>
-            <Button variant="primary" className="w-full h-14 text-lg" size="lg">Start Free Trial</Button>
+            <Button 
+              variant="primary" 
+              className="w-full h-14 text-lg" 
+              size="lg"
+              onClick={() => handleCheckout('47bdc1ba-789c-4a0c-88de-b7a7b5e43d21')}
+              disabled={loadingId === '47bdc1ba-789c-4a0c-88de-b7a7b5e43d21'}
+            >
+              {loadingId === '47bdc1ba-789c-4a0c-88de-b7a7b5e43d21' ? 'Redirecting...' : 'Start Free Trial'}
+            </Button>
           </div>
           
           {/* Pro Plan */}
@@ -88,7 +123,15 @@ export function PricingSection() {
                 </li>
               ))}
             </ul>
-            <Button variant="outline" className="w-full h-14 text-lg" size="lg">Start Free Trial</Button>
+            <Button 
+              variant="outline" 
+              className="w-full h-14 text-lg" 
+              size="lg"
+              onClick={() => handleCheckout('71c9c886-3ebb-4790-a87b-438694f22463')}
+              disabled={loadingId === '71c9c886-3ebb-4790-a87b-438694f22463'}
+            >
+              {loadingId === '71c9c886-3ebb-4790-a87b-438694f22463' ? 'Redirecting...' : 'Start Free Trial'}
+            </Button>
           </div>
         </div>
       </div>
