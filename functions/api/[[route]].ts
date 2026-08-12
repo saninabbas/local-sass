@@ -432,6 +432,73 @@ export const onRequest = async (context: any) => {
         }
       }
 
+      // --- BACKGROUND CRON AUDITS ---
+      if (url.pathname === '/api/cron/run-audits' && request.method === 'POST') {
+        const authHeader = request.headers.get('Authorization');
+        const expectedSecret = env.CRON_SECRET;
+
+        // Security: Prevent unauthorized execution
+        if (!expectedSecret || authHeader !== `Bearer ${expectedSecret}`) {
+          return errorResponse("Unauthorized cron request", 401);
+        }
+
+        try {
+          const { fetchWithTimeout, Extractor, computeScores } = await import('./auditEngine');
+          
+          // Get all businesses with a website
+          const { results: businesses } = await env.DB.prepare(
+            "SELECT id, website_url, city FROM businesses WHERE website_url IS NOT NULL"
+          ).all();
+
+          const auditResults = [];
+
+          for (const business of businesses) {
+            try {
+              const websiteResponse = await fetchWithTimeout(business.website_url as string, 5000);
+              
+              if (websiteResponse.ok && websiteResponse.headers.get('content-type')?.includes('text/html')) {
+                const extractor = new Extractor();
+                const rewriter = new HTMLRewriter()
+                  .on('title', extractor.handlers.title)
+                  .on('meta', extractor.handlers.meta)
+                  .on('h1', extractor.handlers.h1)
+                  .on('h1, h2, h3, h4, h5, h6', extractor.handlers.heading)
+                  .on('script', extractor.handlers.script)
+                  .on('a', extractor.handlers.a);
+
+                await rewriter.transform(websiteResponse).text();
+
+                // Compute fresh scores
+                const scores = computeScores(extractor, business.website_url as string, (business.city as string) || '');
+                
+                // Save new scores to DB
+                await env.DB.prepare(`
+                  INSERT INTO growth_scores (business_id, overall_score, seo_score, local_visibility_score, website_score, reviews_score)
+                  VALUES (?, ?, ?, ?, ?, ?)
+                `).bind(
+                  business.id, 
+                  scores.overall, 
+                  scores.seo, 
+                  scores.visibility, 
+                  scores.website, 
+                  70 // Default placeholder for reviews
+                ).run();
+
+                auditResults.push({ id: business.id, status: 'success', scores });
+              } else {
+                auditResults.push({ id: business.id, status: 'failed', reason: 'Invalid response' });
+              }
+            } catch (error: any) {
+              auditResults.push({ id: business.id, status: 'failed', reason: error.message });
+            }
+          }
+
+          return jsonResponse({ success: true, processed: businesses.length, results: auditResults });
+        } catch (error: any) {
+          return errorResponse("Cron execution failed: " + error.message, 500);
+        }
+      }
+
       // --- DASHBOARD ---
       if (url.pathname === '/api/dashboard' && request.method === 'GET') {
         const user = await authenticate();
