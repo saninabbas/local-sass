@@ -840,6 +840,20 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true, received: true });
       }
 
+      // --- DEBUG ENV ---
+      if (url.pathname === '/api/debug/env') {
+        const keys = Object.keys(env);
+        return jsonResponse({
+          success: true,
+          data: {
+            keys: keys,
+            hasPolarToken: !!env.POLAR_ACCESS_TOKEN,
+            hasPolarWebhook: !!env.POLAR_WEBHOOK_SECRET,
+            typeOfPolarToken: typeof env.POLAR_ACCESS_TOKEN
+          }
+        });
+      }
+
       return errorResponse("Not found", 404);
 
     } catch (err: any) {
