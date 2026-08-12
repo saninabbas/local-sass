@@ -1,6 +1,8 @@
 export interface Env {
   DB: D1Database;
   NVIDIA_API_KEY: string;
+  POLAR_ACCESS_TOKEN?: string;
+  POLAR_WEBHOOK_SECRET?: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -441,6 +443,83 @@ export const onRequest = async (context: any) => {
         }
 
         return jsonResponse({ success: true, data: { id, status } });
+      }
+
+      // --- BILLING: CHECKOUT ---
+      if (url.pathname === '/api/billing/checkout' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const { productId } = await request.json() as any;
+        if (!productId) return errorResponse("Product ID is required", 400);
+
+        if (!env.POLAR_ACCESS_TOKEN) {
+          // Fallback if no token is provided: redirect to a static Polar checkout link if possible
+          // But since we need dynamic sessions for user metadata, we fail if no token.
+          return errorResponse("Billing is not configured on the server.", 500);
+        }
+
+        try {
+          const polarRes = await fetch('https://api.polar.sh/v1/checkouts/custom', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${env.POLAR_ACCESS_TOKEN}`
+            },
+            body: JSON.stringify({
+              product_id: productId,
+              customer_email: user.email,
+              customer_name: user.name,
+              metadata: {
+                user_id: user.id
+              },
+              success_url: `${url.origin}/dashboard/settings?checkout=success`,
+            })
+          });
+
+          if (!polarRes.ok) {
+            const errorText = await polarRes.text();
+            console.error("Polar API error:", errorText);
+            return errorResponse("Failed to generate checkout session", 500);
+          }
+
+          const checkoutData = await polarRes.json() as any;
+          return jsonResponse({ success: true, url: checkoutData.url });
+        } catch (e: any) {
+          console.error("Polar fetch error:", e);
+          return errorResponse("Failed to communicate with billing provider", 500);
+        }
+      }
+
+      // --- BILLING: POLAR WEBHOOK ---
+      if (url.pathname === '/api/webhooks/polar' && request.method === 'POST') {
+        // In a production environment, you should verify the webhook signature using env.POLAR_WEBHOOK_SECRET
+        const payload = await request.json() as any;
+
+        // Check if the event is a successful order or subscription creation
+        if (payload.type === 'order.created' || payload.type === 'subscription.created') {
+          const { metadata, customer_id } = payload.data;
+          
+          if (metadata && metadata.user_id) {
+            let plan = 'pro';
+            // Simple logic: if the price/product corresponds to growth, set to growth
+            // Growth: 47bdc1ba-789c-4a0c-88de-b7a7b5e43d21
+            if (payload.data.product_id === '47bdc1ba-789c-4a0c-88de-b7a7b5e43d21') {
+              plan = 'growth';
+            }
+
+            try {
+              // Note: Ensure the user database has polar_customer_id and subscription_status columns
+              await env.DB.prepare(
+                "UPDATE users SET polar_customer_id = ?, subscription_status = ? WHERE id = ?"
+              ).bind(customer_id, plan, metadata.user_id).run();
+            } catch (e) {
+              console.error("Failed to update user billing status:", e);
+            }
+          }
+        }
+
+        return jsonResponse({ success: true, received: true });
       }
 
       return errorResponse("Not found", 404);
