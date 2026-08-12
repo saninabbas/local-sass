@@ -40,9 +40,9 @@ export function Sidebar({ isOpen }: SidebarProps) {
       ${isOpen ? 'translate-x-0' : '-translate-x-full'}
     `}>
       <div className="h-16 flex items-center px-6 border-b border-gray-100 shrink-0">
-        <Link to="/dashboard" className="flex items-center gap-2">
-          <img src="/brand/logo.png" alt="Rankora Logo" className="h-8 w-8 object-contain" />
-          <span className="text-lg font-bold text-primary">Rankora</span>
+        <Link to="/dashboard" className="flex items-center gap-1">
+          <img src="/brand/logo.png" alt="Rankora Logo" className="h-10 w-auto object-contain scale-[1.35] -mr-1" />
+          <span className="text-xl font-bold text-primary">Rankora</span>
         </Link>
       </div>
 

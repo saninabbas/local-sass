@@ -28,8 +28,8 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-6 pb-8 pt-16 sm:pt-24 lg:px-8 lg:pt-32">
         <div className="xl:grid xl:grid-cols-3 xl:gap-12">
           <div className="space-y-6">
-            <Link to="/" className="flex items-center gap-2.5 mb-6">
-              <img src="/brand/logo.png" alt="Rankora Logo" className="h-8 w-8 object-contain" />
+            <Link to="/" className="flex items-center gap-1 mb-6">
+              <img src="/brand/logo.png" alt="Rankora Logo" className="h-10 w-auto object-contain scale-[1.35] -mr-1" />
               <span className="text-xl font-bold tracking-tight text-primary">
                 Rankora
               </span>
