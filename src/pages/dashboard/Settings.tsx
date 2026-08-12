@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
 import { createCheckout } from '../../lib/api';
-import { Check, Star, Zap } from 'lucide-react';
+import { Check, Star, Zap, User, Building, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 export function Settings() {
@@ -33,7 +33,52 @@ export function Settings() {
     <DashboardLayout>
       <div className="mb-8 mt-4">
         <h1 className="text-3xl font-bold text-primary mb-2">Account Settings</h1>
-        <p className="text-secondary">Manage your billing, subscription, and account preferences.</p>
+        <p className="text-secondary">Manage your profile, business, billing, and account preferences.</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        {/* Profile Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden lg:col-span-1">
+          <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-primary flex items-center gap-2">
+              <User size={18} className="text-secondary" />
+              Profile
+            </h2>
+          </div>
+          <div className="p-6 space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Name</label>
+              <p className="text-primary font-medium">{user?.name || 'Not set'}</p>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Email</label>
+              <p className="text-primary font-medium">{user?.email}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Business Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden lg:col-span-2">
+          <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-primary flex items-center gap-2">
+              <Building size={18} className="text-secondary" />
+              Business Details
+            </h2>
+          </div>
+          <div className="p-6 space-y-4">
+            <p className="text-sm text-secondary mb-4">Your business data is currently managed during onboarding. Updates coming soon.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Business Name</label>
+                <div className="h-10 bg-gray-50 border border-gray-100 rounded-md px-3 py-2 text-sm text-gray-400">Locked</div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Website URL</label>
+                <div className="h-10 bg-gray-50 border border-gray-100 rounded-md px-3 py-2 text-sm text-gray-400">Locked</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
@@ -149,6 +194,29 @@ export function Settings() {
         
         <div className="bg-gray-50 p-6 text-center text-sm text-secondary border-t border-gray-100">
           Payments are securely processed by <strong>Polar</strong>. You can cancel your subscription at any time.
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-red-100 overflow-hidden mb-8">
+        <div className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-danger flex items-center gap-2">
+              Account Actions
+            </h2>
+            <p className="text-sm text-secondary mt-1">
+              Securely log out of your session.
+            </p>
+          </div>
+          <button 
+            onClick={() => {
+              document.cookie = 'session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+              window.location.href = '/login';
+            }}
+            className="px-4 py-2 bg-red-50 text-danger hover:bg-red-100 transition-colors rounded-lg text-sm font-bold flex items-center gap-2 whitespace-nowrap"
+          >
+            <LogOut size={16} />
+            Log Out
+          </button>
         </div>
       </div>
     </DashboardLayout>

@@ -14,11 +14,11 @@ export function HeroSection() {
             </div>
             
             <h1 className="text-5xl sm:text-6xl lg:text-[68px] font-extrabold tracking-tight text-primary leading-[1.1] mb-8">
-              Grow Your Local Business With AI
+              Know exactly what's holding your local business back.
             </h1>
             
             <p className="text-xl sm:text-2xl text-secondary leading-relaxed mb-12 max-w-lg mx-auto xl:mx-0">
-              See what is holding your business back, get a clear action plan, and improve your online presence with AI.
+              Rankora analyzes your website, local visibility and business presence, then gives you a clear Growth Score and an AI-powered action plan.
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center xl:justify-start gap-5 mb-5">
@@ -27,7 +27,7 @@ export function HeroSection() {
                   Start Free Audit
                 </Button>
               </Link>
-              <Link to="/how-it-works" className="w-full sm:w-auto">
+              <Link to="#how-it-works" className="w-full sm:w-auto">
                 <Button variant="outline" size="lg" className="w-full border-gray-200 text-lg px-8 h-14 bg-white">
                   See How It Works
                 </Button>

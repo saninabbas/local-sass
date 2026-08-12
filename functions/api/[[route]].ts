@@ -173,6 +173,70 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true }, 200, { 'Set-Cookie': cookie });
       }
 
+      // --- AUDIT HISTORY ---
+      if (url.pathname === '/api/audits' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const business = await env.DB.prepare(
+          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
+        ).bind(user.id as string).first();
+
+        if (!business) return errorResponse("No business found", 404);
+
+        const { results: audits } = await env.DB.prepare(`
+          SELECT 
+            a.id, 
+            a.created_at, 
+            a.status,
+            g.overall_score,
+            g.seo_score,
+            g.website_score,
+            g.visibility_score
+          FROM audits a
+          LEFT JOIN growth_scores g ON g.audit_id = a.id
+          WHERE a.business_id = ?
+          ORDER BY a.created_at DESC
+        `).bind(business.id as string).all();
+
+        return jsonResponse({ success: true, data: audits });
+      }
+
+      // --- LATEST AUDIT ---
+      if (url.pathname === '/api/audit/latest' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const business = await env.DB.prepare(
+          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
+        ).bind(user.id as string).first();
+
+        if (!business) return errorResponse("No business found", 404);
+
+        const audit = await env.DB.prepare(
+          "SELECT * FROM audits WHERE business_id = ? AND status = 'completed' ORDER BY created_at DESC LIMIT 1"
+        ).bind(business.id as string).first();
+
+        if (!audit) return jsonResponse({ success: true, data: null });
+
+        const scores = await env.DB.prepare(
+          "SELECT * FROM growth_scores WHERE audit_id = ?"
+        ).bind(audit.id as string).first();
+
+        const { results: recommendations } = await env.DB.prepare(
+          "SELECT * FROM recommendations WHERE audit_id = ? ORDER BY created_at DESC"
+        ).bind(audit.id as string).all();
+
+        return jsonResponse({
+          success: true,
+          data: {
+            audit,
+            scores,
+            recommendations
+          }
+        });
+      }
+
       // --- AUTH: ME ---
       if (url.pathname === '/api/auth/me' && request.method === 'GET') {
         const user = await authenticate();

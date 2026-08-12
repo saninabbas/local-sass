@@ -1,9 +1,4 @@
 import type { DashboardData } from '../types';
-import { mockDashboardData } from '../data/mockDashboard';
-
-function delay(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 // -----------------------------------------------------------------------------
 // BASE API FETCHER
@@ -46,16 +41,7 @@ export const getCurrentUser = () => fetchApi('/api/auth/me');
 export const createBusiness = (data: any) => fetchApi('/api/business', { method: 'POST', body: JSON.stringify(data) });
 
 export async function getDashboard(): Promise<DashboardData> {
-  try {
-    return await fetchApi('/api/dashboard');
-  } catch (error: any) {
-    if (error.message === 'Unauthorized') throw error; // Let AuthContext handle 401s
-    
-    // Fallback to dev data ONLY if the backend is down (not for unauthorized)
-    console.warn("Failed to fetch from API, falling back to mock data.", error);
-    await delay(800);
-    return mockDashboardData;
-  }
+  return fetchApi('/api/dashboard');
 }
 
 export async function runAudit(): Promise<any> {

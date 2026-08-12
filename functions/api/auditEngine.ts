@@ -5,7 +5,7 @@ export async function fetchWithTimeout(url: string, timeoutMs: number = 5000): P
   try {
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { 'User-Agent': 'LocalGrowthAI-Auditor/1.0' }
+      headers: { 'User-Agent': 'Rankora-Auditor/1.0' }
     });
     clearTimeout(id);
     return res;
@@ -84,7 +84,7 @@ export async function askNVIDIA(
   extractor: Extractor, 
   scores: any
 ) {
-  const prompt = `You are a Local Business Growth Analyst. 
+  const prompt = `You are Rankora's Local Business Growth Analyst. 
 Analyze the following local business website and provide specific, actionable growth recommendations.
 Business: ${business.name}
 Type: ${business.type}

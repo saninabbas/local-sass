@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, BarChart2 } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 export function Navbar() {
@@ -23,11 +23,9 @@ export function Navbar() {
           {/* Logo */}
           <div className="flex items-center">
             <Link to="/" className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white">
-                <BarChart2 size={20} />
-              </div>
-              <span className="text-xl font-bold tracking-tight text-primary">
-                Local Growth AI
+              <img src="/brand/logo.png" alt="Rankora Logo" className="h-8 w-8 object-contain" />
+              <span className="text-xl font-bold text-gray-900 tracking-tight">
+                Rankora
               </span>
             </Link>
           </div>

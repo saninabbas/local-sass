@@ -1,6 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
 import { 
-  BarChart2, 
   Home, 
   Target, 
   Zap, 
@@ -42,10 +41,8 @@ export function Sidebar({ isOpen }: SidebarProps) {
     `}>
       <div className="h-16 flex items-center px-6 border-b border-gray-100 shrink-0">
         <Link to="/dashboard" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white">
-            <BarChart2 size={20} />
-          </div>
-          <span className="text-lg font-bold text-primary">Local Growth AI</span>
+          <img src="/brand/logo.png" alt="Rankora Logo" className="h-8 w-8 object-contain" />
+          <span className="text-lg font-bold text-primary">Rankora</span>
         </Link>
       </div>
 

@@ -9,6 +9,8 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ActionPlan } from './pages/dashboard/ActionPlan';
 import { Settings } from './pages/dashboard/Settings';
+import { Reports } from './pages/dashboard/Reports';
+import { Score } from './pages/dashboard/Score';
 
 // Simple placeholder page component for remaining routes
 function PlaceholderPage({ title }: { title: string }) {
@@ -57,11 +59,11 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/dashboard/score" element={<DashboardPlaceholder title="Growth Score" />} />
+            <Route path="/dashboard/score" element={<Score />} />
             <Route path="/dashboard/actions" element={<ActionPlan />} />
             <Route path="/dashboard/website" element={<DashboardPlaceholder title="Website Analysis" />} />
             <Route path="/dashboard/reviews" element={<DashboardPlaceholder title="Reviews Manager" />} />
-            <Route path="/dashboard/reports" element={<DashboardPlaceholder title="Custom Reports" />} />
+            <Route path="/dashboard/reports" element={<Reports />} />
             <Route path="/dashboard/settings" element={<Settings />} />
             <Route path="/dashboard/*" element={<DashboardPlaceholder title="Page Not Found" />} />
           </Route>

@@ -1,3 +1,5 @@
+import { ScoreExplanation } from './ScoreExplanation';
+
 interface GrowthScoreCardProps {
   score: number;
 }
@@ -13,12 +15,10 @@ export function GrowthScoreCard({ score }: GrowthScoreCardProps) {
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-4xl sm:text-5xl font-black text-primary tracking-tighter leading-none">{score}</span>
-          <span className="text-sm font-medium text-secondary mt-1">/ 100</span>
+          <span className="text-xl font-medium text-secondary mb-2">/ 100</span>
         </div>
       </div>
-      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-success text-xs font-bold border border-green-100">
-        Good
-      </div>
+      <ScoreExplanation score={score} type="overall" />
     </div>
   );
 }

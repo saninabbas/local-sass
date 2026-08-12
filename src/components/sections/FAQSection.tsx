@@ -4,8 +4,8 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 export function FAQSection() {
   const faqs = [
     {
-      question: 'What is Local Growth AI?',
-      answer: 'Local Growth AI is an intelligent platform designed specifically for local businesses. It analyzes your online presence and provides a simple, actionable plan to help you attract more customers.'
+      question: 'What is Rankora?',
+      answer: 'Rankora is an intelligent platform designed specifically for local businesses. It analyzes your online presence and provides a simple, actionable plan to help you attract more customers.'
     },
     {
       question: 'Do I need SEO knowledge?',
@@ -16,8 +16,8 @@ export function FAQSection() {
       answer: 'Your Growth Score is a single number from 0 to 100 that represents your overall online health. It\'s calculated by analyzing factors across your website, Google Business Profile, and reviews.'
     },
     {
-      question: 'What businesses can use it?',
-      answer: 'Whether you run a dental clinic, a restaurant, a law firm, or a hair salon, if you serve local customers, Local Growth AI can help you improve your online visibility.'
+      question: 'Will this work for my specific type of business?',
+      answer: 'Whether you run a dental clinic, a restaurant, a law firm, or a hair salon, if you serve local customers, Rankora can help you improve your online visibility.'
     },
     {
       question: 'How often should I check my score?',
