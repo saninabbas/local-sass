@@ -9,7 +9,8 @@ import {
   Settings, 
   HelpCircle, 
   User,
-  Users 
+  Users,
+  Award 
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -25,6 +26,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
     { name: 'AI Action Plan', icon: Zap, href: '/dashboard/actions' },
     { name: 'Website', icon: Globe, href: '/dashboard/website' },
     { name: 'Competitors', icon: Target, href: '/dashboard/competitors' },
+    { name: 'Authority Builder', icon: Award, href: '/dashboard/authority' },
     { name: 'Blog Content', icon: FileText, href: '/dashboard/content' },
     { name: 'Lead Gen Widget', icon: Users, href: '/dashboard/leads' },
     { name: 'Reviews', icon: Star, href: '/dashboard/reviews' },
@@ -34,7 +36,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
 
   const bottomItems = [
     { name: 'Help', icon: HelpCircle, href: '/help' },
-    { name: 'Account', icon: User, href: '/account' },
+    { name: 'Account', icon: User, href: '/dashboard/account' },
   ];
 
   return (

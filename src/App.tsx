@@ -29,6 +29,7 @@ const Competitors = lazy(() => import('./pages/dashboard/Competitors').then(m =>
 const Content = lazy(() => import('./pages/dashboard/Content').then(m => ({ default: m.Content })));
 const Leads = lazy(() => import('./pages/dashboard/Leads').then(m => ({ default: m.Leads })));
 const Account = lazy(() => import('./pages/dashboard/Account').then(m => ({ default: m.Account })));
+const AuthorityBuilder = lazy(() => import('./pages/dashboard/AuthorityBuilder').then(m => ({ default: m.AuthorityBuilder })));
 
 function DashboardPlaceholder({ title }: { title: string }) {
   return (
@@ -90,6 +91,7 @@ function App() {
             <Route path="/dashboard/reports" element={<DashboardSuspense><Reports /></DashboardSuspense>} />
             <Route path="/dashboard/settings" element={<DashboardSuspense><Settings /></DashboardSuspense>} />
             <Route path="/dashboard/account" element={<DashboardSuspense><Account /></DashboardSuspense>} />
+            <Route path="/dashboard/authority" element={<DashboardSuspense><AuthorityBuilder /></DashboardSuspense>} />
             
             <Route path="/dashboard/*" element={<DashboardPlaceholder title="Page Not Found" />} />
           </Route>

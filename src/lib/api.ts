@@ -19,12 +19,19 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     throw new Error('Unauthorized');
   }
   
-  const json = await response.json();
-  if (!response.ok || !json.success) {
-    throw new Error(json.error || 'An API error occurred');
+  let json;
+  try {
+    const text = await response.text();
+    json = text ? JSON.parse(text) : {};
+  } catch (e) {
+    throw new Error(`Server error (${response.status}): The server returned an invalid response.`);
+  }
+
+  if (!response.ok || (json && typeof json === 'object' && 'success' in json && !json.success)) {
+    throw new Error(json?.error || `An API error occurred (${response.status})`);
   }
   
-  return json.data;
+  return json?.data;
 }
 
 // -----------------------------------------------------------------------------
@@ -77,4 +84,25 @@ export async function generateBlogArticle(topic?: string): Promise<any> {
 
 export async function fetchLeads(): Promise<any> {
   return fetchApi('/api/leads');
+}
+
+export async function fetchIntegrationStatus(): Promise<any> {
+  return fetchApi('/api/integrations/status');
+}
+
+export async function connectGoogleSearchConsole(): Promise<void> {
+  // Redirect to OAuth
+  window.location.href = (import.meta.env.VITE_API_BASE_URL || '') + '/api/integrations/google/auth';
+}
+
+export async function fetchAuthorityOpportunities(): Promise<any> {
+  return fetchApi('/api/authority/opportunities');
+}
+
+export async function fetchBacklinks(): Promise<any> {
+  return fetchApi('/api/authority/backlinks');
+}
+
+export async function addBacklink(data: any): Promise<any> {
+  return fetchApi('/api/authority/backlinks', { method: 'POST', body: JSON.stringify(data) });
 }

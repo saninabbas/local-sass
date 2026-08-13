@@ -1099,6 +1099,135 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true, data: results });
       }
 
+      // --- INTEGRATIONS (Google Search Console) ---
+      if (url.pathname === '/api/integrations/google/auth' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const clientId = env.GOOGLE_CLIENT_ID;
+        if (!clientId) return errorResponse("Google OAuth not configured", 500);
+
+        const redirectUri = `${url.origin}/api/integrations/google/callback`;
+        const scope = 'https://www.googleapis.com/auth/webmasters.readonly';
+        // Pass userId in state to associate the callback with the user
+        const state = encodeURIComponent(JSON.stringify({ userId: user.id }));
+        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent&state=${state}`;
+
+        return Response.redirect(authUrl, 302);
+      }
+
+      if (url.pathname === '/api/integrations/google/callback' && request.method === 'GET') {
+        const code = url.searchParams.get('code');
+        const stateStr = url.searchParams.get('state');
+        if (!code || !stateStr) return errorResponse("Missing parameters", 400);
+
+        try {
+          const state = JSON.parse(decodeURIComponent(stateStr));
+          const userId = state.userId;
+          if (!userId) throw new Error("Invalid state");
+
+          const redirectUri = `${url.origin}/api/integrations/google/callback`;
+          
+          const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              code,
+              client_id: env.GOOGLE_CLIENT_ID,
+              client_secret: env.GOOGLE_CLIENT_SECRET,
+              redirect_uri: redirectUri,
+              grant_type: 'authorization_code'
+            }).toString()
+          });
+
+          if (!tokenRes.ok) {
+            const err = await tokenRes.text();
+            console.error("Token exchange failed:", err);
+            return errorResponse("Failed to authenticate with Google", 500);
+          }
+
+          const tokens = await tokenRes.json() as any;
+          
+          // Upsert integration
+          const id = crypto.randomUUID();
+          await env.DB.prepare(`
+            INSERT INTO integrations (id, user_id, provider, access_token, refresh_token, status)
+            VALUES (?, ?, 'google_search_console', ?, ?, 'active')
+            ON CONFLICT(user_id, provider) DO UPDATE SET
+            access_token = excluded.access_token,
+            refresh_token = COALESCE(excluded.refresh_token, integrations.refresh_token),
+            status = 'active',
+            updated_at = CURRENT_TIMESTAMP
+          `).bind(id, userId, tokens.access_token, tokens.refresh_token || null).run();
+
+          return Response.redirect(`${url.origin}/dashboard/settings?integration=success`, 302);
+        } catch (e: any) {
+          console.error("Callback error", e);
+          return Response.redirect(`${url.origin}/dashboard/settings?integration=error`, 302);
+        }
+      }
+
+      if (url.pathname === '/api/integrations/status' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const integrations = await env.DB.prepare("SELECT provider, status, property_id FROM integrations WHERE user_id = ?").bind(user.id).all();
+        return jsonResponse({ success: true, data: integrations.results });
+      }
+
+      // --- AUTHORITY BUILDER ---
+      if (url.pathname === '/api/authority/opportunities' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        // Normally we'd use an external API like DataForSEO or similar, here we mock high-quality legitimate opps
+        let opps = await env.DB.prepare("SELECT * FROM authority_opportunities WHERE user_id = ? ORDER BY created_at DESC").bind(user.id).all();
+        
+        if (!opps.results || opps.results.length === 0) {
+          // Seed some legitimate local opportunities based on business data
+          const business = await env.DB.prepare("SELECT * FROM businesses WHERE user_id = ?").bind(user.id).first();
+          const city = business?.city || 'your city';
+          const type = business?.type || 'local business';
+
+          const seeds = [
+            { id: crypto.randomUUID(), type: 'directory', name: `${city} Chamber of Commerce`, url: `https://chamberofcommerce.com/${city}`, difficulty: 'Medium', value: 'High', why_relevant: `Local businesses in ${city} gain significant trust signals from the Chamber.` },
+            { id: crypto.randomUUID(), type: 'sponsorship', name: 'Local Little League', url: '', difficulty: 'Easy', value: 'Medium', why_relevant: 'Sponsoring local community teams often results in high-authority local community links.' },
+            { id: crypto.randomUUID(), type: 'guest_post', name: `${type} Industry Blog`, url: '', difficulty: 'Hard', value: 'High', why_relevant: 'Demonstrating expertise in your field builds topical authority.' }
+          ];
+
+          for (const s of seeds) {
+            await env.DB.prepare(
+              "INSERT INTO authority_opportunities (id, user_id, name, url, type, difficulty, value, why_relevant) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            ).bind(s.id, user.id, s.name, s.url, s.type, s.difficulty, s.value, s.why_relevant).run();
+          }
+          opps = await env.DB.prepare("SELECT * FROM authority_opportunities WHERE user_id = ? ORDER BY created_at DESC").bind(user.id).all();
+        }
+
+        return jsonResponse({ success: true, data: opps.results });
+      }
+
+      if (url.pathname === '/api/authority/backlinks' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const links = await env.DB.prepare("SELECT * FROM backlinks WHERE user_id = ? ORDER BY discovered_at DESC").bind(user.id).all();
+        return jsonResponse({ success: true, data: links.results });
+      }
+
+      if (url.pathname === '/api/authority/backlinks' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const { source_url, target_url, anchor_text, status, notes } = await request.json() as any;
+        const id = crypto.randomUUID();
+        
+        await env.DB.prepare(
+          "INSERT INTO backlinks (id, user_id, source_url, target_url, anchor_text, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        ).bind(id, user.id, source_url, target_url, anchor_text, status || 'Active', notes || '').run();
+
+        return jsonResponse({ success: true, data: { id } });
+      }
+
       // --- DEBUG ENV ---
       if (url.pathname === '/api/debug/env') {
         const keys = Object.keys(env);
