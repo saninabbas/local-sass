@@ -22,6 +22,7 @@ import { Reviews } from './pages/dashboard/Reviews';
 import { Competitors } from './pages/dashboard/Competitors';
 import { Content } from './pages/dashboard/Content';
 import { Leads } from './pages/dashboard/Leads';
+import { PublicReport } from './pages/report/PublicReport';
 
 import { DashboardLayout } from './components/dashboard/DashboardLayout';
 
@@ -53,6 +54,7 @@ function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/verify" element={<VerifyEmail />} />
           <Route path="/api/auth/verify" element={<VerifyEmail />} />
+          <Route path="/report/:id" element={<PublicReport />} />
           
           <Route element={<ProtectedRoute />}>
             <Route path="/onboarding" element={<Onboarding />} />

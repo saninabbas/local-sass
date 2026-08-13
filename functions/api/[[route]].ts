@@ -397,6 +397,40 @@ export const onRequest = async (context: any) => {
         });
       }
 
+      // --- PUBLIC AUDIT ---
+      if (url.pathname.startsWith('/api/public/audit/') && request.method === 'GET') {
+        const auditId = url.pathname.split('/').pop();
+        if (!auditId) return errorResponse("Audit ID required", 400);
+
+        const audit = await env.DB.prepare(
+          "SELECT * FROM audits WHERE id = ? AND status = 'completed'"
+        ).bind(auditId).first();
+
+        if (!audit) return errorResponse("Audit not found", 404);
+
+        const business = await env.DB.prepare(
+          "SELECT name, website_url, city, country, type FROM businesses WHERE id = ?"
+        ).bind(audit.business_id as string).first();
+
+        const scores = await env.DB.prepare(
+          "SELECT * FROM growth_scores WHERE audit_id = ?"
+        ).bind(auditId).first();
+
+        const { results: recommendations } = await env.DB.prepare(
+          "SELECT * FROM recommendations WHERE audit_id = ? ORDER BY created_at DESC"
+        ).bind(auditId).all();
+
+        return jsonResponse({
+          success: true,
+          data: {
+            audit,
+            business,
+            scores,
+            recommendations
+          }
+        });
+      }
+
       // --- AUTH: ME ---
       if (url.pathname === '/api/auth/me' && request.method === 'GET') {
         const user = await authenticate();
