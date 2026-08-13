@@ -109,14 +109,20 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true, worker: "ok", database: "ok" });
       }
 
-      // --- SETUP DB (Temporary endpoint to fix schema) ---
+      // --- SETUP DB (Auto-migration endpoint) ---
       if (url.pathname === '/api/setup-db') {
         try {
           await env.DB.prepare("ALTER TABLE users ADD COLUMN password_hash TEXT").run().catch(() => {});
           await env.DB.prepare("ALTER TABLE users ADD COLUMN polar_customer_id TEXT").run().catch(() => {});
           await env.DB.prepare("ALTER TABLE users ADD COLUMN subscription_status TEXT DEFAULT 'free'").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE users ADD COLUMN verification_token TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE users ADD COLUMN totp_secret TEXT").run().catch(() => {});
+          
           await env.DB.prepare("CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at DATETIME NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))").run().catch(() => {});
-          return jsonResponse({ success: true, message: "Database tables updated successfully!" });
+          await env.DB.prepare("CREATE TABLE IF NOT EXISTS leads (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, name TEXT, email TEXT NOT NULL, website TEXT, captured_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))").run().catch(() => {});
+          
+          return jsonResponse({ success: true, message: "Database schema updated successfully!" });
         } catch (e: any) {
           return jsonResponse({ success: false, error: e.message });
         }
