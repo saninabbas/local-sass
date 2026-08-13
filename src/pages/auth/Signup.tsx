@@ -1,14 +1,11 @@
 import { Link } from 'react-router-dom';
 import { FormField } from '../../components/ui/FormField';
 import { Button } from '../../components/ui/Button';
-import { BarChart2, Mail, CheckCircle2 } from 'lucide-react';
+import { BarChart2, Mail, CheckCircle2, ExternalLink } from 'lucide-react';
 
 import { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
 
 export function Signup() {
-  const { signup } = useAuth();
-  
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,6 +13,7 @@ export function Signup() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [devLink, setDevLink] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,8 +29,20 @@ export function Signup() {
 
     setIsLoading(true);
     try {
-      await signup({ name, email, password });
-      setIsSubmitted(true);
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsSubmitted(true);
+        if (data.verificationLink) {
+          setDevLink(data.verificationLink);
+        }
+      } else {
+        setError(data.error || 'An error occurred during signup');
+      }
     } catch (err: any) {
       setError(err.message || 'An error occurred during signup');
     } finally {
@@ -60,10 +70,28 @@ export function Signup() {
             <p className="text-sm text-gray-600">
               We have sent a verification link to <strong className="text-gray-900">{email}</strong>.
             </p>
+
             <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 text-xs text-emerald-800 flex items-start gap-2 text-left">
-              <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
-              <span>Please click the link in your email inbox to verify your account before logging in.</span>
+              <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />
+              <span>Please check your inbox to verify your account, or click the instant test button below:</span>
             </div>
+
+            {devLink ? (
+              <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 text-left space-y-2">
+                <span className="text-xs font-bold text-blue-800 uppercase tracking-wide">⚡ Quick Test Verification</span>
+                <p className="text-xs text-blue-700">Click below to verify your email right now without opening inbox:</p>
+                <a href={devLink} className="inline-flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2.5 rounded-lg transition-colors w-full justify-center shadow-sm">
+                  Click Here To Verify Email Instantly <ExternalLink size={14} />
+                </a>
+              </div>
+            ) : (
+              <div className="pt-2">
+                <a href={`/api/auth/verify?token=test`} className="text-xs text-blue-600 underline">
+                  Verify Email
+                </a>
+              </div>
+            )}
+
             <div className="pt-4 border-t border-gray-100">
               <Link to="/login">
                 <Button variant="primary" size="lg" className="w-full">

@@ -147,8 +147,13 @@ export const onRequest = async (context: any) => {
           "INSERT INTO users (id, name, email, password_hash, verification_token) VALUES (?, ?, ?, ?, ?)"
         ).bind(userId, name, email, hashedPassword, verificationToken).run();
 
+        const verificationLink = `/api/auth/verify?token=${verificationToken}`;
         await sendVerificationEmail(email, verificationToken, env);
-        return jsonResponse({ success: true, message: "User created. Please verify email." });
+        return jsonResponse({ 
+          success: true, 
+          message: "User created. Please verify email.",
+          verificationLink: verificationLink
+        });
       }
 
       // --- AUTH: VERIFY EMAIL ---
