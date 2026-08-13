@@ -1,8 +1,13 @@
+import { sendVerificationEmail } from '../../src/lib/email';
+import { verifyTOTP } from '../../src/lib/totp';
+
 export interface Env {
   DB: D1Database;
   NVIDIA_API_KEY: string;
   POLAR_ACCESS_TOKEN?: string;
   POLAR_WEBHOOK_SECRET?: string;
+  SENDGRID_API_KEY?: string;
+  BASE_URL?: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -130,18 +135,29 @@ export const onRequest = async (context: any) => {
 
         const hashedPassword = await hashPassword(password);
         const userId = generateId('usr');
+        const verificationToken = crypto.randomUUID();
 
         await env.DB.prepare(
-          "INSERT INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)"
-        ).bind(userId, name, email, hashedPassword).run();
+          "INSERT INTO users (id, name, email, password_hash, verification_token) VALUES (?, ?, ?, ?, ?)"
+        ).bind(userId, name, email, hashedPassword, verificationToken).run();
 
-        const sessionId = generateId('sess');
-        await env.DB.prepare(
-          "INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, datetime('now', '+7 days'))"
-        ).bind(sessionId, userId).run();
+        await sendVerificationEmail(email, verificationToken, env);
+        return jsonResponse({ success: true, message: "User created. Please verify email." });
+      }
 
-        const cookie = `session_id=${sessionId}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
-        return jsonResponse({ success: true, data: { id: userId, name, email } }, 200, { 'Set-Cookie': cookie });
+      // --- AUTH: VERIFY EMAIL ---
+      if (url.pathname === '/api/auth/verify') {
+        let token = url.searchParams.get('token');
+        if (!token && request.method === 'POST') {
+          const body = await request.json().catch(() => ({})) as any;
+          token = body.token;
+        }
+        if (!token) return errorResponse("Verification token missing", 400);
+
+        const user = await env.DB.prepare("SELECT id FROM users WHERE verification_token = ?").bind(token).first();
+        if (!user) return errorResponse("Invalid or expired token", 400);
+        await env.DB.prepare("UPDATE users SET email_verified = 1, verification_token = NULL WHERE id = ?").bind(user.id).run();
+        return jsonResponse({ success: true, message: "Email verified successfully!" });
       }
 
       // --- AUTH: LOGIN ---
@@ -150,9 +166,20 @@ export const onRequest = async (context: any) => {
 
         const user = await env.DB.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
         if (!user) return errorResponse("Invalid credentials", 401);
+        if (!user.email_verified) return errorResponse("Please verify your email first", 403);
 
         const isValid = await verifyPassword(password, user.password_hash as string);
         if (!isValid) return errorResponse("Invalid credentials", 401);
+
+        if (user.totp_secret) {
+          const tmpSess = generateId('sess_tmp');
+          await env.DB.prepare(
+            "INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, datetime('now', '+5 minutes'))"
+          ).bind(tmpSess, user.id).run();
+
+          const cookie = `session_id=${tmpSess}; HttpOnly; Path=/; SameSite=Strict; Max-Age=${5 * 60}`;
+          return jsonResponse({ success: true, require2FA: true, tempToken: tmpSess }, 200, { 'Set-Cookie': cookie });
+        }
 
         const sessionId = generateId('sess');
         await env.DB.prepare(
@@ -160,6 +187,31 @@ export const onRequest = async (context: any) => {
         ).bind(sessionId, user.id).run();
 
         const cookie = `session_id=${sessionId}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
+        return jsonResponse({ success: true, data: { id: user.id, name: user.name, email: user.email } }, 200, { 'Set-Cookie': cookie });
+      }
+
+      // --- AUTH: 2FA VERIFY ---
+      if (url.pathname === '/api/auth/2fa' && request.method === 'POST') {
+        const { token, code } = await request.json() as any;
+        const tmp = await env.DB.prepare(
+          "SELECT user_id FROM sessions WHERE id = ? AND expires_at > CURRENT_TIMESTAMP"
+        ).bind(token).first();
+        if (!tmp) return errorResponse("Session expired or invalid", 401);
+
+        const user = await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(tmp.user_id).first();
+        if (!user?.totp_secret) return errorResponse("2FA not set up", 400);
+
+        if (!verifyTOTP(code, user.totp_secret as string)) {
+          return errorResponse("Invalid 2FA code", 401);
+        }
+
+        await env.DB.prepare("DELETE FROM sessions WHERE id = ?").bind(token).run();
+        const newSess = generateId('sess');
+        await env.DB.prepare(
+          "INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, datetime('now', '+7 days'))"
+        ).bind(newSess, user.id).run();
+
+        const cookie = `session_id=${newSess}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
         return jsonResponse({ success: true, data: { id: user.id, name: user.name, email: user.email } }, 200, { 'Set-Cookie': cookie });
       }
 
