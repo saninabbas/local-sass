@@ -117,7 +117,7 @@ Provide a JSON response strictly in this format:
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: "meta/llama-3.1-8b-instruct",
+      model: "meta/llama-3.1-70b-instruct",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.2,
       max_tokens: 1024,
@@ -171,7 +171,7 @@ Provide a JSON response strictly in this format:
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: "meta/llama-3.1-8b-instruct",
+      model: "meta/llama-3.1-70b-instruct",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.2,
       max_tokens: 1024,
@@ -218,7 +218,7 @@ Provide a JSON response strictly in this format:
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: "meta/llama-3.1-8b-instruct",
+      model: "meta/llama-3.1-70b-instruct",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.7,
       max_tokens: 2000,

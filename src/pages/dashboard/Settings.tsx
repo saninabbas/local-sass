@@ -1,16 +1,105 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
-import { createCheckout } from '../../lib/api';
-import { Check, Star, Zap, User, Building, LogOut } from 'lucide-react';
+import { createCheckout, getBusiness, updateBusiness, updateProfile } from '../../lib/api';
+import { Check, Star, Zap, User, Building, LogOut, Save, Loader2, CheckCircle2, Globe, MapPin, Briefcase } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 export function Settings() {
   const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
-  // Fallback to 'free' if the user context doesn't have a subscription status yet
-  // In a real app, you would fetch this from the /api/auth/me endpoint or a /api/billing/status endpoint
-  const currentPlan = (user as any)?.subscription_status || 'free'; 
+  // Profile Form State
+  const [profileName, setProfileName] = useState(user?.name || '');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Business Form State
+  const [businessLoading, setBusinessLoading] = useState(true);
+  const [businessData, setBusinessData] = useState({
+    name: '',
+    type: '',
+    city: '',
+    country: '',
+    websiteUrl: ''
+  });
+  const [isSavingBusiness, setIsSavingBusiness] = useState(false);
+  const [businessMessage, setBusinessMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const currentPlan = (user as any)?.subscription_status || 'free';
+
+  // Load business details on mount
+  useEffect(() => {
+    if (user?.name) {
+      setProfileName(user.name);
+    }
+    
+    const loadBusiness = async () => {
+      try {
+        const data = await getBusiness();
+        if (data) {
+          setBusinessData({
+            name: data.name || '',
+            type: data.type || '',
+            city: data.city || '',
+            country: data.country || '',
+            websiteUrl: data.website_url || ''
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load business details:', err);
+      } finally {
+        setBusinessLoading(false);
+      }
+    };
+
+    loadBusiness();
+  }, [user]);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileName.trim()) {
+      setProfileMessage({ type: 'error', text: 'Name cannot be empty.' });
+      return;
+    }
+
+    setIsSavingProfile(true);
+    setProfileMessage(null);
+    try {
+      await updateProfile({ name: profileName });
+      setProfileMessage({ type: 'success', text: 'Profile name updated!' });
+      setTimeout(() => setProfileMessage(null), 4000);
+    } catch (err: any) {
+      setProfileMessage({ type: 'error', text: err.message || 'Failed to update profile.' });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleSaveBusiness = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!businessData.name.trim()) {
+      setBusinessMessage({ type: 'error', text: 'Business name is required.' });
+      return;
+    }
+
+    setIsSavingBusiness(true);
+    setBusinessMessage(null);
+    try {
+      await updateBusiness({
+        name: businessData.name,
+        type: businessData.type,
+        city: businessData.city,
+        country: businessData.country,
+        websiteUrl: businessData.websiteUrl
+      });
+      setBusinessMessage({ type: 'success', text: 'Business details saved successfully!' });
+      setTimeout(() => setBusinessMessage(null), 4000);
+    } catch (err: any) {
+      setBusinessMessage({ type: 'error', text: err.message || 'Failed to save business details.' });
+    } finally {
+      setIsSavingBusiness(false);
+    }
+  };
 
   const handleCheckout = async (productId: string, planName: string) => {
     setIsProcessing(planName);
@@ -33,54 +122,180 @@ export function Settings() {
     <DashboardLayout>
       <div className="mb-8 mt-4">
         <h1 className="text-3xl font-bold text-primary mb-2">Account Settings</h1>
-        <p className="text-secondary">Manage your profile, business, billing, and account preferences.</p>
+        <p className="text-secondary">Manage your profile, business details, billing, and security preferences.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
         {/* Profile Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden lg:col-span-1">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden lg:col-span-1 flex flex-col">
           <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
             <h2 className="text-lg font-bold text-primary flex items-center gap-2">
-              <User size={18} className="text-secondary" />
-              Profile
+              <User size={18} className="text-primary-accent" />
+              Personal Profile
             </h2>
           </div>
-          <div className="p-6 space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Name</label>
-              <p className="text-primary font-medium">{user?.name || 'Not set'}</p>
+          
+          <form onSubmit={handleSaveProfile} className="p-6 flex-1 flex flex-col justify-between space-y-4">
+            <div className="space-y-4">
+              {profileMessage && (
+                <div className={`p-3 rounded-lg text-xs font-semibold flex items-center gap-2 ${
+                  profileMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                }`}>
+                  {profileMessage.type === 'success' ? <CheckCircle2 size={14} /> : null}
+                  {profileMessage.text}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Full Name</label>
+                <input
+                  type="text"
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-accent text-primary font-medium"
+                  placeholder="Your Full Name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Email Address</label>
+                <input
+                  type="email"
+                  disabled
+                  value={user?.email || ''}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-400 font-medium cursor-not-allowed"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">Email cannot be changed directly.</p>
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Email</label>
-              <p className="text-primary font-medium">{user?.email}</p>
-            </div>
-          </div>
+
+            <button
+              type="submit"
+              disabled={isSavingProfile}
+              className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 px-4 bg-primary-accent text-white rounded-lg text-sm font-bold hover:bg-blue-600 transition-colors shadow-sm disabled:opacity-50"
+            >
+              {isSavingProfile ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              Save Profile
+            </button>
+          </form>
         </div>
 
-        {/* Business Section */}
+        {/* Business Details Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden lg:col-span-2">
           <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
             <h2 className="text-lg font-bold text-primary flex items-center gap-2">
-              <Building size={18} className="text-secondary" />
-              Business Details
+              <Building size={18} className="text-primary-accent" />
+              Business Profile & Local SEO Data
             </h2>
+            <span className="text-xs text-secondary font-medium hidden sm:inline">Used for AI SEO Audits & Content</span>
           </div>
-          <div className="p-6 space-y-4">
-            <p className="text-sm text-secondary mb-4">Your business data is currently managed during onboarding. Updates coming soon.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Business Name</label>
-                <div className="h-10 bg-gray-50 border border-gray-100 rounded-md px-3 py-2 text-sm text-gray-400">Locked</div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Website URL</label>
-                <div className="h-10 bg-gray-50 border border-gray-100 rounded-md px-3 py-2 text-sm text-gray-400">Locked</div>
-              </div>
+
+          {businessLoading ? (
+            <div className="p-12 flex flex-col items-center justify-center text-secondary">
+              <Loader2 size={24} className="animate-spin mb-2 text-primary-accent" />
+              <p className="text-sm">Loading business details...</p>
             </div>
-          </div>
+          ) : (
+            <form onSubmit={handleSaveBusiness} className="p-6 space-y-4">
+              {businessMessage && (
+                <div className={`p-3 rounded-lg text-xs font-semibold flex items-center gap-2 ${
+                  businessMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                }`}>
+                  {businessMessage.type === 'success' ? <CheckCircle2 size={14} /> : null}
+                  {businessMessage.text}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <Briefcase size={13} className="text-gray-400" />
+                    Business Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={businessData.name}
+                    onChange={(e) => setBusinessData({ ...businessData, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-accent text-primary font-medium"
+                    placeholder="e.g. Apex Dental Clinic"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <Building size={13} className="text-gray-400" />
+                    Industry / Business Type
+                  </label>
+                  <input
+                    type="text"
+                    value={businessData.type}
+                    onChange={(e) => setBusinessData({ ...businessData, type: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-accent text-primary font-medium"
+                    placeholder="e.g. Dental Care, Restaurant, Roofing"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <MapPin size={13} className="text-gray-400" />
+                    City
+                  </label>
+                  <input
+                    type="text"
+                    value={businessData.city}
+                    onChange={(e) => setBusinessData({ ...businessData, city: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-accent text-primary font-medium"
+                    placeholder="e.g. Chicago"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <MapPin size={13} className="text-gray-400" />
+                    Country
+                  </label>
+                  <input
+                    type="text"
+                    value={businessData.country}
+                    onChange={(e) => setBusinessData({ ...businessData, country: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-accent text-primary font-medium"
+                    placeholder="e.g. United States"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <Globe size={13} className="text-gray-400" />
+                    Website URL
+                  </label>
+                  <input
+                    type="url"
+                    value={businessData.websiteUrl}
+                    onChange={(e) => setBusinessData({ ...businessData, websiteUrl: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-accent text-primary font-medium"
+                    placeholder="https://example.com"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">This URL is used by the AI engine to run live website audits.</p>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  disabled={isSavingBusiness}
+                  className="flex items-center gap-2 py-2.5 px-6 bg-primary text-white rounded-lg text-sm font-bold hover:bg-gray-800 transition-colors shadow-sm disabled:opacity-50"
+                >
+                  {isSavingBusiness ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                  Save Business Details
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
 
+      {/* Subscription Plan Section */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
         <div className="p-6 border-b border-gray-100 bg-gray-50/50">
           <h2 className="text-xl font-bold text-primary">Subscription Plan</h2>
@@ -197,6 +412,7 @@ export function Settings() {
         </div>
       </div>
 
+      {/* Account Actions / Logout */}
       <div className="bg-white rounded-xl shadow-sm border border-red-100 overflow-hidden mb-8">
         <div className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
@@ -209,7 +425,7 @@ export function Settings() {
           </div>
           <button 
             onClick={() => {
-              document.cookie = 'session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+              document.cookie = 'session_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
               window.location.href = '/login';
             }}
             className="px-4 py-2 bg-red-50 text-danger hover:bg-red-100 transition-colors rounded-lg text-sm font-bold flex items-center gap-2 whitespace-nowrap"

@@ -34,11 +34,14 @@ export const signup = (data: any) => fetchApi('/api/auth/signup', { method: 'POS
 export const login = (data: any) => fetchApi('/api/auth/login', { method: 'POST', body: JSON.stringify(data) });
 export const logout = () => fetchApi('/api/auth/logout', { method: 'POST' });
 export const getCurrentUser = () => fetchApi('/api/auth/me');
+export const updateProfile = (data: { name: string }) => fetchApi('/api/auth/profile', { method: 'PUT', body: JSON.stringify(data) });
 
 // -----------------------------------------------------------------------------
 // BUSINESS & DASHBOARD
 // -----------------------------------------------------------------------------
+export const getBusiness = () => fetchApi('/api/business', { method: 'GET' });
 export const createBusiness = (data: any) => fetchApi('/api/business', { method: 'POST', body: JSON.stringify(data) });
+export const updateBusiness = (data: any) => fetchApi('/api/business', { method: 'PUT', body: JSON.stringify(data) });
 
 export async function getDashboard(): Promise<DashboardData> {
   return fetchApi('/api/dashboard');

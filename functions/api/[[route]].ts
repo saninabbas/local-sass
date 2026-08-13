@@ -404,6 +404,30 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true, data: user });
       }
 
+      // --- AUTH: UPDATE PROFILE ---
+      if (url.pathname === '/api/auth/profile' && request.method === 'PUT') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const { name } = await request.json() as any;
+        if (!name || !name.trim()) return errorResponse("Name is required", 400);
+
+        await env.DB.prepare("UPDATE users SET name = ? WHERE id = ?").bind(name.trim(), user.id).run();
+        return jsonResponse({ success: true, message: "Profile updated successfully" });
+      }
+
+      // --- BUSINESS: GET CURRENT ---
+      if (url.pathname === '/api/business' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const business = await env.DB.prepare(
+          "SELECT id, name, type, city, country, website_url FROM businesses WHERE user_id = ? LIMIT 1"
+        ).bind(user.id as string).first();
+
+        return jsonResponse({ success: true, data: business || null });
+      }
+
       // --- BUSINESS: CREATE ---
       if (url.pathname === '/api/business' && request.method === 'POST') {
         const user = await authenticate();
@@ -417,6 +441,32 @@ export const onRequest = async (context: any) => {
         ).bind(bizId, user.id, name, type, city, country, websiteUrl).run();
 
         return jsonResponse({ success: true, data: { id: bizId } });
+      }
+
+      // --- BUSINESS: UPDATE ---
+      if (url.pathname === '/api/business' && request.method === 'PUT') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const { name, type, city, country, websiteUrl } = await request.json() as any;
+        if (!name || !name.trim()) return errorResponse("Business name is required", 400);
+
+        const existing = await env.DB.prepare(
+          "SELECT id FROM businesses WHERE user_id = ? LIMIT 1"
+        ).bind(user.id as string).first();
+
+        if (existing) {
+          await env.DB.prepare(
+            "UPDATE businesses SET name = ?, type = ?, city = ?, country = ?, website_url = ? WHERE user_id = ?"
+          ).bind(name.trim(), type || '', city || '', country || '', websiteUrl || '', user.id).run();
+        } else {
+          const bizId = generateId('biz');
+          await env.DB.prepare(
+            "INSERT INTO businesses (id, user_id, name, type, city, country, website_url) VALUES (?, ?, ?, ?, ?, ?, ?)"
+          ).bind(bizId, user.id, name.trim(), type || '', city || '', country || '', websiteUrl || '').run();
+        }
+
+        return jsonResponse({ success: true, message: "Business details updated successfully" });
       }
 
       // --- AUDIT ---
