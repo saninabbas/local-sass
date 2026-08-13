@@ -92,6 +92,103 @@ export const onRequest = async (context: any) => {
       return user;
     };
 
+    const executeAudit = async (business: any) => {
+      if (!business.website_url) throw new Error("Business has no website URL");
+
+      const auditId = generateId('aud');
+      
+      // Start audit
+      await env.DB.prepare(
+        "INSERT INTO audits (id, business_id, status) VALUES (?, ?, 'running')"
+      ).bind(auditId, business.id).run();
+
+      try {
+        const { fetchWithTimeout, Extractor, computeScores, askNVIDIA, getFallbackRecommendations } = await import('./auditEngine');
+        
+        const websiteUrl = business.website_url;
+        let websiteResponse: Response;
+        try {
+          websiteResponse = await fetchWithTimeout(websiteUrl, 10000);
+        } catch {
+          throw new Error("Website fetch failed or timed out.");
+        }
+
+        if (!websiteResponse.ok || !websiteResponse.headers.get('content-type')?.includes('text/html')) {
+          throw new Error("Invalid or non-HTML website response.");
+        }
+
+        const extractor = new Extractor();
+        const rewriter = new HTMLRewriter()
+          .on('title', extractor.handlers.title)
+          .on('meta', extractor.handlers.meta)
+          .on('h1', extractor.handlers.h1)
+          .on('h1, h2, h3, h4, h5, h6', extractor.handlers.heading)
+          .on('script', extractor.handlers.script)
+          .on('a', extractor.handlers.a);
+
+        await rewriter.transform(websiteResponse).text(); // consumes the stream
+
+        const scores = computeScores(extractor, websiteUrl, business.city);
+
+        let aiResult;
+        try {
+          if (!env.NVIDIA_API_KEY) throw new Error("Missing NVIDIA_API_KEY");
+          aiResult = await askNVIDIA(env.NVIDIA_API_KEY, business, extractor, scores);
+        } catch (aiErr: any) {
+          console.error("AI Error:", aiErr);
+          aiResult = getFallbackRecommendations();
+        }
+
+        // Save Results
+        const scoreId = generateId('score');
+        await env.DB.prepare(
+          `INSERT INTO growth_scores 
+           (id, audit_id, business_id, overall_score, seo_score, reviews_score, website_score, visibility_score, previous_score, score_change) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          scoreId, auditId, business.id, scores.overall, scores.seo, -1, scores.website, scores.visibility, null, 0
+        ).run();
+
+        // Save Recommendations
+        const insertRec = env.DB.prepare(
+          "INSERT INTO recommendations (id, audit_id, business_id, priority, priority_color, title, description, impact, estimated_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        );
+        
+        const batch = aiResult.recommendations.map((rec: any) => {
+          const colorMap: Record<string, string> = { high: 'red', medium: 'yellow', low: 'gray' };
+          return insertRec.bind(
+            generateId('rec'),
+            auditId,
+            business.id,
+            rec.priority || 'medium',
+            colorMap[rec.priority?.toLowerCase()] || 'blue',
+            rec.title,
+            rec.description,
+            rec.impact || 'medium',
+            rec.estimatedMinutes || 15
+          );
+        });
+        
+        if (batch.length > 0) {
+          await env.DB.batch(batch);
+        }
+
+        // Complete Audit
+        await env.DB.prepare(
+          "UPDATE audits SET status = 'completed', score = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?"
+        ).bind(scores.overall, auditId).run();
+
+        return { auditId, score: scores.overall };
+
+      } catch (auditError: any) {
+        console.error("Audit failed:", auditError);
+        await env.DB.prepare(
+          "UPDATE audits SET status = 'failed', completed_at = CURRENT_TIMESTAMP WHERE id = ?"
+        ).bind(auditId).run();
+        throw auditError;
+      }
+    };
+
     try {
       if (request.method === 'OPTIONS') {
         return new Response(null, {
@@ -343,101 +440,55 @@ export const onRequest = async (context: any) => {
           return errorResponse("An audit is already running for this business", 429);
         }
 
-        const auditId = generateId('aud');
-        
-        // Start audit
-        await env.DB.prepare(
-          "INSERT INTO audits (id, business_id, status) VALUES (?, ?, 'running')"
-        ).bind(auditId, business.id as string).run();
-
-        // Run the audit process asynchronously, but since we want to return the result, we await it.
-        // In a production serverless environment with strict timeouts, we might queue this.
-        // But for this MVP, we await it directly (within the 30s Cloudflare limit).
         try {
-          const { fetchWithTimeout, Extractor, computeScores, askNVIDIA, getFallbackRecommendations } = await import('./auditEngine');
-          
-          const websiteUrl = business.website_url as string;
-          let websiteResponse: Response;
-          try {
-            websiteResponse = await fetchWithTimeout(websiteUrl, 10000);
-          } catch {
-            throw new Error("Website fetch failed or timed out.");
-          }
-
-          if (!websiteResponse.ok || !websiteResponse.headers.get('content-type')?.includes('text/html')) {
-            throw new Error("Invalid or non-HTML website response.");
-          }
-
-          const extractor = new Extractor();
-          const rewriter = new HTMLRewriter()
-            .on('title', extractor.handlers.title)
-            .on('meta', extractor.handlers.meta)
-            .on('h1', extractor.handlers.h1)
-            .on('h1, h2, h3, h4, h5, h6', extractor.handlers.heading)
-            .on('script', extractor.handlers.script)
-            .on('a', extractor.handlers.a);
-
-          await rewriter.transform(websiteResponse).text(); // consumes the stream
-
-          const scores = computeScores(extractor, websiteUrl, business.city as string);
-
-          let aiResult;
-          try {
-            if (!env.NVIDIA_API_KEY) throw new Error("Missing NVIDIA_API_KEY");
-            aiResult = await askNVIDIA(env.NVIDIA_API_KEY, business, extractor, scores);
-          } catch (aiErr: any) {
-            console.error("AI Error:", aiErr);
-            aiResult = getFallbackRecommendations();
-          }
-
-          // Save Results
-          const scoreId = generateId('score');
-          await env.DB.prepare(
-            `INSERT INTO growth_scores 
-             (id, audit_id, business_id, overall_score, seo_score, reviews_score, website_score, visibility_score, previous_score, score_change) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-          ).bind(
-            scoreId, auditId, business.id, scores.overall, scores.seo, -1, scores.website, scores.visibility, null, 0
-          ).run();
-
-          // Save Recommendations
-          const insertRec = env.DB.prepare(
-            "INSERT INTO recommendations (id, audit_id, business_id, priority, priority_color, title, description, impact, estimated_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-          );
-          
-          const batch = aiResult.recommendations.map((rec: any) => {
-            const colorMap: Record<string, string> = { high: 'red', medium: 'yellow', low: 'gray' };
-            return insertRec.bind(
-              generateId('rec'),
-              auditId,
-              business.id,
-              rec.priority || 'medium',
-              colorMap[rec.priority?.toLowerCase()] || 'blue',
-              rec.title,
-              rec.description,
-              rec.impact || 'medium',
-              rec.estimatedMinutes || 15
-            );
-          });
-          
-          if (batch.length > 0) {
-            await env.DB.batch(batch);
-          }
-
-          // Complete Audit
-          await env.DB.prepare(
-            "UPDATE audits SET status = 'completed', score = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?"
-          ).bind(scores.overall, auditId).run();
-
+          await executeAudit(business);
           return jsonResponse({ success: true, data: { status: 'completed' } });
-
         } catch (auditError: any) {
-          console.error("Audit failed:", auditError);
-          await env.DB.prepare(
-            "UPDATE audits SET status = 'failed', completed_at = CURRENT_TIMESTAMP WHERE id = ?"
-          ).bind(auditId).run();
           return errorResponse("Audit failed to complete: " + (auditError.message || "Unknown error"), 500);
         }
+      }
+
+      // --- CRON: WEEKLY AUDITS ---
+      if (url.pathname === '/api/cron/weekly-audits') {
+        const secret = url.searchParams.get('secret');
+        if (!secret || secret !== env.CRON_SECRET) {
+          return errorResponse("Unauthorized", 401);
+        }
+
+        // Get paid businesses (growth/pro)
+        const { results: businesses } = await env.DB.prepare(
+          "SELECT * FROM businesses WHERE subscription_tier IN ('growth', 'pro')"
+        ).all();
+
+        const results = [];
+        for (const business of businesses as any[]) {
+          // Check if there is already an audit in the last 7 days
+          const lastAudit = await env.DB.prepare(
+            "SELECT completed_at FROM audits WHERE business_id = ? AND status = 'completed' ORDER BY completed_at DESC LIMIT 1"
+          ).bind(business.id).first();
+
+          let shouldAudit = true;
+          if (lastAudit && lastAudit.completed_at) {
+            const lastAuditTime = new Date(lastAudit.completed_at as string).getTime();
+            const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            if (lastAuditTime > oneWeekAgo) {
+              shouldAudit = false;
+            }
+          }
+
+          if (shouldAudit) {
+            try {
+              const res = await executeAudit(business);
+              results.push({ businessId: business.id, name: business.name, status: 'success', score: res.score });
+            } catch (err: any) {
+              results.push({ businessId: business.id, name: business.name, status: 'failed', error: err.message });
+            }
+          } else {
+            results.push({ businessId: business.id, name: business.name, status: 'skipped', reason: 'Audited in last 7 days' });
+          }
+        }
+
+        return jsonResponse({ success: true, results });
       }
 
       // --- WEBSITE LIVE ANALYSIS ---
@@ -885,7 +936,7 @@ export const onRequest = async (context: any) => {
           if (metadata && metadata.user_id) {
             let plan = 'pro';
             // Growth Package Product ID
-            if (product_id === '47bdc1ba-789c-4a0c-88de-b7a7b5e43d21') {
+            if (product_id === '7594755d-5580-4b77-86ae-90baae0e20d8') {
               plan = 'growth';
             }
 

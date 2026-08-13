@@ -58,7 +58,7 @@ async function sendVerificationEmail(email, token, env) {
 }
 var init_email = __esm({
   "../src/lib/email.ts"() {
-    init_functionsRoutes_0_21490195599870965();
+    init_functionsRoutes_0_6772971772079237();
     __name(sendVerificationEmail, "sendVerificationEmail");
   }
 });
@@ -110,7 +110,7 @@ async function verifyTOTP(code, secret) {
 }
 var init_totp = __esm({
   "../src/lib/totp.ts"() {
-    init_functionsRoutes_0_21490195599870965();
+    init_functionsRoutes_0_6772971772079237();
     __name(base32ToBuf, "base32ToBuf");
     __name(generateTOTPCode, "generateTOTPCode");
     __name(verifyTOTP, "verifyTOTP");
@@ -317,7 +317,7 @@ function getFallbackRecommendations() {
 var Extractor;
 var init_auditEngine = __esm({
   "api/auditEngine.ts"() {
-    init_functionsRoutes_0_21490195599870965();
+    init_functionsRoutes_0_6772971772079237();
     __name(fetchWithTimeout, "fetchWithTimeout");
     Extractor = class {
       static {
@@ -408,7 +408,7 @@ function parseCookies(cookieHeader) {
 var buf2hex, hex2buf, generateId, onRequest;
 var init_route = __esm({
   "api/[[route]].ts"() {
-    init_functionsRoutes_0_21490195599870965();
+    init_functionsRoutes_0_6772971772079237();
     init_email();
     init_totp();
     buf2hex = /* @__PURE__ */ __name((buffer) => [...new Uint8Array(buffer)].map((x) => x.toString(16).padStart(2, "0")).join(""), "buf2hex");
@@ -438,6 +438,85 @@ var init_route = __esm({
         ).bind(session.user_id).first();
         return user;
       }, "authenticate");
+      const executeAudit = /* @__PURE__ */ __name(async (business) => {
+        if (!business.website_url) throw new Error("Business has no website URL");
+        const auditId = generateId("aud");
+        await env.DB.prepare(
+          "INSERT INTO audits (id, business_id, status) VALUES (?, ?, 'running')"
+        ).bind(auditId, business.id).run();
+        try {
+          const { fetchWithTimeout: fetchWithTimeout2, Extractor: Extractor2, computeScores: computeScores2, askNVIDIA: askNVIDIA2, getFallbackRecommendations: getFallbackRecommendations2 } = await Promise.resolve().then(() => (init_auditEngine(), auditEngine_exports));
+          const websiteUrl = business.website_url;
+          let websiteResponse;
+          try {
+            websiteResponse = await fetchWithTimeout2(websiteUrl, 1e4);
+          } catch {
+            throw new Error("Website fetch failed or timed out.");
+          }
+          if (!websiteResponse.ok || !websiteResponse.headers.get("content-type")?.includes("text/html")) {
+            throw new Error("Invalid or non-HTML website response.");
+          }
+          const extractor = new Extractor2();
+          const rewriter = new HTMLRewriter().on("title", extractor.handlers.title).on("meta", extractor.handlers.meta).on("h1", extractor.handlers.h1).on("h1, h2, h3, h4, h5, h6", extractor.handlers.heading).on("script", extractor.handlers.script).on("a", extractor.handlers.a);
+          await rewriter.transform(websiteResponse).text();
+          const scores = computeScores2(extractor, websiteUrl, business.city);
+          let aiResult;
+          try {
+            if (!env.NVIDIA_API_KEY) throw new Error("Missing NVIDIA_API_KEY");
+            aiResult = await askNVIDIA2(env.NVIDIA_API_KEY, business, extractor, scores);
+          } catch (aiErr) {
+            console.error("AI Error:", aiErr);
+            aiResult = getFallbackRecommendations2();
+          }
+          const scoreId = generateId("score");
+          await env.DB.prepare(
+            `INSERT INTO growth_scores 
+           (id, audit_id, business_id, overall_score, seo_score, reviews_score, website_score, visibility_score, previous_score, score_change) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(
+            scoreId,
+            auditId,
+            business.id,
+            scores.overall,
+            scores.seo,
+            -1,
+            scores.website,
+            scores.visibility,
+            null,
+            0
+          ).run();
+          const insertRec = env.DB.prepare(
+            "INSERT INTO recommendations (id, audit_id, business_id, priority, priority_color, title, description, impact, estimated_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+          );
+          const batch = aiResult.recommendations.map((rec) => {
+            const colorMap = { high: "red", medium: "yellow", low: "gray" };
+            return insertRec.bind(
+              generateId("rec"),
+              auditId,
+              business.id,
+              rec.priority || "medium",
+              colorMap[rec.priority?.toLowerCase()] || "blue",
+              rec.title,
+              rec.description,
+              rec.impact || "medium",
+              rec.estimatedMinutes || 15
+            );
+          });
+          if (batch.length > 0) {
+            await env.DB.batch(batch);
+          }
+          await env.DB.prepare(
+            "UPDATE audits SET status = 'completed', score = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?"
+          ).bind(scores.overall, auditId).run();
+          return { auditId, score: scores.overall };
+        } catch (auditError) {
+          console.error("Audit failed:", auditError);
+          await env.DB.prepare(
+            "UPDATE audits SET status = 'failed', completed_at = CURRENT_TIMESTAMP WHERE id = ?"
+          ).bind(auditId).run();
+          throw auditError;
+        }
+      }, "executeAudit");
       try {
         if (request.method === "OPTIONS") {
           return new Response(null, {
@@ -635,82 +714,46 @@ var init_route = __esm({
           if (runningAudit) {
             return errorResponse("An audit is already running for this business", 429);
           }
-          const auditId = generateId("aud");
-          await env.DB.prepare(
-            "INSERT INTO audits (id, business_id, status) VALUES (?, ?, 'running')"
-          ).bind(auditId, business.id).run();
           try {
-            const { fetchWithTimeout: fetchWithTimeout2, Extractor: Extractor2, computeScores: computeScores2, askNVIDIA: askNVIDIA2, getFallbackRecommendations: getFallbackRecommendations2 } = await Promise.resolve().then(() => (init_auditEngine(), auditEngine_exports));
-            const websiteUrl = business.website_url;
-            let websiteResponse;
-            try {
-              websiteResponse = await fetchWithTimeout2(websiteUrl, 1e4);
-            } catch {
-              throw new Error("Website fetch failed or timed out.");
-            }
-            if (!websiteResponse.ok || !websiteResponse.headers.get("content-type")?.includes("text/html")) {
-              throw new Error("Invalid or non-HTML website response.");
-            }
-            const extractor = new Extractor2();
-            const rewriter = new HTMLRewriter().on("title", extractor.handlers.title).on("meta", extractor.handlers.meta).on("h1", extractor.handlers.h1).on("h1, h2, h3, h4, h5, h6", extractor.handlers.heading).on("script", extractor.handlers.script).on("a", extractor.handlers.a);
-            await rewriter.transform(websiteResponse).text();
-            const scores = computeScores2(extractor, websiteUrl, business.city);
-            let aiResult;
-            try {
-              if (!env.NVIDIA_API_KEY) throw new Error("Missing NVIDIA_API_KEY");
-              aiResult = await askNVIDIA2(env.NVIDIA_API_KEY, business, extractor, scores);
-            } catch (aiErr) {
-              console.error("AI Error:", aiErr);
-              aiResult = getFallbackRecommendations2();
-            }
-            const scoreId = generateId("score");
-            await env.DB.prepare(
-              `INSERT INTO growth_scores 
-             (id, audit_id, business_id, overall_score, seo_score, reviews_score, website_score, visibility_score, previous_score, score_change) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-            ).bind(
-              scoreId,
-              auditId,
-              business.id,
-              scores.overall,
-              scores.seo,
-              -1,
-              scores.website,
-              scores.visibility,
-              null,
-              0
-            ).run();
-            const insertRec = env.DB.prepare(
-              "INSERT INTO recommendations (id, audit_id, business_id, priority, priority_color, title, description, impact, estimated_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            );
-            const batch = aiResult.recommendations.map((rec) => {
-              const colorMap = { high: "red", medium: "yellow", low: "gray" };
-              return insertRec.bind(
-                generateId("rec"),
-                auditId,
-                business.id,
-                rec.priority || "medium",
-                colorMap[rec.priority?.toLowerCase()] || "blue",
-                rec.title,
-                rec.description,
-                rec.impact || "medium",
-                rec.estimatedMinutes || 15
-              );
-            });
-            if (batch.length > 0) {
-              await env.DB.batch(batch);
-            }
-            await env.DB.prepare(
-              "UPDATE audits SET status = 'completed', score = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?"
-            ).bind(scores.overall, auditId).run();
+            await executeAudit(business);
             return jsonResponse({ success: true, data: { status: "completed" } });
           } catch (auditError) {
-            console.error("Audit failed:", auditError);
-            await env.DB.prepare(
-              "UPDATE audits SET status = 'failed', completed_at = CURRENT_TIMESTAMP WHERE id = ?"
-            ).bind(auditId).run();
             return errorResponse("Audit failed to complete: " + (auditError.message || "Unknown error"), 500);
           }
+        }
+        if (url.pathname === "/api/cron/weekly-audits") {
+          const secret = url.searchParams.get("secret");
+          if (!secret || secret !== env.CRON_SECRET) {
+            return errorResponse("Unauthorized", 401);
+          }
+          const { results: businesses } = await env.DB.prepare(
+            "SELECT * FROM businesses WHERE subscription_tier IN ('growth', 'pro')"
+          ).all();
+          const results = [];
+          for (const business of businesses) {
+            const lastAudit = await env.DB.prepare(
+              "SELECT completed_at FROM audits WHERE business_id = ? AND status = 'completed' ORDER BY completed_at DESC LIMIT 1"
+            ).bind(business.id).first();
+            let shouldAudit = true;
+            if (lastAudit && lastAudit.completed_at) {
+              const lastAuditTime = new Date(lastAudit.completed_at).getTime();
+              const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1e3;
+              if (lastAuditTime > oneWeekAgo) {
+                shouldAudit = false;
+              }
+            }
+            if (shouldAudit) {
+              try {
+                const res = await executeAudit(business);
+                results.push({ businessId: business.id, name: business.name, status: "success", score: res.score });
+              } catch (err) {
+                results.push({ businessId: business.id, name: business.name, status: "failed", error: err.message });
+              }
+            } else {
+              results.push({ businessId: business.id, name: business.name, status: "skipped", reason: "Audited in last 7 days" });
+            }
+          }
+          return jsonResponse({ success: true, results });
         }
         if (url.pathname === "/api/website/analyze" && request.method === "GET") {
           const user = await authenticate();
@@ -1047,7 +1090,7 @@ var init_route = __esm({
             const { metadata, customer_id, product_id } = payload.data;
             if (metadata && metadata.user_id) {
               let plan = "pro";
-              if (product_id === "47bdc1ba-789c-4a0c-88de-b7a7b5e43d21") {
+              if (product_id === "7594755d-5580-4b77-86ae-90baae0e20d8") {
                 plan = "growth";
               }
               try {
@@ -1128,10 +1171,10 @@ var init_route = __esm({
   }
 });
 
-// ../.wrangler/tmp/pages-bmFkXC/functionsRoutes-0.21490195599870965.mjs
+// ../.wrangler/tmp/pages-EDcSMt/functionsRoutes-0.6772971772079237.mjs
 var routes;
-var init_functionsRoutes_0_21490195599870965 = __esm({
-  "../.wrangler/tmp/pages-bmFkXC/functionsRoutes-0.21490195599870965.mjs"() {
+var init_functionsRoutes_0_6772971772079237 = __esm({
+  "../.wrangler/tmp/pages-EDcSMt/functionsRoutes-0.6772971772079237.mjs"() {
     init_route();
     routes = [
       {
@@ -1146,10 +1189,10 @@ var init_functionsRoutes_0_21490195599870965 = __esm({
 });
 
 // ../node_modules/wrangler/templates/pages-template-worker.ts
-init_functionsRoutes_0_21490195599870965();
+init_functionsRoutes_0_6772971772079237();
 
 // ../node_modules/path-to-regexp/dist.es2015/index.js
-init_functionsRoutes_0_21490195599870965();
+init_functionsRoutes_0_6772971772079237();
 function lexer(str) {
   var tokens = [];
   var i = 0;
