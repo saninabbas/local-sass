@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { FormField } from '../../components/ui/FormField';
 import { Button } from '../../components/ui/Button';
-import { BarChart2 } from 'lucide-react';
+import { BarChart2, ShieldCheck } from 'lucide-react';
 
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -12,6 +12,9 @@ export function Login() {
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [tempToken, setTempToken] = useState('');
+  const [requires2FA, setRequires2FA] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -21,8 +24,38 @@ export function Login() {
     setIsLoading(true);
     
     try {
-      await login({ email, password });
-      navigate('/dashboard');
+      if (requires2FA) {
+        const res = await fetch('/api/auth/2fa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: tempToken, code: totpCode })
+        });
+        const data = await res.json();
+        if (data.success) {
+          navigate('/dashboard');
+          window.location.reload();
+        } else {
+          setError(data.error || 'Invalid 2FA verification code');
+        }
+      } else {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (data.require2FA) {
+            setRequires2FA(true);
+            setTempToken(data.tempToken);
+          } else {
+            await login({ email, password });
+            navigate('/dashboard');
+          }
+        } else {
+          setError(data.error || 'Invalid credentials');
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'Invalid credentials');
     } finally {
@@ -40,8 +73,9 @@ export function Login() {
             </div>
           </Link>
         </div>
+
         <h2 className="text-center text-3xl font-extrabold text-primary mb-8">
-          Welcome back
+          {requires2FA ? 'Two-Factor Authentication' : 'Welcome back'}
         </h2>
 
         <div className="bg-white py-8 px-4 shadow-xl shadow-black/5 sm:rounded-2xl sm:px-10 border border-gray-200">
@@ -50,37 +84,61 @@ export function Login() {
               {error}
             </div>
           )}
-          <form className="space-y-2" onSubmit={handleSubmit}>
-            <FormField
-              label="Email"
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <FormField
-              label="Password"
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            <div className="flex items-center justify-end mb-4 -mt-2">
-              <a href="#" className="text-sm font-semibold text-primary hover:text-primary-accent transition-colors">
-                Forgot password?
-              </a>
-            </div>
 
-            <div className="pt-2">
+          {requires2FA ? (
+            <form className="space-y-4" onSubmit={handleSubmit}>
+              <div className="text-center mb-2">
+                <ShieldCheck className="mx-auto text-primary mb-2" size={40} />
+                <p className="text-sm text-gray-600">
+                  Please enter the 6-digit verification code from your authenticator app.
+                </p>
+              </div>
+              <FormField
+                label="Security Code"
+                id="totpCode"
+                type="text"
+                placeholder="123456"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value)}
+                required
+              />
               <Button type="submit" variant="primary" size="lg" className="w-full text-lg h-12" disabled={isLoading}>
-                {isLoading ? 'Logging In...' : 'Log In'}
+                {isLoading ? 'Verifying...' : 'Verify & Log In'}
               </Button>
-            </div>
-          </form>
+            </form>
+          ) : (
+            <form className="space-y-2" onSubmit={handleSubmit}>
+              <FormField
+                label="Email"
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+              <FormField
+                label="Password"
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <div className="flex items-center justify-end mb-4 -mt-2">
+                <a href="#" className="text-sm font-semibold text-primary hover:text-primary-accent transition-colors">
+                  Forgot password?
+                </a>
+              </div>
+
+              <div className="pt-2">
+                <Button type="submit" variant="primary" size="lg" className="w-full text-lg h-12" disabled={isLoading}>
+                  {isLoading ? 'Logging In...' : 'Log In'}
+                </Button>
+              </div>
+            </form>
+          )}
 
           <div className="mt-8 text-center">
             <p className="text-sm text-secondary">

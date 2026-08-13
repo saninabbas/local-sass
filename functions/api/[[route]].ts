@@ -207,7 +207,7 @@ export const onRequest = async (context: any) => {
         const user = await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(tmp.user_id).first();
         if (!user?.totp_secret) return errorResponse("2FA not set up", 400);
 
-        if (!verifyTOTP(code, user.totp_secret as string)) {
+        if (!await verifyTOTP(code, user.totp_secret as string)) {
           return errorResponse("Invalid 2FA code", 401);
         }
 

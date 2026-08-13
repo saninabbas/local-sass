@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Home } from './pages/Home';
 import { Signup } from './pages/auth/Signup';
 import { Login } from './pages/auth/Login';
+import { VerifyEmail } from './pages/auth/VerifyEmail';
 import { Onboarding } from './pages/onboarding/Onboarding';
 import { Dashboard } from './pages/dashboard/Dashboard';
 
@@ -50,6 +51,8 @@ function App() {
           <Route path="/terms" element={<Terms />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/verify" element={<VerifyEmail />} />
+          <Route path="/api/auth/verify" element={<VerifyEmail />} />
           
           <Route element={<ProtectedRoute />}>
             <Route path="/onboarding" element={<Onboarding />} />

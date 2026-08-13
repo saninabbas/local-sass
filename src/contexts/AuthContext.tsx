@@ -36,8 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const handleSignup = async (data: any) => {
-    const authData = await signup(data);
-    setUser(authData);
+    return await signup(data);
   };
 
   const handleLogout = async () => {
