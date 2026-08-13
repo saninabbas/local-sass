@@ -9,7 +9,7 @@ export async function sendVerificationEmail(email: string, token: string, env: a
   }
 
   const baseUrl = env.BASE_URL || 'https://local-sass.pages.dev';
-  const verificationLink = `${baseUrl}/api/auth/verify?token=${token}`;
+  const verificationLink = `${baseUrl}/verify?token=${token}`;
 
   const payload = {
     personalizations: [{ to: [{ email }] }],

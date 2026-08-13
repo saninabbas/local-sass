@@ -22,7 +22,7 @@ async function sendVerificationEmail(email, token, env) {
     return;
   }
   const baseUrl = env.BASE_URL || "https://local-sass.pages.dev";
-  const verificationLink = `${baseUrl}/api/auth/verify?token=${token}`;
+  const verificationLink = `${baseUrl}/verify?token=${token}`;
   const payload = {
     personalizations: [{ to: [{ email }] }],
     from: { email: "no-reply@local-sass.pages.dev", name: "Rankora" },
@@ -58,7 +58,7 @@ async function sendVerificationEmail(email, token, env) {
 }
 var init_email = __esm({
   "../src/lib/email.ts"() {
-    init_functionsRoutes_0_2683692751743715();
+    init_functionsRoutes_0_21490195599870965();
     __name(sendVerificationEmail, "sendVerificationEmail");
   }
 });
@@ -110,7 +110,7 @@ async function verifyTOTP(code, secret) {
 }
 var init_totp = __esm({
   "../src/lib/totp.ts"() {
-    init_functionsRoutes_0_2683692751743715();
+    init_functionsRoutes_0_21490195599870965();
     __name(base32ToBuf, "base32ToBuf");
     __name(generateTOTPCode, "generateTOTPCode");
     __name(verifyTOTP, "verifyTOTP");
@@ -317,7 +317,7 @@ function getFallbackRecommendations() {
 var Extractor;
 var init_auditEngine = __esm({
   "api/auditEngine.ts"() {
-    init_functionsRoutes_0_2683692751743715();
+    init_functionsRoutes_0_21490195599870965();
     __name(fetchWithTimeout, "fetchWithTimeout");
     Extractor = class {
       static {
@@ -408,7 +408,7 @@ function parseCookies(cookieHeader) {
 var buf2hex, hex2buf, generateId, onRequest;
 var init_route = __esm({
   "api/[[route]].ts"() {
-    init_functionsRoutes_0_2683692751743715();
+    init_functionsRoutes_0_21490195599870965();
     init_email();
     init_totp();
     buf2hex = /* @__PURE__ */ __name((buffer) => [...new Uint8Array(buffer)].map((x) => x.toString(16).padStart(2, "0")).join(""), "buf2hex");
@@ -488,7 +488,7 @@ var init_route = __esm({
           await env.DB.prepare(
             "INSERT INTO users (id, name, email, password_hash, verification_token) VALUES (?, ?, ?, ?, ?)"
           ).bind(userId, name, email, hashedPassword, verificationToken).run();
-          const verificationLink = `/api/auth/verify?token=${verificationToken}`;
+          const verificationLink = `/verify?token=${verificationToken}`;
           await sendVerificationEmail(email, verificationToken, env);
           return jsonResponse({
             success: true,
@@ -1128,10 +1128,10 @@ var init_route = __esm({
   }
 });
 
-// ../.wrangler/tmp/pages-BwGqi4/functionsRoutes-0.2683692751743715.mjs
+// ../.wrangler/tmp/pages-bmFkXC/functionsRoutes-0.21490195599870965.mjs
 var routes;
-var init_functionsRoutes_0_2683692751743715 = __esm({
-  "../.wrangler/tmp/pages-BwGqi4/functionsRoutes-0.2683692751743715.mjs"() {
+var init_functionsRoutes_0_21490195599870965 = __esm({
+  "../.wrangler/tmp/pages-bmFkXC/functionsRoutes-0.21490195599870965.mjs"() {
     init_route();
     routes = [
       {
@@ -1146,10 +1146,10 @@ var init_functionsRoutes_0_2683692751743715 = __esm({
 });
 
 // ../node_modules/wrangler/templates/pages-template-worker.ts
-init_functionsRoutes_0_2683692751743715();
+init_functionsRoutes_0_21490195599870965();
 
 // ../node_modules/path-to-regexp/dist.es2015/index.js
-init_functionsRoutes_0_2683692751743715();
+init_functionsRoutes_0_21490195599870965();
 function lexer(str) {
   var tokens = [];
   var i = 0;
