@@ -23,7 +23,7 @@ export function ProductPreviewSection() {
                 <div className="w-3.5 h-3.5 rounded-full bg-green-400"></div>
               </div>
               <div className="flex bg-gray-50 rounded-md px-4 py-2 border border-gray-100">
-                <span className="text-sm font-medium text-gray-400">app.localgrowth.ai</span>
+                <span className="text-sm font-medium text-gray-400">app.rankora.ai</span>
               </div>
               <div className="w-20"></div> {/* Spacer for balance */}
             </div>

@@ -1,5 +1,6 @@
 import { PageLayout } from '../../components/layout/PageLayout';
 import { BookOpen, Video, FileText } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export function Resources() {
   return (
@@ -18,7 +19,7 @@ export function Resources() {
               <div className="text-base leading-7">
                 <h3 className="font-semibold text-primary">Local SEO Guide</h3>
                 <p className="mt-2 text-secondary">The complete guide to dominating your local market search results.</p>
-                <p className="mt-4 text-sm font-semibold text-primary-accent cursor-pointer hover:underline">Read Guide &rarr;</p>
+                <Link to="/signup" className="mt-4 inline-block text-sm font-semibold text-primary-accent hover:underline">Read Guide &rarr;</Link>
               </div>
             </div>
             <div className="flex gap-x-4 rounded-xl bg-gray-50 p-6 ring-1 ring-inset ring-gray-200">
@@ -26,7 +27,7 @@ export function Resources() {
               <div className="text-base leading-7">
                 <h3 className="font-semibold text-primary">Video Tutorials</h3>
                 <p className="mt-2 text-secondary">Step-by-step video lessons on fixing your most critical growth blockers.</p>
-                <p className="mt-4 text-sm font-semibold text-primary-accent cursor-pointer hover:underline">Watch Videos &rarr;</p>
+                <Link to="/signup" className="mt-4 inline-block text-sm font-semibold text-primary-accent hover:underline">Watch Videos &rarr;</Link>
               </div>
             </div>
             <div className="flex gap-x-4 rounded-xl bg-gray-50 p-6 ring-1 ring-inset ring-gray-200">
@@ -34,7 +35,7 @@ export function Resources() {
               <div className="text-base leading-7">
                 <h3 className="font-semibold text-primary">Case Studies</h3>
                 <p className="mt-2 text-secondary">Learn how other local businesses used Rankora to double their foot traffic.</p>
-                <p className="mt-4 text-sm font-semibold text-primary-accent cursor-pointer hover:underline">Read Studies &rarr;</p>
+                <Link to="/signup" className="mt-4 inline-block text-sm font-semibold text-primary-accent hover:underline">Read Studies &rarr;</Link>
               </div>
             </div>
           </div>

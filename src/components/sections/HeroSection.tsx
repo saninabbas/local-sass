@@ -121,9 +121,11 @@ export function HeroSection() {
                     </div>
                   </div>
 
-                  <Button variant="outline" size="md" className="w-full mt-6 font-semibold text-base bg-white h-12">
-                    View Action Plan
-                  </Button>
+                  <Link to="/signup">
+                    <Button variant="outline" size="md" className="w-full mt-6 font-semibold text-base bg-white h-12">
+                      View Action Plan
+                    </Button>
+                  </Link>
                 </div>
                 
               </div>

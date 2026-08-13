@@ -1,4 +1,5 @@
 import { ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export function AIRecommendationsSection() {
   const recommendations = [
@@ -62,9 +63,11 @@ export function AIRecommendationsSection() {
                   <span className="text-base text-secondary">Impact:</span>
                   <span className="text-base font-semibold text-primary">{rec.impact}</span>
                 </div>
-                <button className="text-base font-semibold text-primary-accent hover:text-blue-700 flex items-center group">
-                  View recommendation <ArrowRight className="ml-1.5 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                </button>
+                <Link to="/signup">
+                  <button className="text-base font-semibold text-primary-accent hover:text-blue-700 flex items-center group">
+                    View recommendation <ArrowRight className="ml-1.5 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </Link>
               </div>
             </div>
           ))}

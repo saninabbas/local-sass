@@ -1,5 +1,6 @@
 import { ArrowRight, Clock, Activity, CheckCircle2 } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 interface ActionPlanCardProps {
   id?: string;
@@ -73,9 +74,11 @@ export function ActionPlanCard({ id, title, description, priority, priorityColor
       )}
       
       {(!onComplete && !isCompleted) && (
-        <button className="text-sm font-semibold text-primary-accent hover:text-blue-700 flex items-center group w-full justify-between pt-4 border-t border-gray-100">
-          View Recommendation <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-        </button>
+        <Link to="/dashboard/actions" className="block w-full">
+          <button className="text-sm font-semibold text-primary-accent hover:text-blue-700 flex items-center group w-full justify-between pt-4 border-t border-gray-100">
+            View Recommendation <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+          </button>
+        </Link>
       )}
     </div>
   );

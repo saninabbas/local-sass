@@ -1,30 +1,34 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Home } from './pages/Home';
 import { Signup } from './pages/auth/Signup';
 import { Login } from './pages/auth/Login';
 import { VerifyEmail } from './pages/auth/VerifyEmail';
 import { Onboarding } from './pages/onboarding/Onboarding';
-import { Dashboard } from './pages/dashboard/Dashboard';
 
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { ActionPlan } from './pages/dashboard/ActionPlan';
-import { Settings } from './pages/dashboard/Settings';
-import { Reports } from './pages/dashboard/Reports';
-import { Score } from './pages/dashboard/Score';
 import { About } from './pages/marketing/About';
 import { Contact } from './pages/marketing/Contact';
 import { Privacy } from './pages/marketing/Privacy';
 import { Terms } from './pages/marketing/Terms';
 import { Resources } from './pages/marketing/Resources';
-import { Website } from './pages/dashboard/Website';
-import { Reviews } from './pages/dashboard/Reviews';
-import { Competitors } from './pages/dashboard/Competitors';
-import { Content } from './pages/dashboard/Content';
-import { Leads } from './pages/dashboard/Leads';
 import { PublicReport } from './pages/report/PublicReport';
 
 import { DashboardLayout } from './components/dashboard/DashboardLayout';
+
+// Lazy load dashboard pages to optimize initial bundle size
+const Dashboard = lazy(() => import('./pages/dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
+const ActionPlan = lazy(() => import('./pages/dashboard/ActionPlan').then(m => ({ default: m.ActionPlan })));
+const Settings = lazy(() => import('./pages/dashboard/Settings').then(m => ({ default: m.Settings })));
+const Reports = lazy(() => import('./pages/dashboard/Reports').then(m => ({ default: m.Reports })));
+const Score = lazy(() => import('./pages/dashboard/Score').then(m => ({ default: m.Score })));
+const Website = lazy(() => import('./pages/dashboard/Website').then(m => ({ default: m.Website })));
+const Reviews = lazy(() => import('./pages/dashboard/Reviews').then(m => ({ default: m.Reviews })));
+const Competitors = lazy(() => import('./pages/dashboard/Competitors').then(m => ({ default: m.Competitors })));
+const Content = lazy(() => import('./pages/dashboard/Content').then(m => ({ default: m.Content })));
+const Leads = lazy(() => import('./pages/dashboard/Leads').then(m => ({ default: m.Leads })));
+const Account = lazy(() => import('./pages/dashboard/Account').then(m => ({ default: m.Account })));
 
 function DashboardPlaceholder({ title }: { title: string }) {
   return (
@@ -36,6 +40,21 @@ function DashboardPlaceholder({ title }: { title: string }) {
         </p>
       </div>
     </DashboardLayout>
+  );
+}
+
+function DashboardSuspense({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={
+      <DashboardLayout>
+        <div className="min-h-[60vh] flex flex-col items-center justify-center p-8">
+          <div className="h-10 w-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-secondary font-medium animate-pulse">Loading module...</p>
+        </div>
+      </DashboardLayout>
+    }>
+      {children}
+    </Suspense>
   );
 }
 
@@ -58,16 +77,20 @@ function App() {
           
           <Route element={<ProtectedRoute />}>
             <Route path="/onboarding" element={<Onboarding />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/dashboard/score" element={<Score />} />
-            <Route path="/dashboard/actions" element={<ActionPlan />} />
-            <Route path="/dashboard/website" element={<Website />} />
-            <Route path="/dashboard/competitors" element={<Competitors />} />
-            <Route path="/dashboard/content" element={<Content />} />
-            <Route path="/dashboard/leads" element={<Leads />} />
-            <Route path="/dashboard/reviews" element={<Reviews />} />
-            <Route path="/dashboard/reports" element={<Reports />} />
-            <Route path="/dashboard/settings" element={<Settings />} />
+            
+            {/* Lazy Loaded Dashboard Routes */}
+            <Route path="/dashboard" element={<DashboardSuspense><Dashboard /></DashboardSuspense>} />
+            <Route path="/dashboard/score" element={<DashboardSuspense><Score /></DashboardSuspense>} />
+            <Route path="/dashboard/actions" element={<DashboardSuspense><ActionPlan /></DashboardSuspense>} />
+            <Route path="/dashboard/website" element={<DashboardSuspense><Website /></DashboardSuspense>} />
+            <Route path="/dashboard/competitors" element={<DashboardSuspense><Competitors /></DashboardSuspense>} />
+            <Route path="/dashboard/content" element={<DashboardSuspense><Content /></DashboardSuspense>} />
+            <Route path="/dashboard/leads" element={<DashboardSuspense><Leads /></DashboardSuspense>} />
+            <Route path="/dashboard/reviews" element={<DashboardSuspense><Reviews /></DashboardSuspense>} />
+            <Route path="/dashboard/reports" element={<DashboardSuspense><Reports /></DashboardSuspense>} />
+            <Route path="/dashboard/settings" element={<DashboardSuspense><Settings /></DashboardSuspense>} />
+            <Route path="/dashboard/account" element={<DashboardSuspense><Account /></DashboardSuspense>} />
+            
             <Route path="/dashboard/*" element={<DashboardPlaceholder title="Page Not Found" />} />
           </Route>
         </Routes>
