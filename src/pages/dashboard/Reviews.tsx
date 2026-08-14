@@ -46,6 +46,7 @@ export function Reviews() {
   const currentPlan = (user as any)?.subscription_status || 'free';
   const isPro = currentPlan === 'pro' || currentPlan === 'growth' || currentPlan === 'enterprise';
 
+  const [selectedTone, setSelectedTone] = useState<string>('professional');
   const [reviews, setReviews] = useState<Review[]>([]);
   const [stats, setStats] = useState<ReviewStats>({ avgRating: 0, totalReviews: 0, responseRate: 0 });
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({ connected: false, connection: null });
@@ -86,7 +87,7 @@ export function Reviews() {
     }
   };
 
-  const handleGenerateReply = async (review: Review) => {
+  const handleGenerateReply = async (review: Review, tone: string = selectedTone) => {
     if (!isPro) return;
     setGeneratingFor(review.id);
     try {
@@ -96,7 +97,8 @@ export function Reviews() {
           reviewId: review.id,
           reviewerName: review.reviewer_name,
           rating: review.rating,
-          reviewText: review.review_text
+          reviewText: review.review_text,
+          tone
         })
       });
       if (data?.reply) {
@@ -342,25 +344,40 @@ export function Reviews() {
                     </div>
                   </div>
                 ) : (
-                  <div className="ml-3 sm:ml-6">
+                  <div className="ml-3 sm:ml-6 flex flex-wrap items-center gap-2">
                     {isPro ? (
-                      <button 
-                        onClick={() => handleGenerateReply(review)}
-                        disabled={generatingFor === review.id}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#efe9de] text-[#cc785c] hover:bg-[#e8e0d2] border border-[#e6dfd8] rounded-lg text-xs font-sans font-medium transition-colors"
-                      >
-                        {generatingFor === review.id ? (
-                          <>
-                            <RefreshCw size={13} className="animate-spin" />
-                            Generating...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles size={13} />
-                            Generate AI Reply
-                          </>
-                        )}
-                      </button>
+                      <>
+                        <div className="flex items-center gap-1 bg-[#faf9f5] border border-[#e6dfd8] rounded-lg p-0.5 text-[11px] font-sans text-[#6c6a64]">
+                          <span className="px-1.5 text-[#8e8b82]">Tone:</span>
+                          <select
+                            value={selectedTone}
+                            onChange={(e) => setSelectedTone(e.target.value)}
+                            className="bg-transparent text-xs font-medium text-[#141413] focus:outline-none pr-1"
+                          >
+                            <option value="professional">Professional</option>
+                            <option value="warm">Warm & Friendly</option>
+                            <option value="apologetic">Empathetic</option>
+                            <option value="direct">Direct & Short</option>
+                          </select>
+                        </div>
+                        <button 
+                          onClick={() => handleGenerateReply(review)}
+                          disabled={generatingFor === review.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#efe9de] text-[#cc785c] hover:bg-[#e8e0d2] border border-[#e6dfd8] rounded-lg text-xs font-sans font-medium transition-colors"
+                        >
+                          {generatingFor === review.id ? (
+                            <>
+                              <RefreshCw size={13} className="animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles size={13} />
+                              Generate AI Reply
+                            </>
+                          )}
+                        </button>
+                      </>
                     ) : (
                       <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#faf9f5] text-[#8e8b82] border border-[#e6dfd8] rounded-lg text-xs font-sans cursor-not-allowed">
                         <LockIcon size={13} />

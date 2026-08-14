@@ -188,7 +188,7 @@ export const onRequest = async (context: any) => {
           aiResult = await askNVIDIA(env.NVIDIA_API_KEY, business, extractor, scores);
         } catch (aiErr: any) {
           console.error("AI Error:", aiErr);
-          aiResult = getFallbackRecommendations();
+          aiResult = getFallbackRecommendations(business, scores);
         }
 
         // Save Results
@@ -741,8 +741,9 @@ export const onRequest = async (context: any) => {
           const { generateBlogWithNVIDIA } = await import('./auditEngine');
           const businessName = (business.name as string) || "Our Local Business";
           const city = (business.city as string) || "our city";
+          const businessType = (business.type as string) || "Local Service";
 
-          const blogData = await generateBlogWithNVIDIA(env.NVIDIA_API_KEY, businessName, city, topic);
+          const blogData = await generateBlogWithNVIDIA(env.NVIDIA_API_KEY, businessName, city, topic, businessType);
           
           return jsonResponse({ success: true, data: blogData });
         } catch (error: any) {
@@ -826,7 +827,7 @@ export const onRequest = async (context: any) => {
           let aiStrategy = null;
           if (env.NVIDIA_API_KEY) {
             try {
-              aiStrategy = await compareWithNVIDIA(env.NVIDIA_API_KEY, myExtractor, myScores, compExtractor, compScores);
+              aiStrategy = await compareWithNVIDIA(env.NVIDIA_API_KEY, myExtractor, myScores, compExtractor, compScores, business);
             } catch (e) {
               console.error("NVIDIA AI failed for competitor analysis", e);
             }
@@ -1356,12 +1357,14 @@ export const onRequest = async (context: any) => {
           ).bind(user.id as string).first();
 
           const { generateReviewReplyWithNVIDIA } = await import('./auditEngine');
+          const tone = payload.tone || 'professional';
           const reply = await generateReviewReplyWithNVIDIA(
             env.NVIDIA_API_KEY,
             (business?.name as string) || 'Our Business',
             payload.reviewerName || 'Customer',
             payload.rating,
-            payload.reviewText
+            payload.reviewText,
+            tone
           );
 
           // Save the reply to the database
@@ -1646,8 +1649,9 @@ export const onRequest = async (context: any) => {
         if (!env.NVIDIA_API_KEY) return errorResponse("AI is not configured", 500);
 
         try {
+          const business = await env.DB.prepare("SELECT name FROM businesses WHERE user_id = ?").bind(user.id as string).first();
           const { generateOutreachEmail } = await import('./authorityEngine');
-          const email = await generateOutreachEmail(env.NVIDIA_API_KEY, payload.opportunityId, payload.opportunityName, payload.whyRelevant);
+          const email = await generateOutreachEmail(env.NVIDIA_API_KEY, payload.opportunityId, payload.opportunityName, payload.whyRelevant, business?.name as string);
           
           return jsonResponse({ success: true, data: email });
         } catch (e: any) {
