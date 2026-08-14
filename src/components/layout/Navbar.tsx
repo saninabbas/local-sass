@@ -34,18 +34,13 @@ export function Navbar() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center">
-            <Link to="/" className="flex items-center gap-1.5">
+            <Link to="/" className="flex items-center">
               <img 
                 src="/brand/logo.png" 
-                alt="Rankora Logo" 
-                className="h-9 w-auto object-contain scale-[1.25] -mr-1" 
+                alt="Rankora" 
+                className="h-8 sm:h-9 w-auto object-contain" 
               />
-              <span className="text-xl font-bold font-serif text-[#141413] tracking-tight">
-                Rankora
-              </span>
             </Link>
-          </div>
           
           {/* Desktop Navigation */}
           <div className="hidden md:block">

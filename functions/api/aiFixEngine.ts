@@ -83,6 +83,9 @@ Include target audience, primary keywords, competitor angle, and 5-point outline
   }
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
+
     const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -100,8 +103,11 @@ Include target audience, primary keywords, competitor angle, and 5-point outline
         ],
         temperature: 0.2,
         max_tokens: 800
-      })
+      }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       return generateFallbackFix(req);

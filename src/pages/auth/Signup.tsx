@@ -54,15 +54,12 @@ export function Signup() {
     <div className="min-h-screen bg-[#faf9f5] flex flex-col justify-center py-12 sm:px-6 lg:px-8 text-[#141413]">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center mb-6">
-          <Link to="/" className="flex items-center gap-1.5">
+          <Link to="/" className="flex items-center justify-center">
             <img 
               src="/brand/logo.png" 
-              alt="Rankora Logo" 
-              className="h-10 w-auto object-contain scale-[1.3] -mr-1" 
+              alt="Rankora" 
+              className="h-10 w-auto object-contain" 
             />
-            <span className="text-2xl font-bold font-serif text-[#141413] tracking-tight">
-              Rankora
-            </span>
           </Link>
         </div>
 

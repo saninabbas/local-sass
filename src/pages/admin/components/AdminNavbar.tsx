@@ -23,21 +23,16 @@ export function AdminNavbar({ onRefresh, isRefreshing }: AdminNavbarProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Brand & Admin Badge */}
-          <div className="flex items-center gap-3">
-            <Link to="/admin" className="flex items-center gap-1.5 group">
+            <Link to="/admin" className="flex items-center gap-2 group">
               <img 
                 src="/brand/logo.png" 
-                alt="Rankora Logo" 
-                className="h-9 w-auto object-contain scale-[1.25] -mr-1" 
+                alt="Rankora" 
+                className="h-8 sm:h-9 w-auto object-contain" 
               />
-              <span className="text-xl font-bold font-serif text-[#141413] tracking-tight">
-                Rankora
-              </span>
               <span className="ml-2 px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider bg-[#cc785c]/15 text-[#cc785c] border border-[#cc785c]/30 rounded-md">
                 Admin Console
               </span>
             </Link>
-          </div>
 
           {/* Actions & Profile */}
           <div className="flex items-center gap-2 sm:gap-3">

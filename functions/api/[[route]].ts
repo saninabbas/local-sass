@@ -2251,17 +2251,41 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare("SELECT id, city, website_url FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        const business = await env.DB.prepare("SELECT * FROM businesses WHERE user_id = ?").bind(user.id as string).first();
         if (!business) return jsonResponse({ success: true, data: [] });
 
-        const { results } = await env.DB.prepare("SELECT * FROM keywords WHERE business_id = ? ORDER BY created_at DESC").bind(business.id).all();
+        let { results } = await env.DB.prepare("SELECT * FROM keywords WHERE business_id = ? ORDER BY created_at DESC").bind(business.id).all();
         
+        // Auto-seed initial local keywords if none tracked yet
+        if ((!results || results.length === 0) && business.name) {
+          const cat = (business.type as string) || 'Local Service';
+          const loc = (business.city as string) || 'Local Area';
+          const seedList = [
+            { kw: `${cat} in ${loc}`, intent: 'LOCAL' },
+            { kw: `Best ${cat} ${loc}`, intent: 'LOCAL' },
+            { kw: `Emergency ${cat} near me`, intent: 'TRANSACTIONAL' },
+            { kw: `${cat} prices ${loc}`, intent: 'COMMERCIAL' }
+          ];
+
+          for (const item of seedList) {
+            const kwId = crypto.randomUUID();
+            await env.DB.prepare(
+              `INSERT INTO keywords (id, business_id, keyword, location, intent, current_position, local_pack_position, status, data_source) 
+               VALUES (?, ?, ?, ?, ?, NULL, NULL, 'UNCHECKED', 'auto_seed')`
+            ).bind(kwId, business.id, item.kw, loc, item.intent).run().catch(() => {});
+          }
+
+          const refetched = await env.DB.prepare("SELECT * FROM keywords WHERE business_id = ? ORDER BY created_at DESC").bind(business.id).all();
+          results = refetched.results || [];
+        }
+
+        const serpKey = env.SERP_API_KEY || env.SERPER_API_KEY;
         const mapped = (results || []).map((k: any) => {
           let status: 'UP' | 'DOWN' | 'UNCHANGED' | 'NOT FOUND' | 'UNAVAILABLE' = 'UNAVAILABLE';
           let change = 0;
 
           if (k.current_position === null || k.current_position === undefined) {
-            status = env.SERP_API_KEY ? 'NOT FOUND' : 'UNAVAILABLE';
+            status = serpKey ? 'NOT FOUND' : 'UNAVAILABLE';
           } else if (k.previous_position !== null && k.previous_position !== undefined) {
             change = k.previous_position - k.current_position;
             if (change > 0) status = 'UP';
@@ -2284,9 +2308,9 @@ export const onRequest = async (context: any) => {
             status,
             last_checked_at: k.last_checked_at || k.created_at,
             data_source: k.data_source || 'serp_api',
-            best_competitor: k.best_competitor || 'Local Competitor',
-            competitor_position: k.competitor_position || null,
-            opportunity: k.opportunity || 'Optimize primary H1 tag and JSON-LD LocalBusiness schema'
+            best_competitor: k.best_competitor || 'Top Local Competitor',
+            competitor_position: k.competitor_position || 1,
+            opportunity: k.opportunity || `Target ${business.city || 'local'} searchers with high-converting landing page.`
           };
         });
 
@@ -2315,35 +2339,40 @@ export const onRequest = async (context: any) => {
         let opportunity = `Target ${searchLocation} local search queries with dedicated service headings.`;
 
         // Live SERP lookup via Serper if API key is present
-        if (env.SERP_API_KEY && business.website_url) {
+        const serpKey = env.SERP_API_KEY || env.SERPER_API_KEY;
+        if (serpKey && business.website_url) {
           const { fetchSERPData } = await import('./rankingEngine');
           const domainMatch = (business.website_url as string).replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
-          const queryLocation = zipCode ? `${searchLocation} ${zipCode}`.trim() : searchLocation;
+          const queryLocation = zipCode ? `${searchLocation} ${zipCode}` : searchLocation;
           
-          const result = await fetchSERPData(payload.keyword, queryLocation, domainMatch, env.SERP_API_KEY);
-          currentPos = result.position;
-          localPackPos = result.localPackPosition;
-          if (result.bestCompetitor) bestComp = result.bestCompetitor;
-          if (result.competitorPosition) compPos = result.competitorPosition;
-
-          if (currentPos && currentPos <= 3) {
-            opportunity = 'Maintain #1 ranking with weekly Google Business Profile updates.';
-          } else if (currentPos && currentPos <= 10) {
-            opportunity = 'Add customer FAQs with schema markup to break into the Top 3.';
-          } else {
-            opportunity = `Create a dedicated landing page for "${payload.keyword}" targeting ${searchLocation}.`;
+          try {
+            const result = await fetchSERPData(payload.keyword, queryLocation, domainMatch, serpKey);
+            currentPos = result.position;
+            localPackPos = result.localPackPosition;
+            if (result.bestCompetitor) bestComp = result.bestCompetitor;
+            if (result.competitorPosition) compPos = result.competitorPosition;
+          } catch (e) {
+            console.error("SERP lookup failed for new keyword:", e);
           }
         }
 
         await env.DB.prepare(`
-          INSERT INTO keywords (
-            id, business_id, keyword, location, zip_code, intent, 
-            current_position, previous_position, local_pack_position, 
-            last_checked_at, data_source, best_competitor, competitor_position, opportunity
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'serp_api', ?, ?, ?)
+          INSERT INTO keywords (id, business_id, keyword, location, zip_code, intent, current_position, previous_position, local_pack_position, status, data_source, best_competitor, competitor_position, opportunity, last_checked_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         `).bind(
-          id, business.id, payload.keyword, searchLocation, zipCode, intent,
-          currentPos, null, localPackPos, bestComp, compPos, opportunity
+          id, 
+          business.id, 
+          payload.keyword.trim(), 
+          searchLocation, 
+          zipCode, 
+          intent, 
+          currentPos, 
+          localPackPos,
+          currentPos ? 'UP' : (serpKey ? 'NOT FOUND' : 'UNAVAILABLE'),
+          serpKey ? 'serp_api' : 'manual',
+          bestComp,
+          compPos,
+          opportunity
         ).run();
 
         if (currentPos !== null) {
@@ -2352,15 +2381,18 @@ export const onRequest = async (context: any) => {
           ).bind(crypto.randomUUID(), id, business.id, currentPos).run().catch(() => {});
         }
 
-        return jsonResponse({ 
-          success: true, 
-          data: { 
-            id, 
-            keyword: payload.keyword,
-            current_position: currentPos, 
+        return jsonResponse({
+          success: true,
+          data: {
+            id,
+            keyword: payload.keyword.trim(),
+            location: searchLocation,
+            zip_code: zipCode,
+            intent,
+            current_position: currentPos,
             local_pack_position: localPackPos,
-            status: currentPos ? 'FOUND' : (env.SERP_API_KEY ? 'NOT FOUND' : 'UNAVAILABLE')
-          } 
+            status: currentPos ? 'FOUND' : (serpKey ? 'NOT FOUND' : 'UNAVAILABLE')
+          }
         });
       }
 
@@ -2368,14 +2400,12 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const id = url.pathname.split('/').pop();
-        if (!id) return errorResponse("Invalid ID", 400);
-
+        const kwId = url.pathname.replace('/api/keywords/', '');
         const business = await env.DB.prepare("SELECT id FROM businesses WHERE user_id = ?").bind(user.id as string).first();
         if (!business) return errorResponse("Business not found", 404);
 
-        await env.DB.prepare("DELETE FROM keywords WHERE id = ? AND business_id = ?").bind(id, business.id).run();
-        return jsonResponse({ success: true });
+        await env.DB.prepare("DELETE FROM keywords WHERE id = ? AND business_id = ?").bind(kwId, business.id).run();
+        return jsonResponse({ success: true, message: "Keyword deleted" });
       }
 
       if (url.pathname === '/api/keywords/refresh' && request.method === 'POST') {
@@ -2385,8 +2415,9 @@ export const onRequest = async (context: any) => {
         const business = await env.DB.prepare("SELECT * FROM businesses WHERE user_id = ?").bind(user.id as string).first();
         if (!business || !business.website_url) return errorResponse("Business or website not found", 404);
 
-        if (!env.SERP_API_KEY) {
-          return errorResponse("SERP API is not configured", 503);
+        const serpKey = env.SERP_API_KEY || env.SERPER_API_KEY;
+        if (!serpKey) {
+          return errorResponse("SERP API is not configured on the server", 503);
         }
 
         const { results: keywords } = await env.DB.prepare(
@@ -2400,7 +2431,7 @@ export const onRequest = async (context: any) => {
         for (const kw of keywords) {
           try {
             const loc = (kw.location || business.city || '') + (kw.zip_code ? ` ${kw.zip_code}` : '');
-            const result = await fetchSERPData(kw.keyword as string, loc.trim(), domainMatch, env.SERP_API_KEY);
+            const result = await fetchSERPData(kw.keyword as string, loc.trim(), domainMatch, serpKey);
             
             const prevPos = kw.current_position;
             const newPos = result.position;
@@ -3067,76 +3098,6 @@ export const onRequest = async (context: any) => {
         ).bind(convId, user.id as string).all();
 
         return jsonResponse({ success: true, data: results || [] });
-      }
-
-      // --- COPILOT: SEND CHAT MESSAGE ---
-      if (url.pathname === '/api/copilot/chat' && request.method === 'POST') {
-        const user = await authenticate();
-        if (!user) return errorResponse("Unauthorized", 401);
-
-        let payload: any;
-        try { payload = await request.json(); } catch { return errorResponse("Invalid JSON", 400); }
-        if (!payload.message || !payload.message.trim()) return errorResponse("Message is required", 400);
-
-        if (!env.NVIDIA_API_KEY) return errorResponse("AI Copilot is not configured on the server", 500);
-
-        let convId = payload.conversationId;
-        const business = await env.DB.prepare("SELECT id FROM businesses WHERE user_id = ? LIMIT 1").bind(user.id as string).first();
-        if (!business) return errorResponse("Business not found", 404);
-
-        if (!convId) {
-          convId = crypto.randomUUID();
-          const title = payload.message.length > 35 ? payload.message.substring(0, 35) + '...' : payload.message;
-          await env.DB.prepare(
-            "INSERT INTO copilot_conversations (id, user_id, business_id, title) VALUES (?, ?, ?, ?)"
-          ).bind(convId, user.id as string, business.id as string, title).run();
-        }
-
-        // 1. Save User Message
-        const userMsgId = crypto.randomUUID();
-        await env.DB.prepare(
-          "INSERT INTO copilot_messages (id, conversation_id, user_id, role, content) VALUES (?, ?, ?, 'user', ?)"
-        ).bind(userMsgId, convId, user.id as string, payload.message.trim()).run();
-
-        // 2. Fetch history
-        const { results: rawHistory } = await env.DB.prepare(
-          "SELECT role, content FROM copilot_messages WHERE conversation_id = ? ORDER BY created_at ASC LIMIT 8"
-        ).bind(convId).all();
-
-        const history = (rawHistory || []).map((h: any) => ({ role: h.role, content: h.content }));
-
-        // 3. Synthesize full business context & Ask Copilot
-        try {
-          const { synthesizeBusinessContext, askGrowthCopilot } = await import('./copilotEngine');
-          const context = await synthesizeBusinessContext(env.DB, user.id as string);
-          const aiResponse = await askGrowthCopilot(env.NVIDIA_API_KEY, history, context, payload.message.trim());
-
-          // 4. Save Assistant Message
-          const assistantMsgId = crypto.randomUUID();
-          const actionType = aiResponse.suggested_action?.action_type || null;
-          const actionPayload = aiResponse.suggested_action ? JSON.stringify(aiResponse.suggested_action) : null;
-
-          await env.DB.prepare(
-            "INSERT INTO copilot_messages (id, conversation_id, user_id, role, content, action_type, action_payload) VALUES (?, ?, ?, 'assistant', ?, ?, ?)"
-          ).bind(assistantMsgId, convId, user.id as string, aiResponse.message, actionType, actionPayload).run();
-
-          // Update conversation timestamp
-          await env.DB.prepare(
-            "UPDATE copilot_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-          ).bind(convId).run();
-
-          return jsonResponse({
-            success: true,
-            data: {
-              conversationId: convId,
-              message: aiResponse.message,
-              suggested_action: aiResponse.suggested_action || null,
-              follow_up_prompts: aiResponse.follow_up_prompts || []
-            }
-          });
-        } catch (copilotErr: any) {
-          return errorResponse("Copilot error: " + copilotErr.message, 500);
-        }
       }
 
       // --- COPILOT: DELETE CONVERSATION ---

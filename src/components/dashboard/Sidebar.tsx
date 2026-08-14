@@ -89,15 +89,12 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     }`}>
       {/* Brand Logo */}
       <div className="h-16 flex items-center justify-between px-6 border-b border-gray-100">
-        <Link to="/dashboard" className="flex items-center gap-2">
+        <Link to="/dashboard" className="flex items-center">
           <img 
             src="/brand/logo.png" 
             alt="Rankora" 
             className="h-8 w-auto object-contain" 
           />
-          <span className="text-xl font-bold text-primary tracking-tight">
-            Rankora
-          </span>
         </Link>
         {onClose && (
           <button 

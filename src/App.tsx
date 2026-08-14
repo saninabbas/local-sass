@@ -38,13 +38,15 @@ const Account = lazy(() => import('./pages/dashboard/Account').then(m => ({ defa
 const AuthorityBuilder = lazy(() => import('./pages/dashboard/AuthorityBuilder').then(m => ({ default: m.AuthorityBuilder })));
 const Copilot = lazy(() => import('./pages/dashboard/Copilot').then(m => ({ default: m.Copilot })));
 
+import { ErrorBoundary } from './components/ErrorBoundary';
+
 function DashboardPlaceholder({ title }: { title: string }) {
   return (
     <DashboardLayout>
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 bg-[#efe9de] rounded-2xl shadow-sm border border-[#e6dfd8] py-16 mt-6">
-        <h2 className="text-3xl font-serif font-normal text-[#141413] mb-4">{title}</h2>
-        <p className="text-[#6c6a64] font-sans mb-8 max-w-md text-sm">
-          We are currently loading this module. If this view does not exist, return to your Overview.
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 bg-white rounded-2xl shadow-xs border border-gray-200 py-16 mt-6">
+        <h2 className="text-xl font-bold text-primary mb-2">{title}</h2>
+        <p className="text-secondary text-xs mb-6 max-w-md">
+          This module is currently being synchronized. Return to your Overview.
         </p>
       </div>
     </DashboardLayout>
@@ -53,16 +55,18 @@ function DashboardPlaceholder({ title }: { title: string }) {
 
 function DashboardSuspense({ children }: { children: React.ReactNode }) {
   return (
-    <Suspense fallback={
-      <DashboardLayout>
-        <div className="min-h-[60vh] flex flex-col items-center justify-center p-8">
-          <div className="h-10 w-10 border-3 border-[#cc785c] border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-[#6c6a64] font-sans text-xs animate-pulse">Loading module telemetry...</p>
-        </div>
-      </DashboardLayout>
-    }>
-      {children}
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={
+        <DashboardLayout>
+          <div className="min-h-[60vh] flex flex-col items-center justify-center p-8">
+            <div className="h-8 w-8 border-2 border-primary-accent border-t-transparent rounded-full animate-spin mb-3"></div>
+            <p className="text-secondary text-xs">Loading module telemetry...</p>
+          </div>
+        </DashboardLayout>
+      }>
+        {children}
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 

@@ -29,15 +29,12 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
           {/* Logo & Bio */}
           <div className="space-y-4 md:col-span-1">
-            <Link to="/" className="inline-flex items-center gap-1.5">
+            <Link to="/" className="inline-flex items-center">
               <img 
                 src="/brand/logo.png" 
-                alt="Rankora Logo" 
-                className="h-9 w-auto object-contain scale-[1.25] -mr-1 brightness-200" 
+                alt="Rankora" 
+                className="h-8 sm:h-9 w-auto object-contain bg-white/10 px-2 py-1 rounded-lg backdrop-blur-xs" 
               />
-              <span className="text-xl font-bold font-serif text-[#faf9f5] tracking-tight">
-                Rankora
-              </span>
             </Link>
             <p className="text-xs text-[#8e8b82] leading-relaxed max-w-xs font-sans">
               AI-powered solutions to help local businesses grow their online presence and attract more customers.
