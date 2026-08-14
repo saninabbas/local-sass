@@ -12,7 +12,7 @@ export function calculateLocalVisibilityScore(rankings: any[]): number {
     } else if (ranking.position >= 11 && ranking.position <= 20) {
       totalScore += 50;
     } else if (ranking.position >= 21) {
-      totalScore += 10;
+      totalScore += 15;
     }
   }
   
@@ -27,14 +27,40 @@ export async function getRankingHistory(db: any, businessId: string) {
   return result.results || [];
 }
 
-export async function fetchSERPData(keyword: string, location: string, targetDomain: string, apiKey: string) {
+export interface SerpRankResult {
+  organicPosition: number | null;
+  localPackPosition: number | null;
+  position: number | null; // best of organic or local pack
+  bestCompetitor?: string;
+  competitorPosition?: number | null;
+  topPlaces?: Array<{
+    title: string;
+    rating?: number;
+    reviewsCount?: number;
+    address?: string;
+    position: number;
+  }>;
+  status: 'FOUND' | 'NOT FOUND' | 'UNAVAILABLE';
+}
+
+export async function fetchSERPData(
+  keyword: string, 
+  location: string, 
+  targetDomain: string, 
+  apiKey?: string
+): Promise<SerpRankResult> {
   if (!apiKey) {
     console.warn("SERP_API_KEY is not configured.");
-    return { position: null };
+    return { 
+      organicPosition: null, 
+      localPackPosition: null, 
+      position: null, 
+      status: 'UNAVAILABLE' 
+    };
   }
 
   const query = `${keyword} ${location}`.trim();
-  console.log(`Fetching SERP data for: "${query}" targeting domain: ${targetDomain}`);
+  const cleanTarget = targetDomain.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
 
   try {
     const response = await fetch('https://google.serper.dev/search', {
@@ -45,44 +71,85 @@ export async function fetchSERPData(keyword: string, location: string, targetDom
       },
       body: JSON.stringify({
         q: query,
-        location: location,
+        location: location || 'United States',
         gl: 'us',
         hl: 'en',
-        num: 50 // Fetch top 50 to find position
+        num: 50
       })
     });
 
     if (!response.ok) {
-      console.error(`Serper API error: ${response.status}`);
-      return { position: null };
+      console.error(`Serper API returned HTTP ${response.status}`);
+      return { 
+        organicPosition: null, 
+        localPackPosition: null, 
+        position: null, 
+        status: 'UNAVAILABLE' 
+      };
     }
 
     const data = await response.json() as any;
-    let foundPosition = null;
+    let localPackPosition: number | null = null;
+    let organicPosition: number | null = null;
+    const topPlaces: any[] = [];
 
-    // Check Local Pack (places) first
-    if (data.places && data.places.length > 0) {
-      const placeMatch = data.places.findIndex((place: any) => 
-        place.website && place.website.toLowerCase().includes(targetDomain.toLowerCase())
-      );
-      if (placeMatch !== -1) {
-        foundPosition = placeMatch + 1; // 1-indexed
+    // 1. Evaluate Local Pack (places)
+    if (data.places && Array.isArray(data.places)) {
+      data.places.slice(0, 5).forEach((place: any, pIdx: number) => {
+        topPlaces.push({
+          title: place.title || 'Local Business',
+          rating: place.rating || null,
+          reviewsCount: place.ratingCount || place.reviews || null,
+          address: place.address || null,
+          position: pIdx + 1
+        });
+
+        if (place.website && place.website.toLowerCase().includes(cleanTarget)) {
+          localPackPosition = pIdx + 1;
+        }
+      });
+    }
+
+    // 2. Evaluate Organic search results
+    let bestCompetitor = 'Local Competitor';
+    let competitorPosition = 1;
+
+    if (data.organic && Array.isArray(data.organic)) {
+      if (data.organic.length > 0) {
+        bestCompetitor = data.organic[0].title?.split(/[-|:]/)[0]?.trim() || data.organic[0].title || 'Market Leader';
+      }
+
+      const organicMatchIndex = data.organic.findIndex((res: any) => {
+        if (!res.link) return false;
+        const linkDomain = res.link.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+        return linkDomain.includes(cleanTarget) || cleanTarget.includes(linkDomain);
+      });
+
+      if (organicMatchIndex !== -1) {
+        organicPosition = organicMatchIndex + 1;
       }
     }
 
-    // Check Organic results if not found in places or if we want the best of either
-    if (!foundPosition && data.organic && data.organic.length > 0) {
-      const organicMatch = data.organic.findIndex((res: any) => 
-        res.link && res.link.toLowerCase().includes(targetDomain.toLowerCase())
-      );
-      if (organicMatch !== -1) {
-        foundPosition = organicMatch + 1;
-      }
-    }
+    const bestPosition = localPackPosition !== null 
+      ? (organicPosition !== null ? Math.min(localPackPosition, organicPosition) : localPackPosition)
+      : organicPosition;
 
-    return { position: foundPosition };
+    return {
+      organicPosition,
+      localPackPosition,
+      position: bestPosition,
+      bestCompetitor,
+      competitorPosition,
+      topPlaces,
+      status: bestPosition !== null ? 'FOUND' : 'NOT FOUND'
+    };
   } catch (error) {
     console.error("Error fetching SERP data:", error);
-    return { position: null };
+    return { 
+      organicPosition: null, 
+      localPackPosition: null, 
+      position: null, 
+      status: 'UNAVAILABLE' 
+    };
   }
 }

@@ -209,6 +209,74 @@ export interface ContentTopicItem {
   brief?: string;
 }
 
+export interface AIFixRequest {
+  type: 'title' | 'meta_description' | 'service_page_structure' | 'faq_schema' | 'review_response' | 'outreach_email' | 'content_brief';
+  context: {
+    businessName: string;
+    websiteUrl: string;
+    city: string;
+    category?: string;
+    targetKeyword?: string;
+    issueEvidence?: string;
+    competitorAdvantage?: string;
+    reviewerName?: string;
+    reviewRating?: number;
+    reviewText?: string;
+    prospectDomain?: string;
+    prospectTitle?: string;
+  };
+}
+
+export interface AIFixResult {
+  type: string;
+  title: string;
+  generatedContent: string;
+  explanation: string;
+  suggestedAction: string;
+  metaTags?: {
+    title?: string;
+    description?: string;
+    h1?: string;
+  };
+}
+
+export interface ActionProgressData {
+  completed: number;
+  pending: number;
+  skipped: number;
+  total: number;
+  percentage: number;
+}
+
+export interface ProgressSummaryData {
+  hasComparison: boolean;
+  current: {
+    score: number;
+    local: number;
+    technical: number;
+    onpage: number;
+    content: number;
+    date: string;
+  } | null;
+  previous: {
+    score: number;
+    local: number;
+    technical: number;
+    onpage: number;
+    content: number;
+    date: string;
+  } | null;
+  deltas: {
+    score: number;
+    local: number;
+    technical: number;
+  };
+  completedActions: number;
+  totalActions: number;
+  completionPercentage: number;
+  summaryHighlights: string[];
+}
+
 export interface ActionPlanTask {
   id: string;
   timeframe: 'today' | 'this_week' | 'this_month' | 'next_90_days' | 'long_term';
@@ -216,15 +284,18 @@ export interface ActionPlanTask {
   description?: string;
   problem?: string;
   evidence: string;
+  why?: string;
   priority: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | string;
   difficulty: 'EASY' | 'MEDIUM' | 'ADVANCED' | string;
   impact?: string;
   seoImpact?: string;
   localImpact?: string;
   conversionImpact?: string;
+  estimatedEffort?: string;
   businessOutcome?: string;
   expected_outcome?: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'dismissed';
+  fixType?: 'title' | 'meta_description' | 'service_page_structure' | 'faq_schema' | 'review_response' | 'outreach_email' | 'content_brief';
+  status: 'pending' | 'in_progress' | 'completed' | 'skipped' | 'dismissed';
 }
 
 export interface GrowthScore {

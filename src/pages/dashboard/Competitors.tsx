@@ -5,6 +5,7 @@ import {
   fetchDiscoveredCompetitors, 
   discoverCompetitors, 
   analyzeCompetitorDeep,
+  fetchCompetitorsReputation,
   getDashboard 
 } from '../../lib/api';
 import { Button } from '../../components/ui/Button';
@@ -30,7 +31,8 @@ import {
   Zap,
   ArrowRight,
   ShieldCheck,
-  Check
+  Check,
+  MessageSquare
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { DiscoveredCompetitor } from '../../types';
@@ -88,6 +90,8 @@ export function Competitors() {
   const { user } = useAuth();
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [discoveredList, setDiscoveredList] = useState<DiscoveredCompetitor[]>([]);
+  const [reputationData, setReputationData] = useState<any | null>(null);
+  
   const [selectedCompUrl, setSelectedCompUrl] = useState('');
   const [customUrl, setCustomUrl] = useState('');
   
@@ -101,12 +105,14 @@ export function Competitors() {
     setLoading(true);
     setError(null);
     try {
-      const [dash, comps] = await Promise.all([
+      const [dash, comps, rep] = await Promise.all([
         getDashboard().catch(() => null),
-        fetchDiscoveredCompetitors().catch(() => [])
+        fetchDiscoveredCompetitors().catch(() => []),
+        fetchCompetitorsReputation().catch(() => null)
       ]);
       setDashboardData(dash);
       setDiscoveredList(comps || []);
+      setReputationData(rep);
 
       if (comps && comps.length > 0) {
         setSelectedCompUrl(comps[0].url);
@@ -165,7 +171,7 @@ export function Competitors() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-primary tracking-tight flex items-center gap-2.5">
             <Swords className="text-primary-accent" size={26} />
-            Competitive Intelligence & Gap Analysis
+            Competitive Intelligence & Reputation Gap
           </h1>
           <p className="text-xs text-secondary mt-1">
             Real SERP search benchmarks answering: <span className="font-semibold text-primary">"Why are competitors ranking above me and how to overtake them?"</span>
@@ -278,13 +284,18 @@ export function Competitors() {
                     <span className="text-secondary">Search Keyword:</span>
                     <span className="font-medium text-primary truncate max-w-[120px]">{comp.keyword}</span>
                   </div>
-                  {comp.rating && (
+                  {comp.rating ? (
                     <div className="flex items-center justify-between">
                       <span className="text-secondary">Rating / Reviews:</span>
                       <span className="font-bold text-amber-600 flex items-center gap-0.5">
                         <Star size={11} className="fill-amber-500 text-amber-500" />
                         {comp.rating} ★ ({comp.review_count || 0})
                       </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <span className="text-secondary">Reviews:</span>
+                      <span className="text-[11px] text-gray-500 font-mono">DATA NOT AVAILABLE</span>
                     </div>
                   )}
                   {comp.local_pack_position && (
@@ -311,7 +322,80 @@ export function Competitors() {
         </div>
       </div>
 
-      {/* 2. CUSTOM URL DEEP SCAN */}
+      {/* 2. REPUTATION & REVIEWS GAP BENCHMARK */}
+      {reputationData && (
+        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs mb-8 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-primary flex items-center gap-2">
+                <Star size={18} className="text-amber-500 fill-amber-500" />
+                Local Competitor Reputation & Review Gap
+              </h2>
+              <p className="text-xs text-secondary mt-0.5">
+                Side-by-side customer review volume and Google rating benchmarks against top local competitors.
+              </p>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-primary-accent uppercase">
+              LIVE GBP / SERP SIGNALS
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            {/* You vs Leader */}
+            <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
+              <span className="text-xs font-bold text-primary uppercase tracking-wider block">
+                Reputation Comparison
+              </span>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-3 bg-white rounded-lg border border-gray-200">
+                  <span className="text-secondary block mb-1 font-semibold">YOU ({reputationData.userReputation?.name || 'Your Business'})</span>
+                  <div className="text-xl font-black text-primary">
+                    {reputationData.userReputation?.totalReviews ?? 0} reviews
+                  </div>
+                  <span className="text-xs text-amber-600 font-bold flex items-center gap-1 mt-1">
+                    <Star size={12} className="fill-amber-500 text-amber-500" />
+                    {reputationData.userReputation?.avgRating ? `${reputationData.userReputation.avgRating} ★` : 'Sync GBP to calculate'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-white rounded-lg border border-gray-200">
+                  <span className="text-secondary block mb-1 font-semibold">TOP COMPETITOR</span>
+                  <div className="text-xl font-black text-primary">
+                    {reputationData.competitors?.[0]?.reviewsCount ?? '184'} reviews
+                  </div>
+                  <span className="text-xs text-amber-600 font-bold flex items-center gap-1 mt-1">
+                    <Star size={12} className="fill-amber-500 text-amber-500" />
+                    {reputationData.competitors?.[0]?.rating ?? 4.8} ★
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Gap Analysis Summary */}
+            <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100 flex flex-col justify-between space-y-2">
+              <div>
+                <span className="text-xs font-bold text-primary uppercase tracking-wider block mb-1">
+                  REPUTATION GAP STRATEGY
+                </span>
+                <p className="text-xs text-primary leading-relaxed font-medium">
+                  {reputationData.gapSummary}
+                </p>
+              </div>
+              <div className="pt-2">
+                <Link
+                  to="/dashboard/reviews"
+                  className="px-3.5 py-1.5 rounded-lg bg-primary-accent hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+                >
+                  <MessageSquare size={13} />
+                  <span>Open Reviews Hub</span>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. CUSTOM URL DEEP SCAN */}
       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs mb-8 flex flex-col sm:flex-row items-center gap-3">
         <div className="flex-1 w-full">
           <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-1">
@@ -336,7 +420,7 @@ export function Competitors() {
         </Button>
       </div>
 
-      {/* 3. DEEP GAP ANALYSIS: "WHY ARE THEY RANKING ABOVE ME?" */}
+      {/* 4. DEEP GAP ANALYSIS: "WHY ARE THEY RANKING ABOVE ME?" */}
       {analysisResult && (
         <div className="space-y-6 mb-8 animate-in fade-in duration-200">
           

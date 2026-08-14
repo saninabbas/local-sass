@@ -82,8 +82,9 @@ export async function analyzeCompetitor(competitorUrl: string): Promise<any> {
   return fetchApi('/api/competitors/analyze', { method: 'POST', body: JSON.stringify({ competitorUrl }) });
 }
 
-export async function generateBlogArticle(topic?: string): Promise<any> {
-  return fetchApi('/api/content/generate', { method: 'POST', body: JSON.stringify({ topic }) });
+export async function generateBlogArticle(topic?: string | { topic: string; target_audience?: string; tone?: string; contentType?: string }): Promise<any> {
+  const payload = typeof topic === 'string' ? { topic } : (topic || {});
+  return fetchApi('/api/content/generate', { method: 'POST', body: JSON.stringify(payload) });
 }
 
 export async function fetchLeads(): Promise<any> {
@@ -117,8 +118,8 @@ export async function fetchKeywords(): Promise<any> {
   return fetchApi('/api/keywords');
 }
 
-export async function addKeyword(keyword: string): Promise<any> {
-  return fetchApi('/api/keywords', { method: 'POST', body: JSON.stringify({ keyword }) });
+export async function addKeyword(keyword: string, city?: string, zip?: string): Promise<any> {
+  return fetchApi('/api/keywords', { method: 'POST', body: JSON.stringify({ keyword, city, zip }) });
 }
 
 export async function deleteKeyword(id: string): Promise<any> {
@@ -127,6 +128,33 @@ export async function deleteKeyword(id: string): Promise<any> {
 
 export async function refreshKeywords(): Promise<any> {
   return fetchApi('/api/keywords/refresh', { method: 'POST' });
+}
+
+// -----------------------------------------------------------------------------
+// GOOGLE BUSINESS PROFILE & REPUTATION
+// -----------------------------------------------------------------------------
+export async function connectGoogleBusiness(): Promise<void> {
+  window.location.href = (import.meta.env.VITE_API_BASE_URL || '') + '/api/auth/googleBusiness';
+}
+
+export async function fetchGbpLocations(): Promise<any[]> {
+  return fetchApi('/api/gbp/locations');
+}
+
+export async function selectGbpLocation(locationData: { locationName: string; title?: string; address?: string; phone?: string; website?: string; category?: string }): Promise<any> {
+  return fetchApi('/api/gbp/select-location', { method: 'POST', body: JSON.stringify(locationData) });
+}
+
+export async function fetchGbpHealth(): Promise<any> {
+  return fetchApi('/api/gbp/health');
+}
+
+export async function fetchCompetitorsReputation(): Promise<any> {
+  return fetchApi('/api/competitors/reputation');
+}
+
+export async function generateOutreachEmail(payload: { opportunityId: string; opportunityName: string; whyRelevant: string }): Promise<{ subject: string; body: string }> {
+  return fetchApi('/api/authority/generate-email', { method: 'POST', body: JSON.stringify(payload) });
 }
 
 // -----------------------------------------------------------------------------
@@ -204,3 +232,32 @@ export async function sendCopilotMessage(message: string): Promise<{ reply: stri
     body: JSON.stringify({ message })
   });
 }
+
+// -----------------------------------------------------------------------------
+// AI FIX ENGINE (Fix with AI)
+// -----------------------------------------------------------------------------
+export async function fetchAIFix(type: string, context: Record<string, any>): Promise<any> {
+  return fetchApi('/api/ai/fix', {
+    method: 'POST',
+    body: JSON.stringify({ type, context })
+  });
+}
+
+// -----------------------------------------------------------------------------
+// ACTION EXECUTION & PROGRESS TRACKING
+// -----------------------------------------------------------------------------
+export async function updateActionStatus(actionId: string, status: 'completed' | 'pending' | 'skipped'): Promise<any> {
+  return fetchApi('/api/actions/status', {
+    method: 'POST',
+    body: JSON.stringify({ actionId, status })
+  });
+}
+
+export async function fetchActionProgress(): Promise<{ completed: number; pending: number; skipped: number; total: number; percentage: number }> {
+  return fetchApi('/api/actions/progress');
+}
+
+export async function fetchProgressSummary(): Promise<any> {
+  return fetchApi('/api/reports/progress-summary');
+}
+
