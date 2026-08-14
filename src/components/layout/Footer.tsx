@@ -31,9 +31,9 @@ export function Footer() {
           <div className="space-y-4 md:col-span-1">
             <Link to="/" className="inline-flex items-center">
               <img 
-                src="/brand/logo.png" 
+                src="/brand/logo-light.svg" 
                 alt="Rankora" 
-                className="h-11 sm:h-12 w-auto max-w-[210px] object-contain bg-white/95 px-3 py-1.5 rounded-xl shadow-xs" 
+                className="w-[115px] sm:w-[130px] h-auto object-contain transition-transform hover:scale-105" 
               />
             </Link>
             <p className="text-xs text-[#8e8b82] leading-relaxed max-w-xs font-sans">

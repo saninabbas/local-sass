@@ -36,9 +36,9 @@ export function Navbar() {
           {/* Logo */}
             <Link to="/" className="flex items-center py-1">
               <img 
-                src="/brand/logo.png" 
+                src="/brand/logo.svg" 
                 alt="Rankora" 
-                className="h-11 sm:h-12 w-auto max-w-[210px] object-contain transition-transform hover:scale-105" 
+                className="w-[105px] sm:w-[125px] h-auto object-contain transition-transform hover:scale-105" 
               />
             </Link>
           

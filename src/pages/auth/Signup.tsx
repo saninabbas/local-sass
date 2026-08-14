@@ -56,9 +56,9 @@ export function Signup() {
         <div className="flex justify-center mb-6">
           <Link to="/" className="flex items-center justify-center">
             <img 
-              src="/brand/logo.png" 
+              src="/brand/logo.svg" 
               alt="Rankora" 
-              className="h-14 sm:h-16 w-auto max-w-[260px] object-contain transition-transform hover:scale-105" 
+              className="w-[130px] sm:w-[150px] h-auto object-contain transition-transform hover:scale-105" 
             />
           </Link>
         </div>

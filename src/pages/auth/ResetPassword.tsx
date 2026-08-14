@@ -62,9 +62,9 @@ export function ResetPassword() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link to="/" className="flex justify-center mb-6">
           <img 
-            src="/brand/logo.png" 
+            src="/brand/logo.svg" 
             alt="Rankora" 
-            className="h-14 sm:h-16 w-auto max-w-[260px] object-contain transition-transform hover:scale-105" 
+            className="w-[130px] sm:w-[150px] h-auto object-contain transition-transform hover:scale-105" 
           />
         </Link>
         <h2 className="text-center text-3xl font-serif font-normal text-[#141413]">
