@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:api": "wrangler pages dev --port 8787 --d1 DB=local-growth-ai",
+    "dev:api": "wrangler pages dev --port 8787",
     "build": "tsc -b && vite build",
     "deploy": "npm run build && wrangler pages deploy dist --project-name local-sass",
     "lint": "oxlint",
