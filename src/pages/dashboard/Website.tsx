@@ -52,9 +52,9 @@ export function Website() {
     return (
       <DashboardLayout>
         <div className="flex flex-col items-center justify-center min-h-[60vh]">
-          <RefreshCw className="animate-spin text-primary-accent mb-4" size={48} />
-          <h2 className="text-xl font-bold text-primary">Analyzing your website...</h2>
-          <p className="text-secondary mt-2">Fetching live SEO and technical signals.</p>
+          <RefreshCw className="animate-spin text-[#cc785c] mb-4" size={40} />
+          <h2 className="text-xl font-serif font-normal text-[#141413]">Analyzing your website...</h2>
+          <p className="text-xs text-[#6c6a64] font-sans mt-1">Extracting live SEO and technical signals.</p>
         </div>
       </DashboardLayout>
     );
@@ -63,13 +63,13 @@ export function Website() {
   if (error || !data) {
     return (
       <DashboardLayout>
-        <div className="bg-red-50 border border-red-100 rounded-xl p-8 text-center mt-8">
-          <XCircle className="text-danger mx-auto mb-4" size={48} />
-          <h2 className="text-xl font-bold text-danger mb-2">Analysis Failed</h2>
-          <p className="text-red-700 mb-6">{error}</p>
+        <div className="bg-[#efe9de] border border-[#c64545]/30 rounded-xl p-8 text-center mt-6">
+          <XCircle className="text-[#c64545] mx-auto mb-3" size={40} />
+          <h2 className="text-xl font-serif font-normal text-[#141413] mb-1">Analysis Failed</h2>
+          <p className="text-xs text-[#c64545] font-mono mb-6">{error}</p>
           <button 
             onClick={fetchData}
-            className="px-6 py-2 bg-white text-danger font-bold rounded-lg border border-red-200 hover:bg-red-50 transition-colors"
+            className="px-5 py-2 bg-[#faf9f5] text-[#141413] text-xs font-medium rounded-lg border border-[#e6dfd8] hover:bg-[#e8e0d2] transition-colors"
           >
             Try Again
           </button>
@@ -78,7 +78,7 @@ export function Website() {
     );
   }
 
-  // Calculate some basic signals based on the raw data
+  // Calculate basic signals based on raw data
   const isTitleGood = data.title.length > 10 && data.title.length < 70;
   const isDescGood = data.metaDescription.length > 50 && data.metaDescription.length < 160;
   const isH1Good = data.h1.trim().length > 0;
@@ -91,93 +91,93 @@ export function Website() {
   if (!data.https) score -= 20;
   if (data.scriptCount > 30) score -= 10;
   
-  const scoreColor = score >= 80 ? 'text-green-500' : score >= 60 ? 'text-warning' : 'text-danger';
+  const scoreColor = score >= 80 ? 'text-[#5db872]' : score >= 60 ? 'text-[#e8a55a]' : 'text-[#c64545]';
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 mt-4 gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 mt-2 gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-primary mb-2 flex items-center gap-3">
-            <Globe className="text-primary-accent" size={32} />
-            Website Analysis
+          <h1 className="text-2xl sm:text-3xl font-serif font-normal text-[#141413] mb-1 flex items-center gap-2.5">
+            <Globe className="text-[#cc785c]" size={26} />
+            Website Technical Analysis
           </h1>
-          <p className="text-secondary">Live technical and content signals for <a href={data.url} target="_blank" rel="noreferrer" className="text-primary-accent hover:underline">{data.url}</a></p>
+          <p className="text-xs text-[#6c6a64] font-sans">Live technical and content signals for <a href={data.url} target="_blank" rel="noreferrer" className="text-[#cc785c] hover:underline font-mono">{data.url}</a></p>
         </div>
         <button 
           onClick={fetchData}
           disabled={refreshing}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-primary hover:bg-gray-50 transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-3.5 py-1.5 bg-[#efe9de] border border-[#e6dfd8] rounded-lg text-xs font-sans font-medium text-[#141413] hover:bg-[#e8e0d2] transition-colors disabled:opacity-50"
         >
-          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+          <RefreshCw size={13} className={refreshing ? 'animate-spin text-[#cc785c]' : 'text-[#cc785c]'} />
           {refreshing ? 'Analyzing...' : 'Refresh Analysis'}
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Main Score Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center justify-center text-center lg:col-span-1">
-          <h2 className="text-lg font-bold text-secondary mb-6 uppercase tracking-wider">Health Score</h2>
-          <div className={`text-7xl font-black mb-4 ${scoreColor}`}>
+        <div className="bg-[#efe9de] rounded-xl border border-[#e6dfd8] p-6 flex flex-col items-center justify-center text-center lg:col-span-1 shadow-xs">
+          <h2 className="text-xs font-mono text-[#6c6a64] mb-4 uppercase tracking-widest">Health Score</h2>
+          <div className={`text-6xl font-serif font-normal mb-2 ${scoreColor}`}>
             {score}
           </div>
-          <p className="text-secondary font-medium">
+          <p className="text-xs text-[#6c6a64] font-sans">
             {score >= 80 ? 'Excellent! Your website is well optimized.' : score >= 60 ? 'Good, but has room for improvement.' : 'Critical issues detected. Fix immediately.'}
           </p>
         </div>
 
         {/* Content Signals */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:col-span-2">
-          <h2 className="text-lg font-bold text-primary mb-6 flex items-center gap-2">
-            <Search className="text-secondary" size={20} />
+        <div className="bg-[#efe9de] rounded-xl border border-[#e6dfd8] p-6 lg:col-span-2 shadow-xs">
+          <h2 className="text-base font-serif font-medium text-[#141413] mb-4 flex items-center gap-2">
+            <Search className="text-[#cc785c]" size={18} />
             Content & SEO Signals
           </h2>
-          <div className="space-y-6">
+          <div className="space-y-4">
             
             {/* Title */}
-            <div className="flex items-start gap-4 p-4 rounded-xl bg-gray-50 border border-gray-100">
-              <div className="mt-1 shrink-0">
-                {isTitleGood ? <CheckCircle2 className="text-green-500" /> : <XCircle className="text-warning" />}
+            <div className="flex items-start gap-3 p-3.5 rounded-lg bg-[#faf9f5] border border-[#e6dfd8]">
+              <div className="mt-0.5 shrink-0">
+                {isTitleGood ? <CheckCircle2 size={16} className="text-[#5db872]" /> : <XCircle size={16} className="text-[#e8a55a]" />}
               </div>
               <div className="flex-1">
                 <div className="flex justify-between mb-1">
-                  <h3 className="font-bold text-primary">Title Tag</h3>
-                  <span className="text-xs font-bold text-secondary">{data.title.length} chars</span>
+                  <h3 className="font-sans font-medium text-xs text-[#141413]">Title Tag</h3>
+                  <span className="text-[10px] font-mono text-[#8e8b82]">{data.title.length} chars</span>
                 </div>
-                <p className="text-sm text-secondary mb-2">Ideal length is 10-70 characters.</p>
-                <div className="text-sm text-primary bg-white p-3 rounded border border-gray-200 break-all font-mono">
-                  {data.title || <span className="text-gray-400 italic">No title tag found</span>}
+                <p className="text-[11px] text-[#6c6a64] mb-1.5">Ideal length is 10-70 characters.</p>
+                <div className="text-xs text-[#141413] bg-[#efe9de] p-2.5 rounded border border-[#e6dfd8] break-all font-mono">
+                  {data.title || <span className="text-[#8e8b82] italic">No title tag found</span>}
                 </div>
               </div>
             </div>
 
             {/* Meta Description */}
-            <div className="flex items-start gap-4 p-4 rounded-xl bg-gray-50 border border-gray-100">
-              <div className="mt-1 shrink-0">
-                {isDescGood ? <CheckCircle2 className="text-green-500" /> : <XCircle className="text-warning" />}
+            <div className="flex items-start gap-3 p-3.5 rounded-lg bg-[#faf9f5] border border-[#e6dfd8]">
+              <div className="mt-0.5 shrink-0">
+                {isDescGood ? <CheckCircle2 size={16} className="text-[#5db872]" /> : <XCircle size={16} className="text-[#e8a55a]" />}
               </div>
               <div className="flex-1">
                 <div className="flex justify-between mb-1">
-                  <h3 className="font-bold text-primary">Meta Description</h3>
-                  <span className="text-xs font-bold text-secondary">{data.metaDescription.length} chars</span>
+                  <h3 className="font-sans font-medium text-xs text-[#141413]">Meta Description</h3>
+                  <span className="text-[10px] font-mono text-[#8e8b82]">{data.metaDescription.length} chars</span>
                 </div>
-                <p className="text-sm text-secondary mb-2">Ideal length is 50-160 characters.</p>
-                <div className="text-sm text-primary bg-white p-3 rounded border border-gray-200 break-all font-mono">
-                  {data.metaDescription || <span className="text-gray-400 italic">No meta description found</span>}
+                <p className="text-[11px] text-[#6c6a64] mb-1.5">Ideal length is 50-160 characters.</p>
+                <div className="text-xs text-[#141413] bg-[#efe9de] p-2.5 rounded border border-[#e6dfd8] break-all font-mono">
+                  {data.metaDescription || <span className="text-[#8e8b82] italic">No meta description found</span>}
                 </div>
               </div>
             </div>
 
             {/* H1 */}
-            <div className="flex items-start gap-4 p-4 rounded-xl bg-gray-50 border border-gray-100">
-              <div className="mt-1 shrink-0">
-                {isH1Good ? <CheckCircle2 className="text-green-500" /> : <XCircle className="text-danger" />}
+            <div className="flex items-start gap-3 p-3.5 rounded-lg bg-[#faf9f5] border border-[#e6dfd8]">
+              <div className="mt-0.5 shrink-0">
+                {isH1Good ? <CheckCircle2 size={16} className="text-[#5db872]" /> : <XCircle size={16} className="text-[#c64545]" />}
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-primary mb-1">H1 Heading</h3>
-                <p className="text-sm text-secondary mb-2">Every page should have exactly one H1 tag.</p>
-                <div className="text-sm text-primary bg-white p-3 rounded border border-gray-200 break-all font-mono">
-                  {data.h1 || <span className="text-danger font-bold">Missing H1 Heading!</span>}
+                <h3 className="font-sans font-medium text-xs text-[#141413] mb-1">H1 Heading</h3>
+                <p className="text-[11px] text-[#6c6a64] mb-1.5">Every page should have exactly one H1 tag.</p>
+                <div className="text-xs text-[#141413] bg-[#efe9de] p-2.5 rounded border border-[#e6dfd8] break-all font-mono">
+                  {data.h1 || <span className="text-[#c64545] font-mono font-bold">Missing H1 Heading!</span>}
                 </div>
               </div>
             </div>
@@ -188,45 +188,45 @@ export function Website() {
       </div>
 
       {/* Technical Grid */}
-      <h2 className="text-xl font-bold text-primary mt-12 mb-6">Technical Overview</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
+      <h2 className="text-lg font-serif font-medium text-[#141413] mt-8 mb-4">Technical Overview</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         
-        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col items-center text-center">
-          <div className={`p-3 rounded-full mb-3 ${data.https ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-            <Lock size={24} />
+        <div className="bg-[#efe9de] p-5 rounded-xl border border-[#e6dfd8] shadow-xs flex flex-col items-center text-center">
+          <div className={`p-2.5 rounded-full mb-2 ${data.https ? 'bg-[#5db872]/20 text-[#2b753e]' : 'bg-[#c64545]/20 text-[#c64545]'}`}>
+            <Lock size={18} />
           </div>
-          <h3 className="font-bold text-primary mb-1">Security (SSL)</h3>
-          <p className="text-sm text-secondary">
-            {data.https ? 'Secure (HTTPS active)' : 'Insecure (Missing HTTPS)'}
+          <h3 className="font-sans font-medium text-xs text-[#141413] mb-0.5">Security (SSL)</h3>
+          <p className="text-[11px] font-mono text-[#6c6a64]">
+            {data.https ? 'HTTPS Active' : 'Missing HTTPS'}
           </p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col items-center text-center">
-          <div className="p-3 rounded-full bg-blue-50 text-blue-600 mb-3">
-            <Heading1 size={24} />
+        <div className="bg-[#efe9de] p-5 rounded-xl border border-[#e6dfd8] shadow-xs flex flex-col items-center text-center">
+          <div className="p-2.5 rounded-full bg-[#faf9f5] text-[#cc785c] border border-[#e6dfd8] mb-2">
+            <Heading1 size={18} />
           </div>
-          <h3 className="font-bold text-primary mb-1">Headings</h3>
-          <p className="text-sm text-secondary">
+          <h3 className="font-sans font-medium text-xs text-[#141413] mb-0.5">Headings</h3>
+          <p className="text-[11px] font-mono text-[#6c6a64]">
             {data.headingsCount} heading tags found
           </p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col items-center text-center">
-          <div className="p-3 rounded-full bg-purple-50 text-purple-600 mb-3">
-            <Code size={24} />
+        <div className="bg-[#efe9de] p-5 rounded-xl border border-[#e6dfd8] shadow-xs flex flex-col items-center text-center">
+          <div className="p-2.5 rounded-full bg-[#faf9f5] text-[#e8a55a] border border-[#e6dfd8] mb-2">
+            <Code size={18} />
           </div>
-          <h3 className="font-bold text-primary mb-1">Scripts</h3>
-          <p className="text-sm text-secondary">
-            {data.scriptCount} script tags detected
+          <h3 className="font-sans font-medium text-xs text-[#141413] mb-0.5">Scripts</h3>
+          <p className="text-[11px] font-mono text-[#6c6a64]">
+            {data.scriptCount} scripts detected
           </p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col items-center text-center">
-          <div className="p-3 rounded-full bg-orange-50 text-orange-600 mb-3">
-            <LinkIcon size={24} />
+        <div className="bg-[#efe9de] p-5 rounded-xl border border-[#e6dfd8] shadow-xs flex flex-col items-center text-center">
+          <div className="p-2.5 rounded-full bg-[#faf9f5] text-[#5db8a6] border border-[#e6dfd8] mb-2">
+            <LinkIcon size={18} />
           </div>
-          <h3 className="font-bold text-primary mb-1">Links</h3>
-          <p className="text-sm text-secondary">
+          <h3 className="font-sans font-medium text-xs text-[#141413] mb-0.5">Links</h3>
+          <p className="text-[11px] font-mono text-[#6c6a64]">
             {data.linkCount} total links found
           </p>
         </div>

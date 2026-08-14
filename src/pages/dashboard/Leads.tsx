@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchLeads, getBusiness } from '../../lib/api';
-import { Users, Copy, CheckCircle2, Link as LinkIcon, Download, Mail } from 'lucide-react';
+import { Users, Copy, CheckCircle2, Link as LinkIcon, Download, Mail, Lock } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Link } from 'react-router-dom';
 
@@ -17,7 +17,7 @@ interface Lead {
 export function Leads() {
   const { user } = useAuth();
   const currentPlan = (user as any)?.subscription_status || 'free';
-  const isPro = currentPlan === 'pro' || currentPlan === 'growth';
+  const isPro = currentPlan === 'pro' || currentPlan === 'growth' || currentPlan === 'enterprise';
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +41,6 @@ export function Leads() {
   const loadData = async () => {
     try {
       setLoading(true);
-      // Fetch real business ID and leads in parallel
       const [businessData, leadsData] = await Promise.all([
         getBusiness().catch(() => null),
         fetchLeads().catch(() => [])
@@ -51,12 +50,11 @@ export function Leads() {
       }
       setLeads(leadsData || []);
     } catch (error) {
-      console.error("Failed to load data", error);
+      console.error("Failed to load leads data", error);
     } finally {
       setLoading(false);
     }
   };
-
 
   const handleCopy = () => {
     navigator.clipboard.writeText(embedCode);
@@ -89,109 +87,107 @@ export function Leads() {
 
   return (
     <DashboardLayout>
-      <div className="mb-8 mt-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      <div className="mb-6 mt-2 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-primary mb-2 flex items-center gap-3">
-            <Users className="text-blue-500" size={32} />
-            Lead Generation
+          <h1 className="text-2xl sm:text-3xl font-serif font-normal text-[#141413] mb-1 flex items-center gap-2.5">
+            <Users className="text-[#cc785c]" size={26} />
+            Lead Generation Widget
           </h1>
-          <p className="text-secondary max-w-2xl">
-            Embed the SEO Audit widget on your website to capture emails and generate warm leads automatically.
+          <p className="text-xs text-[#6c6a64] max-w-2xl font-sans">
+            Embed the interactive audit widget on your website to capture high-intent inbound inquiries automatically.
           </p>
         </div>
         {isPro && leads.length > 0 && (
-          <Button onClick={handleExportCSV} variant="outline" className="flex items-center gap-2">
-            <Download size={16} /> Export CSV
+          <Button onClick={handleExportCSV} variant="outline" size="sm" className="flex items-center gap-1.5 bg-[#efe9de] border-[#e6dfd8] text-xs text-[#141413]">
+            <Download size={14} /> Export CSV
           </Button>
         )}
       </div>
 
       {!isPro ? (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-8 mb-8 text-center relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-indigo-400"></div>
-          <Users className="text-blue-400 mx-auto mb-4" size={40} />
-          <h2 className="text-2xl font-bold text-primary mb-3">Unlock Lead Generation</h2>
-          <p className="text-secondary max-w-xl mx-auto mb-6">
-            Get a beautiful widget to embed on your WordPress or Shopify site. Capture visitor emails automatically and turn them into paying clients.
+        <div className="bg-[#efe9de] border border-[#cc785c]/30 rounded-xl p-8 mb-8 text-center relative overflow-hidden shadow-xs">
+          <Lock className="text-[#cc785c] mx-auto mb-3" size={36} />
+          <h2 className="text-xl font-serif font-medium text-[#141413] mb-2">Unlock Lead Capture Widget</h2>
+          <p className="text-xs text-[#6c6a64] max-w-lg mx-auto mb-6 font-sans">
+            Embed the SEO diagnostic widget on your website to capture inbound visitor leads directly into your dashboard.
           </p>
           <Link to="/dashboard/settings">
-            <Button className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 border-none shadow-lg">
-              Upgrade to Access
+            <Button className="bg-[#cc785c] hover:bg-[#a9583e] text-white text-xs font-sans font-medium px-6 py-2 rounded-lg shadow-sm">
+              Upgrade Now
             </Button>
           </Link>
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-8 shadow-sm">
-            <h2 className="text-lg font-bold text-primary mb-4 flex items-center gap-2">
-              <LinkIcon className="text-blue-500" size={20} />
-              Widget Embed Code
+          <div className="bg-[#efe9de] rounded-xl border border-[#e6dfd8] p-5 mb-6 shadow-xs">
+            <h2 className="text-sm font-serif font-medium text-[#141413] mb-2 flex items-center gap-2">
+              <LinkIcon className="text-[#cc785c]" size={16} />
+              Widget Embed Script
             </h2>
-            <p className="text-sm text-secondary mb-4">
-              Copy and paste this script right before the closing <code>&lt;/body&gt;</code> tag on your website. 
-              It will display a floating "Free SEO Audit" button to your visitors.
+            <p className="text-xs text-[#6c6a64] font-sans mb-3">
+              Paste this snippet right before the closing <code>&lt;/body&gt;</code> tag on your website to activate the floating audit button.
             </p>
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <code className="flex-1 bg-gray-50 border border-gray-200 rounded-lg p-3 w-full overflow-x-auto text-sm text-gray-700 whitespace-nowrap">
+            <div className="flex flex-col sm:flex-row items-center gap-2.5">
+              <code className="flex-1 bg-[#faf9f5] border border-[#e6dfd8] rounded-lg p-2.5 w-full overflow-x-auto text-xs text-[#141413] font-mono whitespace-nowrap">
                 {embedCode || 'Loading your widget code...'}
               </code>
-              <Button onClick={handleCopy} disabled={!embedCode} className="w-full sm:w-auto flex items-center gap-2 whitespace-nowrap">
-                {copied ? <CheckCircle2 size={16} /> : <Copy size={16} />}
+              <Button onClick={handleCopy} disabled={!embedCode} size="sm" className="w-full sm:w-auto flex items-center gap-1.5 whitespace-nowrap bg-[#cc785c] hover:bg-[#a9583e] text-white text-xs font-medium h-9">
+                {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
                 {copied ? 'Copied' : 'Copy Code'}
               </Button>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-              <h2 className="text-lg font-bold text-primary">Captured Leads ({leads.length})</h2>
+          <div className="bg-[#efe9de] rounded-xl border border-[#e6dfd8] overflow-hidden shadow-xs">
+            <div className="p-4 border-b border-[#e6dfd8] bg-[#faf9f5] flex justify-between items-center">
+              <h2 className="text-sm font-serif font-medium text-[#141413]">Captured Inbound Leads ({leads.length})</h2>
             </div>
             
             {loading ? (
-              <div className="p-12 text-center text-gray-400">
-                <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+              <div className="p-12 text-center text-xs font-mono text-[#8e8b82]">
+                <div className="w-6 h-6 border-2 border-[#cc785c] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
                 Loading leads...
               </div>
             ) : leads.length === 0 ? (
-              <div className="p-16 text-center">
-                <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Mail size={32} />
+              <div className="p-12 text-center">
+                <div className="w-12 h-12 bg-[#faf9f5] text-[#cc785c] border border-[#e6dfd8] rounded-full flex items-center justify-center mx-auto mb-3 shadow-xs">
+                  <Mail size={24} />
                 </div>
-                <h3 className="text-xl font-bold text-primary mb-2">No leads yet</h3>
-                <p className="text-secondary max-w-md mx-auto">
-                  Embed the widget on your website to start capturing leads. When visitors request an SEO audit, their details will appear here.
+                <h3 className="text-base font-serif font-medium text-[#141413] mb-1">No leads captured yet</h3>
+                <p className="text-xs text-[#6c6a64] max-w-md mx-auto font-sans">
+                  Embed the snippet on your website to start capturing prospective client inquiries.
                 </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left text-xs font-sans">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100 text-xs uppercase tracking-wider text-gray-500 font-bold">
-                      <th className="p-4 pl-6">Name</th>
-                      <th className="p-4">Email</th>
-                      <th className="p-4">Website</th>
-                      <th className="p-4 pr-6">Date Captured</th>
+                    <tr className="bg-[#e8e0d2] border-b border-[#e6dfd8] text-[10px] uppercase font-mono tracking-wider text-[#6c6a64]">
+                      <th className="py-3 px-4 sm:px-6">Name</th>
+                      <th className="py-3 px-4">Email</th>
+                      <th className="py-3 px-4">Website</th>
+                      <th className="py-3 px-4 sm:px-6">Date Captured</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-[#e6dfd8] bg-[#faf9f5]">
                     {leads.map((lead) => (
-                      <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="p-4 pl-6 font-medium text-primary">{lead.name}</td>
-                        <td className="p-4 text-secondary">
-                          <a href={`mailto:${lead.email}`} className="hover:text-blue-600 transition-colors">
+                      <tr key={lead.id} className="hover:bg-[#efe9de]/50 transition-colors">
+                        <td className="py-3 px-4 sm:px-6 font-medium text-[#141413]">{lead.name}</td>
+                        <td className="py-3 px-4 text-[#6c6a64] font-mono">
+                          <a href={`mailto:${lead.email}`} className="text-[#cc785c] hover:underline">
                             {lead.email}
                           </a>
                         </td>
-                        <td className="p-4 text-secondary">
+                        <td className="py-3 px-4 text-[#6c6a64] font-mono">
                           {lead.website_url ? (
-                            <a href={lead.website_url.startsWith('http') ? lead.website_url : `https://${lead.website_url}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                            <a href={lead.website_url.startsWith('http') ? lead.website_url : `https://${lead.website_url}`} target="_blank" rel="noopener noreferrer" className="text-[#cc785c] hover:underline">
                               {lead.website_url.replace(/^https?:\/\//i, '')}
                             </a>
                           ) : (
-                            <span className="text-gray-400">-</span>
+                            <span className="text-[#8e8b82]">-</span>
                           )}
                         </td>
-                        <td className="p-4 pr-6 text-sm text-gray-500">
+                        <td className="py-3 px-4 sm:px-6 text-[10px] font-mono text-[#8e8b82]">
                           {new Date(lead.created_at).toLocaleDateString()}
                         </td>
                       </tr>

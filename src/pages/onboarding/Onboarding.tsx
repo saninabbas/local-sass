@@ -41,82 +41,91 @@ export function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col pt-12 sm:pt-20 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#faf9f5] flex flex-col pt-10 sm:pt-16 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-lg">
         
+        {/* Brand Logo Header */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="flex items-center gap-2 mb-2">
+            <img src="/brand/logo.png" alt="Rankora" className="h-8 w-auto" />
+            <span className="font-serif font-bold text-xl text-[#141413]">Rankora</span>
+          </div>
+          <p className="text-xs text-[#6c6a64] font-sans">Set up your local entity to begin telemetry crawling</p>
+        </div>
+
         {/* Progress Indicator */}
-        <div className="flex items-center justify-between mb-12 relative">
+        <div className="flex items-center justify-between mb-8 relative px-8">
           {[
-            { num: 1, label: 'Business' },
-            { num: 2, label: 'Details' }
+            { num: 1, label: 'Organization' },
+            { num: 2, label: 'Location & URL' }
           ].map((s) => (
             <div key={s.num} className="flex flex-col items-center flex-1 z-10 relative">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
-                step >= s.num ? 'bg-primary text-white shadow-md' : 'bg-gray-200 text-gray-400'
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono font-bold transition-colors ${
+                step >= s.num ? 'bg-[#cc785c] text-white shadow-xs' : 'bg-[#e8e0d2] text-[#8e8b82]'
               }`}>
                 {s.num}
               </div>
-              <span className={`text-xs mt-2 font-medium ${step >= s.num ? 'text-primary' : 'text-gray-400'}`}>
+              <span className={`text-[11px] mt-1.5 font-sans font-medium ${step >= s.num ? 'text-[#141413]' : 'text-[#8e8b82]'}`}>
                 {s.label}
               </span>
             </div>
           ))}
           {/* Track line */}
-          <div className="absolute top-4 left-[25%] right-[25%] h-0.5 bg-gray-200 z-0">
-            <div className={`h-full bg-primary transition-all duration-300 ${step === 2 ? 'w-full' : 'w-0'}`} />
+          <div className="absolute top-3.5 left-[30%] right-[30%] h-0.5 bg-[#e6dfd8] z-0">
+            <div className={`h-full bg-[#cc785c] transition-all duration-300 ${step === 2 ? 'w-full' : 'w-0'}`} />
           </div>
         </div>
 
-        <div className="bg-white py-10 px-6 shadow-xl shadow-black/5 sm:rounded-2xl sm:px-12 border border-gray-200 relative overflow-hidden">
+        <div className="bg-[#efe9de] py-8 px-6 sm:px-10 rounded-2xl border border-[#e6dfd8] shadow-xs relative overflow-hidden">
           {error && (
-            <div className="mb-6 p-3 bg-red-50 border border-red-100 text-danger text-sm rounded-lg">
+            <div className="mb-5 p-3 bg-[#faf9f5] border border-[#c64545]/30 text-[#c64545] text-xs font-mono rounded-lg">
               {error}
             </div>
           )}
 
           {step === 1 && (
-            <form onSubmit={handleNext} className="animate-in fade-in slide-in-from-right-4 duration-300">
-              <h2 className="text-2xl font-extrabold text-primary mb-6">Tell us about your business</h2>
+            <form onSubmit={handleNext} className="animate-in fade-in duration-300">
+              <h2 className="text-xl font-serif font-normal text-[#141413] mb-4">Organization Profile</h2>
               <FormField
                 label="Business Name"
                 id="businessName"
                 type="text"
-                placeholder="ABC Dental"
+                placeholder="Apex Dental Clinic"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
               />
-              <div className="mb-8">
-                <label htmlFor="businessType" className="block text-sm font-semibold text-primary mb-2">
-                  Business Type
+              <div className="mb-6">
+                <label htmlFor="businessType" className="block text-xs font-mono uppercase tracking-wider text-[#6c6a64] mb-1">
+                  Business Industry
                 </label>
                 <select
                   id="businessType"
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-primary text-base focus:outline-none focus:ring-2 focus:ring-primary-accent/20 focus:border-primary-accent transition-all appearance-none"
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-[#e6dfd8] bg-[#faf9f5] text-[#141413] text-xs font-sans focus:outline-none focus:ring-1 focus:ring-[#cc785c] transition-all"
                   value={type}
                   onChange={(e) => setType(e.target.value)}
                   required
                 >
-                  <option value="" disabled>Select an industry...</option>
+                  <option value="" disabled>Select an industry category...</option>
                   {businessTypes.map(t => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
               </div>
-              <Button type="submit" variant="primary" size="lg" className="w-full text-lg h-12">
-                Continue
+              <Button type="submit" variant="primary" size="lg" className="w-full text-xs font-medium h-10 bg-[#cc785c] hover:bg-[#a9583e] text-white rounded-lg">
+                Continue to Step 2
               </Button>
             </form>
           )}
 
           {step === 2 && (
-            <form onSubmit={handleNext} className="animate-in fade-in slide-in-from-right-4 duration-300">
-              <h2 className="text-2xl font-extrabold text-primary mb-6">Business Details</h2>
+            <form onSubmit={handleNext} className="animate-in fade-in duration-300">
+              <h2 className="text-xl font-serif font-normal text-[#141413] mb-4">Location & Website URL</h2>
               <FormField
                 label="City"
                 id="city"
                 type="text"
-                placeholder="New York"
+                placeholder="Chicago"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
                 required
@@ -131,7 +140,7 @@ export function Onboarding() {
                 required
               />
               <FormField
-                label="Website URL"
+                label="Website URL (Audit Target)"
                 id="website"
                 type="url"
                 placeholder="https://example.com"
@@ -139,12 +148,12 @@ export function Onboarding() {
                 onChange={(e) => setWebsiteUrl(e.target.value)}
                 required
               />
-              <div className="flex gap-4 mt-8">
-                <Button type="button" variant="outline" size="lg" className="w-1/3 h-12" onClick={() => setStep(1)} disabled={isLoading}>
+              <div className="flex gap-3 mt-6">
+                <Button type="button" variant="outline" size="lg" className="w-1/3 h-10 text-xs border-[#e6dfd8] bg-[#faf9f5] text-[#141413]" onClick={() => setStep(1)} disabled={isLoading}>
                   Back
                 </Button>
-                <Button type="submit" variant="primary" size="lg" className="w-2/3 h-12" disabled={isLoading}>
-                  {isLoading ? 'Saving...' : 'Start Free Audit'}
+                <Button type="submit" variant="primary" size="lg" className="w-2/3 h-10 text-xs font-medium bg-[#cc785c] hover:bg-[#a9583e] text-white rounded-lg" disabled={isLoading}>
+                  {isLoading ? 'Initializing...' : 'Complete & Launch'}
                 </Button>
               </div>
             </form>

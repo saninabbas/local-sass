@@ -3,6 +3,7 @@ import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { fetchApi } from '../../lib/api';
+import { FileText, ExternalLink } from 'lucide-react';
 
 interface AuditHistory {
   id: string;
@@ -55,89 +56,91 @@ export function Reports() {
 
   return (
     <DashboardLayout>
-      <div className="mt-8">
-        <h2 className="text-2xl font-bold text-primary mb-6">Audit History</h2>
-        
-        {(!history || history.length === 0) ? (
-          <div className="bg-white rounded-xl border border-gray-100 p-12 text-center shadow-sm">
-            <h3 className="text-lg font-semibold text-primary mb-2">No reports yet.</h3>
-            <p className="text-secondary mb-0">Run your first audit from the dashboard to start tracking your progress.</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100 text-xs uppercase tracking-wider font-semibold text-secondary">
-                    <th className="py-4 px-6">Audit Date</th>
-                    <th className="py-4 px-6 text-center">Growth Score</th>
-                    <th className="py-4 px-6 text-center">SEO</th>
-                    <th className="py-4 px-6 text-center">Website</th>
-                    <th className="py-4 px-6 text-center">Visibility</th>
-                    <th className="py-4 px-6 text-center">Status</th>
-                    <th className="py-4 px-6 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {history.map((audit) => {
-                    const date = new Date(audit.created_at);
-                    const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                    
-                    return (
-                      <tr key={audit.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="py-4 px-6 whitespace-nowrap">
-                          <span className="font-medium text-primary">{formattedDate}</span>
-                          <span className="block text-xs text-secondary mt-0.5">{date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          {audit.overall_score !== null ? (
-                            <span className="inline-flex items-center justify-center bg-blue-50 text-primary-accent font-bold h-8 w-12 rounded-lg text-sm">
-                              {audit.overall_score}
-                            </span>
-                          ) : '-'}
-                        </td>
-                        <td className="py-4 px-6 text-center text-sm font-medium text-secondary">{audit.seo_score ?? '-'}</td>
-                        <td className="py-4 px-6 text-center text-sm font-medium text-secondary">{audit.website_score ?? '-'}</td>
-                        <td className="py-4 px-6 text-center text-sm font-medium text-secondary">{audit.visibility_score ?? '-'}</td>
-                        <td className="py-4 px-6 text-center">
-                          {audit.status === 'completed' ? (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-success/10 text-success-dark">
-                              Completed
-                            </span>
-                          ) : audit.status === 'running' ? (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-warning/20 text-warning-dark">
-                              Running
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-danger/10 text-danger">
-                              Failed
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          {audit.status === 'completed' && (
-                            <a
-                              href={`/report/${audit.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors whitespace-nowrap"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                              </svg>
-                              View Report
-                            </a>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+      <div className="mb-6 mt-2">
+        <h1 className="text-2xl sm:text-3xl font-serif font-normal text-[#141413] mb-1 flex items-center gap-2.5">
+          <FileText className="text-[#cc785c]" size={26} />
+          Diagnostic Audit History
+        </h1>
+        <p className="text-xs text-[#6c6a64] font-sans">View previous audit scans, track score improvements, and access shareable public executive summaries.</p>
       </div>
+
+      {(!history || history.length === 0) ? (
+        <div className="bg-[#efe9de] rounded-xl border border-[#e6dfd8] p-12 text-center shadow-xs">
+          <h3 className="text-base font-serif font-medium text-[#141413] mb-1">No diagnostic reports yet.</h3>
+          <p className="text-xs text-[#6c6a64] font-sans">Execute your first audit from the Overview dashboard to start tracking progress.</p>
+        </div>
+      ) : (
+        <div className="bg-[#efe9de] rounded-xl border border-[#e6dfd8] overflow-hidden shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-sans">
+              <thead>
+                <tr className="bg-[#e8e0d2] border-b border-[#e6dfd8] text-[10px] uppercase font-mono tracking-wider text-[#6c6a64]">
+                  <th className="py-3 px-4 sm:px-6">Audit Timestamp</th>
+                  <th className="py-3 px-4 text-center">Growth Score</th>
+                  <th className="py-3 px-4 text-center">SEO</th>
+                  <th className="py-3 px-4 text-center">Website</th>
+                  <th className="py-3 px-4 text-center">Visibility</th>
+                  <th className="py-3 px-4 text-center">Status</th>
+                  <th className="py-3 px-4 sm:px-6 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#e6dfd8] bg-[#faf9f5]">
+                {history.map((audit) => {
+                  const date = new Date(audit.created_at);
+                  const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                  
+                  return (
+                    <tr key={audit.id} className="hover:bg-[#efe9de]/50 transition-colors">
+                      <td className="py-3.5 px-4 sm:px-6 whitespace-nowrap">
+                        <span className="font-medium text-[#141413] text-xs">{formattedDate}</span>
+                        <span className="block text-[10px] font-mono text-[#8e8b82] mt-0.5">{date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        {audit.overall_score !== null ? (
+                          <span className="inline-flex items-center justify-center bg-[#cc785c]/15 text-[#cc785c] font-mono font-bold h-7 w-11 rounded-lg text-xs">
+                            {audit.overall_score}
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className="py-3.5 px-4 text-center font-mono text-xs text-[#3d3d3a]">{audit.seo_score ?? '-'}</td>
+                      <td className="py-3.5 px-4 text-center font-mono text-xs text-[#3d3d3a]">{audit.website_score ?? '-'}</td>
+                      <td className="py-3.5 px-4 text-center font-mono text-xs text-[#3d3d3a]">{audit.visibility_score ?? '-'}</td>
+                      <td className="py-3.5 px-4 text-center">
+                        {audit.status === 'completed' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#5db872]/20 text-[#2b753e]">
+                            Completed
+                          </span>
+                        ) : audit.status === 'running' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#e8a55a]/20 text-[#e8a55a]">
+                            Running
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#c64545]/20 text-[#c64545]">
+                            Failed
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 sm:px-6 text-right">
+                        {audit.status === 'completed' && (
+                          <a
+                            href={`/report/${audit.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-sans font-medium text-[#cc785c] bg-[#efe9de] hover:bg-[#e8e0d2] rounded-lg border border-[#e6dfd8] transition-colors whitespace-nowrap"
+                          >
+                            <span>View Public Report</span>
+                            <ExternalLink size={12} />
+                          </a>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { Printer, AlertCircle } from 'lucide-react';
 
 interface AuditData {
   audit: {
@@ -66,10 +67,10 @@ export function PublicReport() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[#faf9f5] flex items-center justify-center">
         <div className="animate-pulse flex flex-col items-center">
-          <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <p className="mt-4 text-secondary font-medium text-lg">Loading Report...</p>
+          <div className="h-10 w-10 border-3 border-[#cc785c] border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 text-[#6c6a64] font-sans text-xs">Loading Executive Report...</p>
         </div>
       </div>
     );
@@ -77,15 +78,13 @@ export function PublicReport() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-sm text-center max-w-md w-full border border-gray-100">
-          <div className="h-16 w-16 bg-danger/10 text-danger rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+      <div className="min-h-screen bg-[#faf9f5] flex items-center justify-center p-4">
+        <div className="bg-[#efe9de] p-8 rounded-2xl shadow-sm text-center max-w-md w-full border border-[#e6dfd8]">
+          <div className="h-12 w-12 bg-[#c64545]/15 text-[#c64545] rounded-full flex items-center justify-center mx-auto mb-3">
+            <AlertCircle size={24} />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Report Not Found</h2>
-          <p className="text-secondary">{error || "This audit report doesn't exist or is not complete."}</p>
+          <h2 className="text-xl font-serif font-normal text-[#141413] mb-1">Report Not Found</h2>
+          <p className="text-xs text-[#6c6a64] font-sans">{error || "This audit report does not exist or has expired."}</p>
         </div>
       </div>
     );
@@ -97,117 +96,118 @@ export function PublicReport() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 print:bg-white font-sans">
-      {/* Floating Action Bar (Hidden when printing) */}
-      <div className="fixed bottom-6 inset-x-0 mx-auto max-w-[250px] bg-white rounded-full shadow-lg border border-gray-200 p-2 flex justify-center print:hidden z-50">
+    <div className="min-h-screen bg-[#faf9f5] text-[#141413] print:bg-white font-sans selection:bg-[#cc785c] selection:text-white">
+      {/* Floating Action Bar */}
+      <div className="fixed bottom-6 inset-x-0 mx-auto max-w-[220px] bg-[#181715] rounded-full shadow-xl border border-[#252320] p-1.5 flex justify-center print:hidden z-50">
         <button
           onClick={handlePrint}
-          className="bg-primary text-white px-6 py-2 rounded-full font-medium shadow hover:bg-primary-dark transition flex items-center gap-2"
+          className="bg-[#cc785c] text-white px-5 py-2 rounded-full text-xs font-sans font-medium hover:bg-[#a9583e] transition-colors flex items-center gap-2"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-          </svg>
-          Print / Save PDF
+          <Printer size={14} />
+          <span>Print / Save PDF</span>
         </button>
       </div>
 
       <div className="max-w-4xl mx-auto p-4 sm:p-8 print:p-0">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 sm:p-12 print:shadow-none print:border-none print:p-0 mb-8">
+        <div className="bg-[#efe9de] rounded-2xl shadow-xs border border-[#e6dfd8] p-8 sm:p-12 print:shadow-none print:border-none print:p-0 mb-8">
           
           {/* Header */}
-          <header className="border-b border-gray-100 pb-8 mb-8">
+          <header className="border-b border-[#e6dfd8] pb-6 mb-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
               <div>
-                <h1 className="text-4xl font-extrabold text-gray-900 mb-2">{business.name}</h1>
-                <div className="flex items-center gap-2 text-primary font-medium">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                  </svg>
-                  <a href={business.website_url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                <div className="flex items-center gap-2 mb-2">
+                  <img src="/brand/logo.png" alt="Rankora" className="h-7 w-auto" />
+                  <span className="font-serif font-bold text-lg text-[#141413]">Rankora</span>
+                </div>
+                <h1 className="text-3xl sm:text-4xl font-serif font-normal text-[#141413] mb-1">{business.name}</h1>
+                <div className="text-xs text-[#6c6a64] font-mono">
+                  <a href={business.website_url} target="_blank" rel="noopener noreferrer" className="text-[#cc785c] hover:underline">
                     {business.website_url.replace(/^https?:\/\//, '')}
                   </a>
+                  {business.city && <span className="ml-2 text-[#8e8b82]">· {business.city}, {business.country}</span>}
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-sm text-secondary uppercase tracking-wider font-semibold">Audit Report</div>
-                <div className="text-lg text-gray-900 font-medium">{auditDate}</div>
+                <div className="text-[10px] font-mono text-[#6c6a64] uppercase tracking-wider">Executive Audit Report</div>
+                <div className="text-xs font-mono text-[#141413] font-medium mt-0.5">{auditDate}</div>
               </div>
             </div>
           </header>
 
           {/* Scores Overview */}
-          <section className="mb-12 print:mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Performance Overview</h2>
+          <section className="mb-10 print:mb-6">
+            <h2 className="text-lg font-serif font-medium text-[#141413] mb-4">Performance Overview</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-primary/5 rounded-2xl p-6 text-center border border-primary/10">
-                <div className="text-sm font-semibold text-primary uppercase tracking-wider mb-2">Overall Score</div>
-                <div className="text-5xl font-extrabold text-primary">{scores.overall_score}</div>
-                <div className="text-xs text-primary/70 font-medium mt-1">/ 100</div>
+              <div className="bg-[#faf9f5] rounded-xl p-5 text-center border border-[#e6dfd8]">
+                <div className="text-[10px] font-mono text-[#cc785c] uppercase tracking-wider mb-1">Growth Score</div>
+                <div className="text-4xl font-serif font-normal text-[#141413]">{scores.overall_score}</div>
+                <div className="text-[10px] font-mono text-[#8e8b82] mt-0.5">/ 100</div>
               </div>
               
-              <div className="bg-gray-50 rounded-2xl p-6 text-center border border-gray-100">
-                <div className="text-sm font-medium text-secondary mb-2">SEO Health</div>
-                <div className="text-4xl font-bold text-gray-900">{scores.seo_score}</div>
+              <div className="bg-[#faf9f5] rounded-xl p-5 text-center border border-[#e6dfd8]">
+                <div className="text-[10px] font-mono text-[#6c6a64] uppercase tracking-wider mb-1">SEO Health</div>
+                <div className="text-3xl font-serif font-normal text-[#141413]">{scores.seo_score}</div>
               </div>
               
-              <div className="bg-gray-50 rounded-2xl p-6 text-center border border-gray-100">
-                <div className="text-sm font-medium text-secondary mb-2">Website</div>
-                <div className="text-4xl font-bold text-gray-900">{scores.website_score}</div>
+              <div className="bg-[#faf9f5] rounded-xl p-5 text-center border border-[#e6dfd8]">
+                <div className="text-[10px] font-mono text-[#6c6a64] uppercase tracking-wider mb-1">Website</div>
+                <div className="text-3xl font-serif font-normal text-[#141413]">{scores.website_score}</div>
               </div>
               
-              <div className="bg-gray-50 rounded-2xl p-6 text-center border border-gray-100">
-                <div className="text-sm font-medium text-secondary mb-2">Visibility</div>
-                <div className="text-4xl font-bold text-gray-900">{scores.visibility_score}</div>
+              <div className="bg-[#faf9f5] rounded-xl p-5 text-center border border-[#e6dfd8]">
+                <div className="text-[10px] font-mono text-[#6c6a64] uppercase tracking-wider mb-1">Visibility</div>
+                <div className="text-3xl font-serif font-normal text-[#141413]">{scores.visibility_score}</div>
               </div>
             </div>
           </section>
 
-          {/* Recommendations Page Break for Print */}
-          <div className="print:break-before-auto"></div>
-
           {/* Recommendations */}
           <section>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Actionable Recommendations</h2>
-            <div className="space-y-6">
+            <h2 className="text-lg font-serif font-medium text-[#141413] mb-4">Actionable AI Recommendations</h2>
+            <div className="space-y-3.5">
               {recommendations.length > 0 ? (
                 recommendations.map((rec) => (
-                  <div key={rec.id} className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm print:shadow-none print:border-b print:rounded-none">
-                    <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4 mb-4">
+                  <div key={rec.id} className="bg-[#faf9f5] rounded-xl border border-[#e6dfd8] p-5 shadow-xs print:shadow-none print:border-b print:rounded-none">
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-2 mb-2">
                       <div>
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide text-white bg-${rec.priority_color}`}>
-                            {rec.priority} PRIORITY
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider border ${
+                            rec.priority === 'high' ? 'bg-[#c64545]/15 text-[#c64545] border-[#c64545]/30' :
+                            rec.priority === 'medium' ? 'bg-[#e8a55a]/15 text-[#e8a55a] border-[#e8a55a]/30' :
+                            'bg-[#efe9de] text-[#6c6a64] border-[#e6dfd8]'
+                          }`}>
+                            {rec.priority} Priority
                           </span>
                         </div>
-                        <h3 className="text-lg font-bold text-gray-900">{rec.title}</h3>
+                        <h3 className="text-sm font-sans font-medium text-[#141413]">{rec.title}</h3>
                       </div>
                       
-                      <div className="flex gap-4 text-sm font-medium">
+                      <div className="flex gap-3 text-xs font-mono">
                         <div className="flex flex-col items-end">
-                          <span className="text-secondary text-xs uppercase tracking-wider">Impact</span>
-                          <span className="text-gray-900">{rec.impact}</span>
+                          <span className="text-[#8e8b82] text-[9px] uppercase">Impact</span>
+                          <span className="text-[#141413] text-[11px]">{rec.impact}</span>
                         </div>
                         <div className="flex flex-col items-end">
-                          <span className="text-secondary text-xs uppercase tracking-wider">Time</span>
-                          <span className="text-gray-900">{rec.estimated_minutes}</span>
+                          <span className="text-[#8e8b82] text-[9px] uppercase">Time</span>
+                          <span className="text-[#141413] text-[11px]">{rec.estimated_minutes}</span>
                         </div>
                       </div>
                     </div>
-                    <p className="text-gray-700 leading-relaxed text-sm">
+                    <p className="text-xs text-[#6c6a64] font-sans leading-relaxed">
                       {rec.description}
                     </p>
                   </div>
                 ))
               ) : (
-                <p className="text-secondary italic">No recommendations found.</p>
+                <p className="text-xs text-[#6c6a64] font-sans italic">No critical recommendations found.</p>
               )}
             </div>
           </section>
 
           {/* Footer for print */}
-          <footer className="mt-16 pt-8 border-t border-gray-100 text-center text-sm text-secondary hidden print:block">
-            <p>Generated by LocalSaaS SEO Auditor</p>
-            <p className="mt-1">{window.location.origin}/report/{id}</p>
+          <footer className="mt-12 pt-6 border-t border-[#e6dfd8] text-center text-xs font-sans text-[#8e8b82] hidden print:block">
+            <p>Generated by Rankora AI Local Auditor</p>
+            <p className="mt-0.5 font-mono text-[10px]">{window.location.origin}/report/{id}</p>
           </footer>
 
         </div>

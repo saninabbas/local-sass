@@ -98,7 +98,15 @@ export const onRequest = async (context: any) => {
     // Helper to get authenticated user
     const authenticate = async () => {
       const cookies = parseCookies(request.headers.get('Cookie'));
-      const sessionId = cookies['session_id'];
+      let sessionId = cookies['session_id'];
+      
+      if (!sessionId) {
+        const authHeader = request.headers.get('Authorization') || request.headers.get('authorization');
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          sessionId = authHeader.substring(7).trim();
+        }
+      }
+      
       if (!sessionId) return null;
 
       const session = await env.DB.prepare(

@@ -36,10 +36,10 @@ const AuthorityBuilder = lazy(() => import('./pages/dashboard/AuthorityBuilder')
 function DashboardPlaceholder({ title }: { title: string }) {
   return (
     <DashboardLayout>
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 bg-white rounded-2xl shadow-sm border border-gray-100 py-16 mt-6">
-        <h2 className="text-3xl font-bold text-primary mb-4">{title}</h2>
-        <p className="text-secondary mb-8 max-w-md">
-          We are currently building this feature. Check back soon for detailed insights on your {title.toLowerCase()}.
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 bg-[#efe9de] rounded-2xl shadow-sm border border-[#e6dfd8] py-16 mt-6">
+        <h2 className="text-3xl font-serif font-normal text-[#141413] mb-4">{title}</h2>
+        <p className="text-[#6c6a64] font-sans mb-8 max-w-md text-sm">
+          We are currently loading this module. If this view does not exist, return to your Overview.
         </p>
       </div>
     </DashboardLayout>
@@ -51,8 +51,8 @@ function DashboardSuspense({ children }: { children: React.ReactNode }) {
     <Suspense fallback={
       <DashboardLayout>
         <div className="min-h-[60vh] flex flex-col items-center justify-center p-8">
-          <div className="h-10 w-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-secondary font-medium animate-pulse">Loading module...</p>
+          <div className="h-10 w-10 border-3 border-[#cc785c] border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-[#6c6a64] font-sans text-xs animate-pulse">Loading module telemetry...</p>
         </div>
       </DashboardLayout>
     }>
