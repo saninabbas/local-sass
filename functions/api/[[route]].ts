@@ -363,6 +363,9 @@ export const onRequest = async (context: any) => {
           await env.DB.prepare("ALTER TABLE users ADD COLUMN verification_token TEXT").run().catch(() => {});
           await env.DB.prepare("ALTER TABLE users ADD COLUMN totp_secret TEXT").run().catch(() => {});
           await env.DB.prepare("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE users ADD COLUMN reset_token TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE users ADD COLUMN reset_token_expires_at DATETIME").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE users ADD COLUMN verification_token TEXT").run().catch(() => {});
           
           await env.DB.prepare("ALTER TABLE growth_scores ADD COLUMN gbp_score INTEGER DEFAULT -1").run().catch(() => {});
           await env.DB.prepare("ALTER TABLE growth_scores ADD COLUMN rankings_score INTEGER DEFAULT -1").run().catch(() => {});
@@ -576,6 +579,10 @@ export const onRequest = async (context: any) => {
 
       // --- AUTH: FORGOT PASSWORD ---
       if (url.pathname === '/api/auth/forgot-password' && request.method === 'POST') {
+        // Ensure reset_token columns exist defensively in production D1
+        await env.DB.prepare("ALTER TABLE users ADD COLUMN reset_token TEXT").run().catch(() => {});
+        await env.DB.prepare("ALTER TABLE users ADD COLUMN reset_token_expires_at DATETIME").run().catch(() => {});
+
         const { email } = await request.json().catch(() => ({})) as any;
         if (!email) return errorResponse("Email is required", 400);
 
@@ -606,6 +613,10 @@ export const onRequest = async (context: any) => {
 
       // --- AUTH: RESET PASSWORD ---
       if (url.pathname === '/api/auth/reset-password' && request.method === 'POST') {
+        // Ensure reset_token columns exist defensively in production D1
+        await env.DB.prepare("ALTER TABLE users ADD COLUMN reset_token TEXT").run().catch(() => {});
+        await env.DB.prepare("ALTER TABLE users ADD COLUMN reset_token_expires_at DATETIME").run().catch(() => {});
+
         const { email, token, password } = await request.json().catch(() => ({})) as any;
         if (!email || !token || !password) return errorResponse("Missing required fields", 400);
         if (password.length < 8) return errorResponse("Password must be at least 8 characters long", 400);
