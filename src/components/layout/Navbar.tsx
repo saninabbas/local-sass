@@ -34,11 +34,11 @@ export function Navbar() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-            <Link to="/" className="flex items-center">
+            <Link to="/" className="flex items-center py-1">
               <img 
                 src="/brand/logo.png" 
                 alt="Rankora" 
-                className="h-8 sm:h-9 w-auto object-contain" 
+                className="h-11 sm:h-12 w-auto max-w-[210px] object-contain transition-transform hover:scale-105" 
               />
             </Link>
           

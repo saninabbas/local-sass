@@ -93,7 +93,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <img 
             src="/brand/logo.png" 
             alt="Rankora" 
-            className="h-8 w-auto object-contain" 
+            className="h-10 w-auto max-w-[180px] object-contain transition-transform hover:scale-105" 
           />
         </Link>
         {onClose && (

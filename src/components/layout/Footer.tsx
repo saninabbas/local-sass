@@ -33,7 +33,7 @@ export function Footer() {
               <img 
                 src="/brand/logo.png" 
                 alt="Rankora" 
-                className="h-8 sm:h-9 w-auto object-contain bg-white/10 px-2 py-1 rounded-lg backdrop-blur-xs" 
+                className="h-11 sm:h-12 w-auto max-w-[210px] object-contain bg-white/95 px-3 py-1.5 rounded-xl shadow-xs" 
               />
             </Link>
             <p className="text-xs text-[#8e8b82] leading-relaxed max-w-xs font-sans">

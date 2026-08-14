@@ -58,7 +58,7 @@ export function Signup() {
             <img 
               src="/brand/logo.png" 
               alt="Rankora" 
-              className="h-10 w-auto object-contain" 
+              className="h-14 sm:h-16 w-auto max-w-[260px] object-contain transition-transform hover:scale-105" 
             />
           </Link>
         </div>
