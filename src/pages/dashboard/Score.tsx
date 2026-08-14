@@ -38,7 +38,7 @@ export function Score() {
   if (isLoading) {
     return (
       <DashboardLayout>
-        <LoadingState message="Loading your Growth Score telemetry..." />
+        <LoadingState message="Loading your Growth Score..." />
       </DashboardLayout>
     );
   }
@@ -55,9 +55,9 @@ export function Score() {
     return (
       <DashboardLayout>
         <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4 bg-[#efe9de] rounded-2xl shadow-sm border border-[#e6dfd8] py-16 mt-6">
-          <h2 className="text-2xl font-serif font-normal text-[#141413] mb-2">No Score Diagnostic Available</h2>
+          <h2 className="text-2xl font-serif font-normal text-[#141413] mb-2">No Score Available</h2>
           <p className="text-xs font-sans text-[#6c6a64] mb-6 max-w-md">
-            Execute your initial autonomous audit to generate your diagnostic benchmark. Head to Overview to start.
+            You need to run your first audit to generate a Growth Score. Head over to the Overview tab to get started.
           </p>
         </div>
       </DashboardLayout>
@@ -69,8 +69,8 @@ export function Score() {
   return (
     <DashboardLayout>
       <div className="mt-2 mb-6">
-        <h2 className="text-2xl font-serif font-normal text-[#141413]">Growth Score Diagnostic Breakdown</h2>
-        <p className="text-xs font-sans text-[#6c6a64] mt-1">Algorithmic evaluation across 100+ local ranking & performance parameters.</p>
+        <h2 className="text-2xl font-serif font-normal text-[#141413]">Growth Score Details</h2>
+        <p className="text-xs font-sans text-[#6c6a64] mt-1">A detailed breakdown of your overall online performance.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -78,28 +78,28 @@ export function Score() {
           <GrowthScoreCard score={scores.overall_score || 0} />
         </div>
         <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <ScoreMetric label="Search Engine Index" score={scores.seo_score} />
-          <ScoreMetric label="Core Web Vitals" score={scores.website_score} />
-          <ScoreMetric label="Local Map Pack Visibility" score={scores.visibility_score} />
-          <ScoreMetric label="Customer Review Sentiment" score={scores.reviews_score} />
+          <ScoreMetric label="SEO" score={scores.seo_score} />
+          <ScoreMetric label="Website" score={scores.website_score} />
+          <ScoreMetric label="Visibility" score={scores.visibility_score} />
+          <ScoreMetric label="Reviews" score={scores.reviews_score} />
         </div>
       </div>
 
       <div className="mb-8">
-        <h3 className="text-lg font-serif font-medium text-[#141413] mb-3">Sub-System Telemetry</h3>
+        <h3 className="text-lg font-serif font-medium text-[#141413] mb-3">Advanced Audit Metrics</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          <ScoreMetric label="Technical Crawl" score={scores.technical_score} />
-          <ScoreMetric label="On-Page Structure" score={scores.onpage_score} />
-          <ScoreMetric label="Local Map Signals" score={scores.local_score} />
-          <ScoreMetric label="Content Depth" score={scores.content_score} />
-          <ScoreMetric label="Asset Delivery" score={scores.performance_score} />
+          <ScoreMetric label="Technical SEO" score={scores.technical_score} />
+          <ScoreMetric label="On-Page SEO" score={scores.onpage_score} />
+          <ScoreMetric label="Local Signals" score={scores.local_score} />
+          <ScoreMetric label="Content Quality" score={scores.content_score} />
+          <ScoreMetric label="Performance" score={scores.performance_score} />
           <ScoreMetric label="Mobile UX" score={scores.mobile_score} />
-          <ScoreMetric label="Security SSL" score={scores.security_score} />
+          <ScoreMetric label="Security" score={scores.security_score} />
         </div>
       </div>
 
       <div className="mb-8">
-        <h3 className="text-lg font-serif font-medium text-[#141413] mb-3">Targeted Action Recommendations</h3>
+        <h3 className="text-lg font-serif font-medium text-[#141413] mb-3">Recommended Actions</h3>
         {recommendations && recommendations.length > 0 ? (
           <div className="bg-[#efe9de] rounded-xl border border-[#e6dfd8] shadow-xs divide-y divide-[#e6dfd8] overflow-hidden">
             {recommendations.map((rec: any) => (
@@ -121,7 +121,7 @@ export function Score() {
             ))}
           </div>
         ) : (
-          <p className="text-xs text-[#6c6a64] font-sans">No critical issues detected for this audit pass.</p>
+          <p className="text-xs text-[#6c6a64] font-sans">No specific recommendations generated for this audit.</p>
         )}
       </div>
     </DashboardLayout>

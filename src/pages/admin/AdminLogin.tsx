@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Shield, ArrowLeft, AlertCircle, BarChart2 } from 'lucide-react';
+import { Shield, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { FormField } from '../../components/ui/FormField';
@@ -9,7 +9,6 @@ export function AdminLogin() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  // Explicit autofill for admin credentials
   const [email, setEmail] = useState('saninabbas@gmail.com');
   const [password, setPassword] = useState('Pakistan@2026');
   const [error, setError] = useState('');
@@ -46,39 +45,44 @@ export function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#faf9f5] flex flex-col justify-center py-12 sm:px-6 lg:px-8 text-[#141413]">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Brand Logo & Shield Badge */}
+        {/* Brand Logo */}
         <div className="flex justify-center mb-6">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-white shadow-md shadow-primary/20">
-              <Shield size={26} />
-            </div>
+          <Link to="/" className="flex items-center gap-1.5">
+            <img 
+              src="/brand/logo.png" 
+              alt="Rankora Logo" 
+              className="h-10 w-auto object-contain scale-[1.3] -mr-1" 
+            />
+            <span className="text-2xl font-bold font-serif text-[#141413] tracking-tight">
+              Rankora
+            </span>
           </Link>
         </div>
 
         <div className="text-center">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-primary-accent text-xs font-bold uppercase tracking-wider mb-2">
-            <BarChart2 size={13} /> Rankora Control Center
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#cc785c]/10 border border-[#cc785c]/25 text-[#cc785c] text-xs font-mono font-bold uppercase tracking-wider mb-2">
+            <Shield size={13} /> Rankora Control Center
           </div>
-          <h2 className="text-center text-3xl font-extrabold text-primary mb-2">
+          <h2 className="text-center text-3xl font-serif font-normal text-[#141413] mb-2">
             Administrator Portal
           </h2>
-          <p className="text-center text-sm text-secondary mb-8">
+          <p className="text-center text-xs text-[#6c6a64] font-sans mb-8">
             Access user metrics, telemetry, and platform management
           </p>
         </div>
 
         {/* Login Box */}
-        <div className="bg-white py-8 px-4 shadow-xl shadow-black/5 sm:rounded-2xl sm:px-10 border border-gray-200">
+        <div className="bg-[#efe9de] py-8 px-4 shadow-xl sm:rounded-2xl sm:px-10 border border-[#e6dfd8]">
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-100 text-danger text-sm rounded-xl flex items-start gap-3">
-              <AlertCircle size={18} className="shrink-0 mt-0.5" />
+            <div className="mb-6 p-3 bg-[#c64545]/15 border border-[#c64545]/30 text-[#c64545] text-xs font-mono rounded-lg flex items-start gap-2.5">
+              <AlertCircle size={16} className="shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
 
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-3" onSubmit={handleSubmit}>
             <div>
               <FormField
                 label="Admin Email"
@@ -103,12 +107,12 @@ export function AdminLogin() {
               />
             </div>
 
-            <div className="pt-2">
+            <div className="pt-3">
               <Button
                 type="submit"
                 variant="primary"
-                size="lg"
-                className="w-full text-base h-12 flex items-center justify-center gap-2 shadow-md shadow-primary/10"
+                size="md"
+                className="w-full h-11 text-sm bg-[#cc785c] hover:bg-[#a9583e] flex items-center justify-center gap-2"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -118,7 +122,7 @@ export function AdminLogin() {
                   </>
                 ) : (
                   <>
-                    <Shield size={18} />
+                    <Shield size={16} />
                     <span>Sign In to Admin Dashboard</span>
                   </>
                 )}
@@ -126,12 +130,12 @@ export function AdminLogin() {
             </div>
           </form>
 
-          <div className="mt-8 text-center pt-5 border-t border-gray-100">
+          <div className="mt-8 text-center pt-4 border-t border-[#e6dfd8]">
             <Link
               to="/login"
-              className="inline-flex items-center gap-2 text-xs font-semibold text-secondary hover:text-primary transition-colors"
+              className="inline-flex items-center gap-2 text-xs font-medium text-[#6c6a64] hover:text-[#141413] transition-colors"
             >
-              <ArrowLeft size={14} /> Back to User Login
+              <ArrowLeft size={13} /> Back to User Login
             </Link>
           </div>
         </div>

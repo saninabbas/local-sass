@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
-import { AnthropicLogo } from '../claude/AnthropicLogo';
 
 export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -11,7 +10,6 @@ export function Navbar() {
     { name: 'Features', href: '/#features' },
     { name: 'How It Works', href: '/#how-it-works' },
     { name: 'Pricing', href: '/#pricing' },
-    { name: 'Computer Use', href: '/claude', isBadge: true },
     { name: 'Resources', href: '/resources' },
   ];
 
@@ -37,29 +35,31 @@ export function Navbar() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <div className="flex items-center">
-            <Link to="/" className="flex items-center gap-2">
-              <AnthropicLogo size={22} color="#cc785c" showWordmark={true} wordmarkColor="#141413" brandName="Rankora" />
+            <Link to="/" className="flex items-center gap-1.5">
+              <img 
+                src="/brand/logo.png" 
+                alt="Rankora Logo" 
+                className="h-9 w-auto object-contain scale-[1.25] -mr-1" 
+              />
+              <span className="text-xl font-bold font-serif text-[#141413] tracking-tight">
+                Rankora
+              </span>
             </Link>
           </div>
           
           {/* Desktop Navigation */}
           <div className="hidden md:block">
-            <div className="ml-10 flex items-center space-x-7">
+            <div className="ml-10 flex items-center space-x-8">
               {navigation.map((item) => (
                 <Link
                   key={item.name}
                   to={item.href}
                   onClick={(e) => handleNavClick(e, item.href)}
-                  className={`text-[14px] font-medium transition-colors flex items-center gap-1.5 ${
+                  className={`text-[14px] font-medium transition-colors ${
                     isActive(item.href) ? 'text-[#cc785c] font-semibold' : 'text-[#3d3d3a] hover:text-[#141413]'
                   }`}
                 >
-                  <span>{item.name}</span>
-                  {item.isBadge && (
-                    <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 bg-[#cc785c]/15 text-[#cc785c] rounded font-semibold border border-[#cc785c]/20">
-                      Beta
-                    </span>
-                  )}
+                  {item.name}
                 </Link>
               ))}
             </div>
@@ -67,7 +67,7 @@ export function Navbar() {
           
           {/* Desktop CTAs */}
           <div className="hidden md:block">
-            <div className="flex items-center space-x-5">
+            <div className="flex items-center space-x-6">
               <Link to="/login" className="text-[14px] font-medium text-[#3d3d3a] hover:text-[#141413] transition-colors">
                 Log in
               </Link>

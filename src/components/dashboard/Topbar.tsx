@@ -1,53 +1,49 @@
-import { Menu, Bell, Sparkles } from 'lucide-react';
+import { Bell, Menu } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Link } from 'react-router-dom';
 
 interface TopbarProps {
-  onMenuClick: () => void;
+  onMenuClick?: () => void;
 }
 
 export function Topbar({ onMenuClick }: TopbarProps) {
   const { user } = useAuth();
   const initial = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
 
-  const handleNotificationClick = () => {
-    alert("You have no new notifications.");
-  };
-
   return (
-    <header className="h-16 bg-[#faf9f5] border-b border-[#e6dfd8] flex items-center justify-between px-4 sm:px-6 lg:px-8 shrink-0">
-      <div className="flex items-center gap-4 lg:hidden">
-        <button 
+    <header className="h-16 border-b border-[#e6dfd8] bg-[#faf9f5] flex items-center justify-between px-6 sticky top-0 z-20">
+      <div className="flex items-center gap-4">
+        <button
           onClick={onMenuClick}
-          className="p-2 -ml-2 text-[#6c6a64] hover:text-[#141413] rounded-md focus:outline-none"
+          className="lg:hidden p-1.5 rounded-lg text-[#6c6a64] hover:bg-[#efe9de] hover:text-[#141413] transition-colors"
+          aria-label="Open sidebar"
         >
-          <Menu size={22} />
+          <Menu size={20} />
         </button>
       </div>
-      
-      <div className="hidden lg:flex items-center gap-3 text-xs font-sans text-[#6c6a64]">
-        <span className="text-[#141413] font-medium">Enterprise Growth Platform</span>
-        <span>•</span>
-        <span className="font-mono text-[#cc785c] bg-[#cc785c]/10 px-2 py-0.5 rounded border border-[#cc785c]/20">
-          Sonnet 3.7 Intelligence
-        </span>
-      </div>
 
-      <div className="flex items-center gap-4 ml-auto">
-        <Link
-          to="/claude"
-          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-[#efe9de] hover:bg-[#e8e0d2] text-xs font-sans font-medium text-[#141413] rounded-lg border border-[#e6dfd8] transition-colors"
+      <div className="flex items-center gap-3">
+        <button
+          className="p-2 rounded-lg text-[#6c6a64] hover:bg-[#efe9de] hover:text-[#141413] relative transition-colors"
+          aria-label="Notifications"
         >
-          <Sparkles size={13} className="text-[#cc785c]" />
-          <span>Computer Use Demo</span>
-        </Link>
-
-        <button onClick={handleNotificationClick} className="p-2 text-[#6c6a64] hover:text-[#141413] transition-colors relative">
           <Bell size={18} />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#cc785c]" />
         </button>
 
-        <div className="w-8 h-8 rounded-full bg-[#181715] text-[#faf9f5] flex items-center justify-center text-xs font-serif font-semibold shadow-xs border border-[#252320]">
-          {initial}
+        <div className="h-4 w-[1px] bg-[#e6dfd8] mx-1" />
+
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-[#181715] flex items-center justify-center text-xs font-serif font-semibold text-[#faf9f5] border border-[#252320]">
+            {initial}
+          </div>
+          <div className="hidden sm:flex flex-col text-left">
+            <span className="text-xs font-medium text-[#141413] leading-tight font-sans">
+              {user?.name || 'User'}
+            </span>
+            <span className="text-[10px] text-[#8e8b82] font-mono">
+              {user?.email}
+            </span>
+          </div>
         </div>
       </div>
     </header>

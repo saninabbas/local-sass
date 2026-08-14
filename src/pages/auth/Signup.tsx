@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom';
 import { FormField } from '../../components/ui/FormField';
 import { Button } from '../../components/ui/Button';
 import { Mail, CheckCircle2, ExternalLink } from 'lucide-react';
-import { AnthropicLogo } from '../../components/claude/AnthropicLogo';
 
 import { useState } from 'react';
 
@@ -52,11 +51,18 @@ export function Signup() {
   };
 
   return (
-    <div className="min-h-screen bg-[#faf9f5] flex flex-col justify-center py-12 sm:px-6 lg:px-8 text-[#141413] selection:bg-[#cc785c] selection:text-white">
+    <div className="min-h-screen bg-[#faf9f5] flex flex-col justify-center py-12 sm:px-6 lg:px-8 text-[#141413]">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center mb-6">
-          <Link to="/" className="flex items-center gap-2">
-            <AnthropicLogo size={28} color="#cc785c" showWordmark={true} wordmarkColor="#141413" brandName="Rankora" />
+          <Link to="/" className="flex items-center gap-1.5">
+            <img 
+              src="/brand/logo.png" 
+              alt="Rankora Logo" 
+              className="h-10 w-auto object-contain scale-[1.3] -mr-1" 
+            />
+            <span className="text-2xl font-bold font-serif text-[#141413] tracking-tight">
+              Rankora
+            </span>
           </Link>
         </div>
 
@@ -67,20 +73,20 @@ export function Signup() {
             </div>
             <h2 className="text-2xl font-serif font-normal text-[#141413]">Check Your Email</h2>
             <p className="text-xs text-[#6c6a64] font-sans">
-              We have dispatched a verification link to <strong className="text-[#141413]">{email}</strong>.
+              We have sent a verification link to <strong className="text-[#141413]">{email}</strong>.
             </p>
 
             <div className="p-3.5 bg-[#faf9f5] rounded-xl border border-[#e6dfd8] text-xs text-[#252523] flex items-start gap-2 text-left">
               <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-[#5db872]" />
-              <span>Please click the link in your email, or use the quick verification bypass:</span>
+              <span>Please check your inbox to verify your account, or click the instant test button below:</span>
             </div>
 
             {devLink ? (
               <div className="p-3.5 bg-[#efe9de] rounded-xl border border-[#cc785c]/30 text-left space-y-2">
-                <span className="text-[11px] font-mono font-bold text-[#cc785c] uppercase tracking-wide">⚡ Quick Verification Link</span>
-                <p className="text-xs text-[#3d3d3a]">Click below to complete registration instantly:</p>
+                <span className="text-[11px] font-mono font-bold text-[#cc785c] uppercase tracking-wide">⚡ Quick Test Verification</span>
+                <p className="text-xs text-[#3d3d3a]">Click below to verify your email right now without opening inbox:</p>
                 <a href={devLink} className="inline-flex items-center gap-2 text-xs font-medium text-white bg-[#cc785c] hover:bg-[#a9583e] px-4 py-2 rounded-lg transition-colors w-full justify-center shadow-sm">
-                  <span>Verify Email Instantly</span> <ExternalLink size={14} />
+                  <span>Click Here To Verify Email Instantly</span> <ExternalLink size={14} />
                 </a>
               </div>
             ) : (
@@ -102,10 +108,10 @@ export function Signup() {
         ) : (
           <>
             <h2 className="text-center text-3xl font-serif font-normal text-[#141413] mb-2">
-              Start scaling your local business
+              Start growing your business
             </h2>
             <p className="text-center text-xs font-sans text-[#6c6a64] mb-8">
-              Create your account to unlock continuous AI audit intelligence.
+              Create your account and get your first Growth Score.
             </p>
 
             <div className="bg-[#efe9de] py-8 px-4 shadow-xl sm:rounded-2xl sm:px-10 border border-[#e6dfd8]">
@@ -119,16 +125,16 @@ export function Signup() {
                   label="Full Name"
                   id="name"
                   type="text"
-                  placeholder="Alex Mercer"
+                  placeholder="John Doe"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
                 />
                 <FormField
-                  label="Business Email"
+                  label="Email"
                   id="email"
                   type="email"
-                  placeholder="alex@business.com"
+                  placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -154,7 +160,7 @@ export function Signup() {
 
                 <div className="pt-3">
                   <Button type="submit" variant="primary" size="md" className="w-full h-11 text-sm bg-[#cc785c] hover:bg-[#a9583e]" disabled={isLoading}>
-                    {isLoading ? 'Generating Audit Account...' : 'Create Account & Start Audit'}
+                    {isLoading ? 'Creating Account...' : 'Create Account'}
                   </Button>
                 </div>
               </form>

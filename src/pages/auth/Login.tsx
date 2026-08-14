@@ -2,7 +2,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { FormField } from '../../components/ui/FormField';
 import { Button } from '../../components/ui/Button';
 import { ShieldCheck } from 'lucide-react';
-import { AnthropicLogo } from '../../components/claude/AnthropicLogo';
 
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -65,11 +64,18 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#faf9f5] flex flex-col justify-center py-12 sm:px-6 lg:px-8 text-[#141413] selection:bg-[#cc785c] selection:text-white">
+    <div className="min-h-screen bg-[#faf9f5] flex flex-col justify-center py-12 sm:px-6 lg:px-8 text-[#141413]">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center mb-6">
-          <Link to="/" className="flex items-center gap-2">
-            <AnthropicLogo size={28} color="#cc785c" showWordmark={true} wordmarkColor="#141413" brandName="Rankora" />
+          <Link to="/" className="flex items-center gap-1.5">
+            <img 
+              src="/brand/logo.png" 
+              alt="Rankora Logo" 
+              className="h-10 w-auto object-contain scale-[1.3] -mr-1" 
+            />
+            <span className="text-2xl font-bold font-serif text-[#141413] tracking-tight">
+              Rankora
+            </span>
           </Link>
         </div>
 
@@ -108,7 +114,7 @@ export function Login() {
           ) : (
             <form className="space-y-3" onSubmit={handleSubmit}>
               <FormField
-                label="Email address"
+                label="Email"
                 id="email"
                 type="email"
                 placeholder="you@example.com"
@@ -147,7 +153,7 @@ export function Login() {
             <p className="text-xs font-sans text-[#6c6a64]">
               Don't have an account?{' '}
               <Link to="/signup" className="font-medium text-[#cc785c] hover:text-[#a9583e] transition-colors">
-                Create one now
+                Create one
               </Link>
             </p>
           </div>
