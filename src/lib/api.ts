@@ -160,6 +160,25 @@ export async function generateOutreachEmail(payload: { opportunityId: string; op
 }
 
 // -----------------------------------------------------------------------------
+// LOCAL GEO-GRID & REPORTING
+// -----------------------------------------------------------------------------
+export async function fetchGeoGridScans(): Promise<any> {
+  return fetchApi('/api/geogrid/scans');
+}
+
+export async function runGeoGridScan(params: { keyword: string; city?: string; gridSize?: number; radiusMiles?: number; lat?: number; lng?: number }): Promise<any> {
+  return fetchApi('/api/geogrid/scan', { method: 'POST', body: JSON.stringify(params) });
+}
+
+export async function fetchGrowthSummaryReport(): Promise<any> {
+  return fetchApi('/api/reports/growth-summary');
+}
+
+export async function generateContentBrief(params: { topic: string; contentType?: string }): Promise<any> {
+  return fetchApi('/api/content/brief', { method: 'POST', body: JSON.stringify(params) });
+}
+
+// -----------------------------------------------------------------------------
 // ADMIN MANAGEMENT
 // -----------------------------------------------------------------------------
 export async function getAdminStats(): Promise<import('../types').AdminStats> {

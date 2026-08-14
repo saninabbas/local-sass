@@ -12,9 +12,7 @@ import {
   MapPin, 
   ExternalLink,
   AlertCircle,
-  Clock,
   Sparkles,
-  ShieldAlert,
   Zap,
   Layers
 } from 'lucide-react';

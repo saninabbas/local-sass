@@ -23,6 +23,8 @@ import {
   CheckCircle
 } from 'lucide-react';
 
+import { FixWithAIModal } from '../../components/modals/FixWithAIModal';
+
 export function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,6 +33,12 @@ export function Dashboard() {
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditStep, setAuditStep] = useState(0);
   const navigate = useNavigate();
+
+  // Fix With AI Modal
+  const [modalOpen, setModalOpen] = useState(false);
+  const [activeFixType, setActiveFixType] = useState<any>('title');
+  const [activeFixTitle, setActiveFixTitle] = useState('');
+  const [activeFixContext, setActiveFixContext] = useState<any>({});
 
   const auditMessages = [
     "Crawling website pages and extracting DOM telemetry...",
@@ -388,13 +396,35 @@ export function Dashboard() {
                     <span className="text-secondary text-[11px]">
                       <strong>Fix:</strong> {prob.recommendedFix}
                     </span>
-                    <Link
-                      to={prob.actionLink || '/dashboard/actions'}
-                      className="inline-flex items-center gap-1 text-primary-accent font-bold hover:underline shrink-0 ml-2"
-                    >
-                      <span>Fix Now</span>
-                      <ArrowRight size={12} />
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const fixType = prob.title.toLowerCase().includes('meta') ? 'meta_description' :
+                                          prob.title.toLowerCase().includes('schema') ? 'faq_schema' :
+                                          prob.title.toLowerCase().includes('page') || prob.title.toLowerCase().includes('service') ? 'service_page_structure' : 'title';
+                          setActiveFixType(fixType);
+                          setActiveFixTitle(prob.title);
+                          setActiveFixContext({
+                            evidence: prob.evidence,
+                            recommendedFix: prob.recommendedFix,
+                            city: business.city,
+                            businessName: business.name
+                          });
+                          setModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1 text-[#cc785c] font-bold hover:underline shrink-0 text-[11px] cursor-pointer"
+                      >
+                        <Sparkles size={12} />
+                        <span>FIX WITH AI</span>
+                      </button>
+                      <Link
+                        to={prob.actionLink || '/dashboard/actions'}
+                        className="inline-flex items-center gap-1 text-primary-accent font-bold hover:underline shrink-0 ml-1"
+                      >
+                        <span>Details</span>
+                        <ArrowRight size={12} />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -548,6 +578,14 @@ export function Dashboard() {
         </div>
 
       </div>
+
+      <FixWithAIModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={activeFixTitle}
+        fixType={activeFixType}
+        context={activeFixContext}
+      />
     </DashboardLayout>
   );
 }

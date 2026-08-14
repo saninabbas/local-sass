@@ -9,16 +9,13 @@ import {
   Star,
   FileText,
   Settings,
-  HelpCircle,
-  LogOut,
   User,
-  ShieldCheck,
-  Shield,
   Building,
   Sparkles,
   Bot,
   X,
-  Award
+  Award,
+  Navigation
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -29,23 +26,24 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   
   const navSections = [
     {
       title: 'OVERVIEW',
       items: [
         { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'Growth Score', href: '/dashboard/score', icon: TrendingUp },
+        { name: 'AI Action Plan', href: '/dashboard/actions', icon: ListTodo },
       ]
     },
     {
       title: 'GROWTH ENGINE',
       items: [
-        { name: 'Growth Score', href: '/dashboard/score', icon: TrendingUp },
-        { name: 'AI Action Plan', href: '/dashboard/actions', icon: ListTodo },
         { name: 'Website Audit', href: '/dashboard/website', icon: Globe },
         { name: 'Local Rankings', href: '/dashboard/keywords', icon: Search },
-        { name: 'Competitors', href: '/dashboard/competitors', icon: Users },
+        { name: 'Local Geo-Grid', href: '/dashboard/geogrid', icon: Navigation },
+        { name: 'Competitor Radar', href: '/dashboard/competitors', icon: Users },
       ]
     },
     {
@@ -58,14 +56,14 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     {
       title: 'CONTENT & LEADS',
       items: [
-        { name: 'Content Engine', href: '/dashboard/content', icon: Sparkles },
-        { name: 'Lead Generation', href: '/dashboard/leads', icon: Building },
+        { name: 'Content Studio', href: '/dashboard/content', icon: Sparkles },
+        { name: 'Lead Gen Widget', href: '/dashboard/leads', icon: Building },
       ]
     },
     {
       title: 'AI & REPORTING',
       items: [
-        { name: 'Rankora AI Agent', href: '/dashboard/copilot', icon: Bot },
+        { name: 'RANKORA AI Agent', href: '/dashboard/copilot', icon: Bot },
         { name: 'Executive Reports', href: '/dashboard/reports', icon: FileText },
       ]
     }
@@ -84,11 +82,11 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   };
 
   return (
-    <aside className={`w-64 border-r border-gray-200 bg-white flex flex-col h-screen fixed lg:static left-0 top-0 z-50 transition-transform duration-200 ${
+    <aside className={`w-64 border-r border-[#e6dfd8] bg-[#faf9f5] flex flex-col h-screen fixed lg:static left-0 top-0 z-50 transition-transform duration-200 ${
       isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
     }`}>
       {/* Brand Logo */}
-      <div className="h-16 flex items-center justify-between px-6 border-b border-gray-100">
+      <div className="h-16 flex items-center justify-between px-6 border-b border-[#e6dfd8] bg-[#efe9de]/40">
         <Link to="/dashboard" className="flex items-center">
           <img 
             src="/brand/logo.png" 
@@ -99,7 +97,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         {onClose && (
           <button 
             onClick={onClose} 
-            className="lg:hidden p-1 text-gray-400 hover:text-gray-600 cursor-pointer"
+            className="lg:hidden p-1 text-[#6c6a64] hover:text-[#141413] cursor-pointer"
           >
             <X size={20} />
           </button>
@@ -110,7 +108,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
         {navSections.map((section, idx) => (
           <div key={idx} className="space-y-1">
-            <h3 className="px-3 text-[10px] font-bold tracking-wider text-secondary uppercase mb-2">
+            <h3 className="px-3 text-[10px] font-mono font-bold tracking-wider text-[#8e8b82] uppercase mb-2">
               {section.title}
             </h3>
             {section.items.map((item) => {
@@ -121,13 +119,13 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                   key={item.name}
                   to={item.href}
                   onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-sans font-medium transition-all ${
                     active 
-                      ? 'bg-blue-50 text-primary-accent shadow-xs' 
-                      : 'text-secondary hover:text-primary hover:bg-gray-50'
+                      ? 'bg-[#efe9de] text-[#141413] font-semibold shadow-xs border border-[#e6dfd8]' 
+                      : 'text-[#6c6a64] hover:text-[#141413] hover:bg-[#efe9de]/50'
                   }`}
                 >
-                  <Icon size={16} className={active ? 'text-primary-accent' : 'text-secondary'} />
+                  <Icon size={16} className={active ? 'text-[#cc785c]' : 'text-[#6c6a64]'} />
                   <span>{item.name}</span>
                 </Link>
               );
@@ -137,17 +135,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       </div>
 
       {/* Footer / Account / Admin */}
-      <div className="p-4 border-t border-gray-100 space-y-1">
-        {user?.role === 'admin' && (
-          <Link
-            to="/admin"
-            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 hover:bg-purple-100 transition-colors mb-2"
-          >
-            <ShieldCheck size={16} className="text-purple-600" />
-            <span>Admin Portal</span>
-          </Link>
-        )}
-
+      <div className="p-4 border-t border-[#e6dfd8] bg-[#efe9de]/30 space-y-1 font-sans text-xs">
         {bottomNavItems.map((item) => {
           const active = isActive(item.href);
           const Icon = item.icon;
@@ -156,25 +144,28 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               key={item.name}
               to={item.href}
               onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-all ${
                 active 
-                  ? 'bg-blue-50 text-primary-accent shadow-xs' 
-                  : 'text-secondary hover:text-primary hover:bg-gray-50'
+                  ? 'bg-[#efe9de] text-[#141413] font-semibold border border-[#e6dfd8]' 
+                  : 'text-[#6c6a64] hover:text-[#141413] hover:bg-[#efe9de]/50'
               }`}
             >
-              <Icon size={16} className={active ? 'text-primary-accent' : 'text-secondary'} />
+              <Icon size={16} className={active ? 'text-[#cc785c]' : 'text-[#6c6a64]'} />
               <span>{item.name}</span>
             </Link>
           );
         })}
 
-        <button
-          onClick={() => logout()}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-        >
-          <LogOut size={16} />
-          <span>Sign Out</span>
-        </button>
+        {user?.role === 'admin' && (
+          <Link
+            to="/admin/dashboard"
+            onClick={onClose}
+            className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-[#cc785c] hover:bg-[#efe9de]/50 transition-colors mt-2"
+          >
+            <span className="w-2 h-2 rounded-full bg-[#cc785c] animate-pulse" />
+            <span>Admin Console</span>
+          </Link>
+        )}
       </div>
     </aside>
   );

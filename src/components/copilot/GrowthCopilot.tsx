@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Sparkles, 
   X, 
@@ -17,26 +17,76 @@ interface GrowthCopilotProps {
   businessName?: string;
 }
 
-const PRESET_QUESTIONS = [
-  "Why am I not ranking?",
-  "Why is competitor beating me?",
-  "What should I fix first?",
-  "What keywords should I target?",
-  "What pages should I create?",
-  "How can I get more reviews?",
-  "Give me a 30-day growth plan.",
-  "What are my biggest SEO problems?"
-];
-
 export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Dynamic context-aware chips based on active route
+  const getContextualPresets = () => {
+    const path = location.pathname;
+    if (path.includes('competitors')) {
+      return [
+        "Why is competitor beating me?",
+        "What are my biggest competitor gaps?",
+        "How can I overtake my top rival?",
+        "What pages do competitors have that I lack?"
+      ];
+    }
+    if (path.includes('reviews')) {
+      return [
+        "How can I get more 5-star reviews?",
+        "How to respond to negative feedback?",
+        "How do reviews affect local Map Pack ranking?"
+      ];
+    }
+    if (path.includes('website') || path.includes('score')) {
+      return [
+        "Why is my Growth Score low?",
+        "What is the most critical technical issue?",
+        "How do I fix missing JSON-LD schema?",
+        "Explain my on-page meta tag status"
+      ];
+    }
+    if (path.includes('keywords')) {
+      return [
+        "Which local keywords should I target?",
+        "How do I break into Google's Top 3?",
+        "Why am I unranked for commercial terms?"
+      ];
+    }
+    if (path.includes('authority')) {
+      return [
+        "How do I get high-authority local citations?",
+        "Draft outreach pitch for local directory",
+        "How many backlinks do I need to compete?"
+      ];
+    }
+    if (path.includes('content')) {
+      return [
+        "What service pages should I create?",
+        "Generate pricing comparison outline",
+        "How to format local FAQ schema?"
+      ];
+    }
+    return [
+      "Why am I not ranking?",
+      "Why is competitor beating me?",
+      "What should I fix first?",
+      "Give me a 30-day growth plan.",
+      "What are my biggest SEO problems?"
+    ];
+  };
+
+  const currentPresets = getContextualPresets();
+
   const [messages, setMessages] = useState<CopilotMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content: `Hello! I am **RANKORA AI**, your dedicated local growth strategist.\n\nI have direct access to your live website crawl, competitor benchmarks, keyword rankings, and review telemetry for **${businessName || 'your business'}**.\n\nWhat would you like to solve today?`,
+      content: `Hello! I am **RANKORA AI**, your dedicated local growth strategist.\n\nI have direct access to your live website crawl, competitor benchmarks, keyword rankings, and review telemetry for **${businessName || 'your business'}**.\n\nAsk me anything or choose a context-aware question below.`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       actions: [
         { type: 'view_module', label: 'View Action Plan', target: '/dashboard/actions' },
@@ -46,9 +96,8 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
   ]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
 
-  // Listen for custom "open-copilot" events from anywhere in the app (e.g. Action Plan "ASK AI" button)
+  // Listen for custom "open-copilot" events from anywhere in the app
   useEffect(() => {
     const handleOpenCopilot = (event: any) => {
       const prompt = event.detail?.prompt;
@@ -178,19 +227,19 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="p-1.5 rounded-lg text-[#8e8b82] hover:text-white hover:bg-[#252320] transition-colors"
+              className="p-1.5 rounded-lg text-[#8e8b82] hover:text-white hover:bg-[#252320] transition-colors cursor-pointer"
             >
               <X size={18} />
             </button>
           </div>
 
-          {/* Quick Question Presets */}
+          {/* Contextual Quick Question Presets */}
           <div className="p-3 bg-[#efe9de] border-b border-[#e6dfd8] overflow-x-auto no-scrollbar flex items-center gap-1.5">
-            {PRESET_QUESTIONS.map((q, idx) => (
+            {currentPresets.map((q, idx) => (
               <button
                 key={idx}
                 onClick={() => handleSendMessage(q)}
-                className="whitespace-nowrap px-2.5 py-1 rounded-full text-[11px] font-sans font-medium bg-[#faf9f5] text-[#141413] border border-[#e6dfd8] hover:border-[#cc785c] hover:text-[#cc785c] transition-colors shrink-0"
+                className="whitespace-nowrap px-2.5 py-1 rounded-full text-[11px] font-sans font-medium bg-[#faf9f5] text-[#141413] border border-[#e6dfd8] hover:border-[#cc785c] hover:text-[#cc785c] transition-colors shrink-0 cursor-pointer"
               >
                 {q}
               </button>
@@ -222,7 +271,7 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
                         <button
                           key={i}
                           onClick={() => handleActionClick(act)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#faf9f5] hover:bg-[#e8e0d2] text-[#cc785c] font-sans font-semibold rounded-lg text-[11px] border border-[#e6dfd8] transition-colors shadow-xs"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#faf9f5] hover:bg-[#e8e0d2] text-[#cc785c] font-sans font-semibold rounded-lg text-[11px] border border-[#e6dfd8] transition-colors shadow-xs cursor-pointer"
                         >
                           {act.type === 'run_audit' ? <RefreshCw size={11} /> : act.type === 'add_keyword' ? <Plus size={11} /> : <Layers size={11} />}
                           <span>{act.label}</span>
@@ -264,7 +313,7 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
               <button
                 type="submit"
                 disabled={!input.trim() || loading}
-                className="p-2 bg-[#cc785c] hover:bg-[#a9583e] text-white rounded-lg disabled:opacity-40 transition-colors shadow-xs"
+                className="p-2 bg-[#cc785c] hover:bg-[#a9583e] text-white rounded-lg disabled:opacity-40 transition-colors shadow-xs cursor-pointer"
               >
                 <Send size={15} />
               </button>

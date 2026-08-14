@@ -38,6 +38,7 @@ const Content = lazy(() => import('./pages/dashboard/Content').then(m => ({ defa
 const Leads = lazy(() => import('./pages/dashboard/Leads').then(m => ({ default: m.Leads })));
 const Account = lazy(() => import('./pages/dashboard/Account').then(m => ({ default: m.Account })));
 const AuthorityBuilder = lazy(() => import('./pages/dashboard/AuthorityBuilder').then(m => ({ default: m.AuthorityBuilder })));
+const GeoGrid = lazy(() => import('./pages/dashboard/GeoGrid').then(m => ({ default: m.GeoGrid })));
 const Copilot = lazy(() => import('./pages/dashboard/Copilot').then(m => ({ default: m.Copilot })));
 
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -122,6 +123,7 @@ function App() {
             <Route path="/dashboard/settings" element={<DashboardSuspense><Settings /></DashboardSuspense>} />
             <Route path="/dashboard/account" element={<DashboardSuspense><Account /></DashboardSuspense>} />
             <Route path="/dashboard/authority" element={<DashboardSuspense><AuthorityBuilder /></DashboardSuspense>} />
+            <Route path="/dashboard/geogrid" element={<DashboardSuspense><GeoGrid /></DashboardSuspense>} />
             
             <Route path="/dashboard/*" element={<DashboardPlaceholder title="Page Not Found" />} />
           </Route>

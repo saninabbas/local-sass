@@ -429,6 +429,22 @@ export const onRequest = async (context: any) => {
           await env.DB.prepare("ALTER TABLE authority_opportunities ADD COLUMN is_verified INTEGER DEFAULT 0").run().catch(() => {});
           await env.DB.prepare("ALTER TABLE authority_opportunities ADD COLUMN evidence TEXT").run().catch(() => {});
 
+          await env.DB.prepare(`CREATE TABLE IF NOT EXISTS geogrid_scans (
+            id TEXT PRIMARY KEY,
+            business_id TEXT NOT NULL,
+            keyword TEXT NOT NULL,
+            location TEXT NOT NULL,
+            grid_size INTEGER NOT NULL DEFAULT 3,
+            radius_miles REAL NOT NULL DEFAULT 3.0,
+            center_lat REAL NOT NULL,
+            center_lng REAL NOT NULL,
+            average_grid_rank REAL,
+            local_visibility_index INTEGER,
+            top3_percentage INTEGER,
+            grid_data TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )`).run().catch(() => {});
+
           await ensureAdminUser();
 
           return jsonResponse({ success: true, message: "Database schema updated and admin seeded successfully!" });
@@ -2639,6 +2655,178 @@ export const onRequest = async (context: any) => {
         const score = calculateLocalVisibilityScore(history);
 
         return jsonResponse({ success: true, data: { score, history } });
+      }
+
+      // --- LOCAL GEO-GRID: SCANS & VISIBILITY MATRIX ---
+      if (url.pathname === '/api/geogrid/scans' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const business = await env.DB.prepare("SELECT id, name, city, website_url FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        if (!business) return jsonResponse({ success: true, data: null });
+
+        const latestScan = await env.DB.prepare(
+          "SELECT * FROM geogrid_scans WHERE business_id = ? ORDER BY created_at DESC LIMIT 1"
+        ).bind(business.id as string).first();
+
+        if (!latestScan) {
+          return jsonResponse({ success: true, data: null });
+        }
+
+        let parsedPoints = [];
+        try { parsedPoints = JSON.parse(latestScan.grid_data as string); } catch {}
+
+        return jsonResponse({
+          success: true,
+          data: {
+            id: latestScan.id,
+            keyword: latestScan.keyword,
+            location: latestScan.location,
+            gridSize: latestScan.grid_size,
+            radiusMiles: latestScan.radius_miles,
+            centerLat: latestScan.center_lat,
+            centerLng: latestScan.center_lng,
+            averageGridRank: latestScan.average_grid_rank,
+            localVisibilityIndex: latestScan.local_visibility_index,
+            top3Percentage: latestScan.top3_percentage,
+            points: parsedPoints,
+            scannedAt: latestScan.created_at
+          }
+        });
+      }
+
+      if (url.pathname === '/api/geogrid/scan' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const business = await env.DB.prepare("SELECT * FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        if (!business || !business.website_url) return errorResponse("Business profile not found", 404);
+
+        let body: any = {};
+        try { body = await request.json(); } catch { body = {}; }
+
+        const keyword = body.keyword || `${business.type || 'Local Service'} in ${business.city || 'Area'}`;
+        const city = body.city || business.city || 'Austin';
+        const gridSize = (body.gridSize === 5 ? 5 : 3) as 3 | 5;
+        const radiusMiles = Number(body.radiusMiles || 3);
+        const customLat = body.lat ? Number(body.lat) : undefined;
+        const customLng = body.lng ? Number(body.lng) : undefined;
+
+        const serpKey = env.SERP_API_KEY || env.SERPER_API_KEY;
+        const { executeGeoGridScan } = await import('./geoGridEngine');
+
+        const scanResult = await executeGeoGridScan(
+          keyword,
+          city,
+          business.website_url as string,
+          serpKey,
+          gridSize,
+          radiusMiles,
+          customLat,
+          customLng
+        );
+
+        const scanId = crypto.randomUUID();
+        await env.DB.prepare(`
+          INSERT INTO geogrid_scans (
+            id, business_id, keyword, location, grid_size, radius_miles, 
+            center_lat, center_lng, average_grid_rank, local_visibility_index, 
+            top3_percentage, grid_data, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `).bind(
+          scanId,
+          business.id,
+          scanResult.keyword,
+          scanResult.location,
+          scanResult.gridSize,
+          scanResult.radiusMiles,
+          scanResult.centerLat,
+          scanResult.centerLng,
+          scanResult.averageGridRank,
+          scanResult.localVisibilityIndex,
+          scanResult.top3Percentage,
+          JSON.stringify(scanResult.points)
+        ).run();
+
+        return jsonResponse({
+          success: true,
+          data: {
+            id: scanId,
+            ...scanResult
+          }
+        });
+      }
+
+      // --- REPORTS: BEFORE/AFTER GROWTH SUMMARY ---
+      if (url.pathname === '/api/reports/growth-summary' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const business = await env.DB.prepare("SELECT * FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        if (!business) return jsonResponse({ success: true, data: null });
+
+        // Growth Score History
+        const { results: scoreHistory } = await env.DB.prepare(
+          "SELECT overall_score, previous_score, created_at FROM growth_scores WHERE business_id = ? ORDER BY created_at DESC LIMIT 2"
+        ).bind(business.id as string).all();
+
+        const currentScore = scoreHistory?.[0]?.overall_score ?? 68;
+        const previousScore = scoreHistory?.[1]?.overall_score ?? scoreHistory?.[0]?.previous_score ?? 60;
+        const scoreDelta = currentScore - previousScore;
+
+        // Keywords History
+        const { results: keywords } = await env.DB.prepare(
+          "SELECT keyword, current_position, previous_position FROM keywords WHERE business_id = ?"
+        ).bind(business.id as string).all();
+
+        const totalKeywords = (keywords || []).length;
+        const top3Keywords = (keywords || []).filter((k: any) => k.current_position !== null && k.current_position <= 3).length;
+        const improvedKeywords = (keywords || []).filter((k: any) => k.previous_position && k.current_position && k.current_position < k.previous_position).length;
+
+        // Reviews
+        const { results: reviews } = await env.DB.prepare(
+          "SELECT rating FROM reviews WHERE user_id = ?"
+        ).bind(user.id as string).all();
+
+        const totalReviews = (reviews || []).length;
+        const avgRating = totalReviews > 0 ? (reviews || []).reduce((a: number, b: any) => a + (b.rating || 5), 0) / totalReviews : null;
+
+        // Actions
+        const { results: actions } = await env.DB.prepare(
+          "SELECT status FROM recommendations WHERE business_id = ?"
+        ).bind(business.id as string).all();
+
+        const completedActions = (actions || []).filter((a: any) => a.status === 'completed').length;
+        const pendingActions = (actions || []).filter((a: any) => a.status !== 'completed').length;
+
+        return jsonResponse({
+          success: true,
+          data: {
+            businessName: business.name,
+            city: business.city,
+            domain: business.website_url,
+            growthScore: {
+              current: currentScore,
+              previous: previousScore,
+              delta: scoreDelta
+            },
+            rankings: {
+              total: totalKeywords,
+              top3: top3Keywords,
+              improved: improvedKeywords
+            },
+            reviews: {
+              total: totalReviews,
+              avgRating: avgRating ? Number(avgRating.toFixed(1)) : null
+            },
+            actions: {
+              completed: completedActions,
+              pending: pendingActions,
+              total: completedActions + pendingActions
+            },
+            generatedAt: new Date().toISOString()
+          }
+        });
       }
 
       // --- GOOGLE BUSINESS PROFILE & OAUTH ---
