@@ -25,9 +25,9 @@ export function AdminNavbar({ onRefresh, isRefreshing }: AdminNavbarProps) {
           {/* Brand & Admin Badge */}
             <Link to="/admin" className="flex items-center gap-2 group">
               <img 
-                src="/brand/logo.png" 
+                src="/brand/logo.svg" 
                 alt="Rankora" 
-                className="h-8 sm:h-9 w-auto object-contain" 
+                className="w-[105px] sm:w-[115px] h-auto object-contain" 
               />
               <span className="ml-2 px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider bg-[#cc785c]/15 text-[#cc785c] border border-[#cc785c]/30 rounded-md">
                 Admin Console

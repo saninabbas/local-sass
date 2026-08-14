@@ -14,8 +14,8 @@ import {
   Sparkles,
   Bot,
   X,
-  Award,
-  Navigation
+  Navigation,
+  Link2
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -34,13 +34,11 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       items: [
         { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Growth Score', href: '/dashboard/score', icon: TrendingUp },
-        { name: 'AI Action Plan', href: '/dashboard/actions', icon: ListTodo },
       ]
     },
     {
-      title: 'GROWTH ENGINE',
+      title: 'GROWTH',
       items: [
-        { name: 'Website Audit', href: '/dashboard/website', icon: Globe },
         { name: 'Local Rankings', href: '/dashboard/keywords', icon: Search },
         { name: 'Local Geo-Grid', href: '/dashboard/geogrid', icon: Navigation },
         { name: 'Competitor Radar', href: '/dashboard/competitors', icon: Users },
@@ -49,8 +47,9 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     {
       title: 'LOCAL PRESENCE',
       items: [
+        { name: 'Website Audit', href: '/dashboard/website', icon: Globe },
         { name: 'Reviews & Reputation', href: '/dashboard/reviews', icon: Star },
-        { name: 'Citations & Authority', href: '/dashboard/authority', icon: Award },
+        { name: 'Backlinks & Authority', href: '/dashboard/backlinks', icon: Link2 },
       ]
     },
     {
@@ -63,8 +62,9 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     {
       title: 'AI & REPORTING',
       items: [
+        { name: 'AI Action Plan', href: '/dashboard/actions', icon: ListTodo },
         { name: 'RANKORA AI Agent', href: '/dashboard/copilot', icon: Bot },
-        { name: 'Executive Reports', href: '/dashboard/reports', icon: FileText },
+        { name: 'Reports', href: '/dashboard/reports', icon: FileText },
       ]
     }
   ];
@@ -89,9 +89,9 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       <div className="h-16 flex items-center justify-between px-6 border-b border-[#e6dfd8] bg-[#efe9de]/40">
         <Link to="/dashboard" className="flex items-center">
           <img 
-            src="/brand/logo.png" 
+            src="/brand/logo.svg" 
             alt="Rankora" 
-            className="h-10 w-auto max-w-[180px] object-contain transition-transform hover:scale-105" 
+            className="w-[135px] h-auto object-contain transition-transform hover:scale-105" 
           />
         </Link>
         {onClose && (

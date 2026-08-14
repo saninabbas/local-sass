@@ -51,9 +51,9 @@ export function AdminLogin() {
         <div className="flex justify-center mb-6">
           <Link to="/" className="flex items-center justify-center">
             <img 
-              src="/brand/logo.png" 
+              src="/brand/logo.svg" 
               alt="Rankora" 
-              className="h-10 w-auto object-contain" 
+              className="w-[130px] sm:w-[150px] h-auto object-contain" 
             />
           </Link>
         </div>

@@ -10,19 +10,19 @@ export function HeroSection() {
           {/* Left Column: Copy & CTA */}
           <div className="xl:col-span-5 max-w-2xl mx-auto xl:mx-0 text-center xl:text-left">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#efe9de] border border-[#e6dfd8] text-[#cc785c] text-xs font-semibold uppercase tracking-wider mb-8">
-              AI-powered growth for local businesses
+              AI Local Growth Operating System
             </div>
             
             <h1 className="text-4xl sm:text-5xl lg:text-[64px] font-serif font-normal tracking-[-1.5px] text-[#141413] leading-[1.05] mb-8">
-              Know exactly what's holding your local business back.
+              Find Out Why Your Local Business Isn't Ranking.
             </h1>
             
             <p className="text-lg sm:text-xl text-[#3d3d3a] leading-relaxed mb-10 max-w-lg mx-auto xl:mx-0 font-sans">
-              Rankora analyzes your website, local visibility and business presence, then gives you a clear Growth Score and an AI-powered action plan.
+              Rankora audits your website, analyzes your competitors, tracks local visibility, and gives you an AI-powered plan to grow — all from one dashboard.
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center xl:justify-start gap-4 mb-5">
-              <Link to="/dashboard" className="w-full sm:w-auto">
+              <Link to="/signup" className="w-full sm:w-auto">
                 <Button size="lg" className="w-full sm:w-auto bg-[#cc785c] hover:bg-[#a9583e] text-white shadow-sm font-medium px-8 h-12 rounded-lg text-base">
                   Start Free Audit
                 </Button>
@@ -35,7 +35,7 @@ export function HeroSection() {
             </div>
             
             <p className="text-xs text-[#6c6a64] font-sans">
-              No credit card required · Takes about 2 minutes
+              Free &bull; No credit card required &bull; Setup in 2 minutes
             </p>
           </div>
 

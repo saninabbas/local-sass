@@ -16,13 +16,11 @@ export function ProductPreviewSection() {
             {/* Browser/App Header */}
             <div className="border-b border-[#252320] bg-[#181715] px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="bg-white/95 px-2 py-0.5 rounded-md shadow-xs">
-                  <img 
-                    src="/brand/logo.png" 
-                    alt="Rankora" 
-                    className="h-5 w-auto object-contain" 
-                  />
-                </div>
+                <img 
+                  src="/brand/logo-light.svg" 
+                  alt="Rankora" 
+                  className="w-[90px] h-auto object-contain" 
+                />
                 <div className="flex space-x-1.5 ml-1">
                   <div className="w-2.5 h-2.5 rounded-full bg-[#c64545]"></div>
                   <div className="w-2.5 h-2.5 rounded-full bg-[#d4a017]"></div>

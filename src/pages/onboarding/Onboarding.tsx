@@ -73,8 +73,7 @@ export function Onboarding() {
         {/* Brand Header */}
         <div className="flex flex-col items-center mb-8">
           <div className="flex items-center gap-2 mb-2">
-            <img src="/brand/logo.png" alt="Rankora" className="h-9 w-auto" />
-            <span className="font-serif font-bold text-2xl text-[#141413] tracking-tight">Rankora</span>
+            <img src="/brand/logo.svg" alt="Rankora" className="w-[140px] h-auto object-contain" />
           </div>
           <p className="text-xs text-[#6c6a64] font-sans text-center">
             AI Local Growth Operating System — Automated Business & Market Discovery

@@ -116,8 +116,7 @@ export function PublicReport() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <img src="/brand/logo.png" alt="Rankora" className="h-7 w-auto" />
-                  <span className="font-serif font-bold text-lg text-[#141413]">Rankora</span>
+                  <img src="/brand/logo.svg" alt="Rankora" className="w-[110px] h-auto object-contain" />
                 </div>
                 <h1 className="text-3xl sm:text-4xl font-serif font-normal text-[#141413] mb-1">{business.name}</h1>
                 <div className="text-xs text-[#6c6a64] font-mono">
