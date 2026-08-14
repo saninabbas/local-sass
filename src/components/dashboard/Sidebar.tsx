@@ -5,6 +5,7 @@ import {
   ListTodo,
   Globe,
   Users,
+  Search,
   Star,
   FileText,
   Settings,
@@ -15,7 +16,9 @@ import {
   Shield,
   Building,
   Sparkles,
-  X
+  Bot,
+  X,
+  Award
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -28,22 +31,48 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const location = useLocation();
   const { user, logout } = useAuth();
   
-  const mainNavItems = [
-    { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Growth Score', href: '/dashboard/score', icon: TrendingUp },
-    { name: 'AI Action Plan', href: '/dashboard/actions', icon: ListTodo },
-    { name: 'Website', href: '/dashboard/website', icon: Globe },
-    { name: 'Competitors', href: '/dashboard/competitors', icon: Users },
-    { name: 'Authority Builder', href: '/dashboard/authority', icon: Shield },
-    { name: 'Blog Content', href: '/dashboard/content', icon: Sparkles },
-    { name: 'Lead Gen Widget', href: '/dashboard/leads', icon: Building },
-    { name: 'Reviews', href: '/dashboard/reviews', icon: Star },
-    { name: 'Reports', href: '/dashboard/reports', icon: FileText },
+  const navSections = [
+    {
+      title: 'OVERVIEW',
+      items: [
+        { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+      ]
+    },
+    {
+      title: 'GROWTH ENGINE',
+      items: [
+        { name: 'Growth Score', href: '/dashboard/score', icon: TrendingUp },
+        { name: 'AI Action Plan', href: '/dashboard/actions', icon: ListTodo },
+        { name: 'Website Audit', href: '/dashboard/website', icon: Globe },
+        { name: 'Local Rankings', href: '/dashboard/keywords', icon: Search },
+        { name: 'Competitors', href: '/dashboard/competitors', icon: Users },
+      ]
+    },
+    {
+      title: 'LOCAL PRESENCE',
+      items: [
+        { name: 'Reviews & Reputation', href: '/dashboard/reviews', icon: Star },
+        { name: 'Citations & Authority', href: '/dashboard/authority', icon: Award },
+      ]
+    },
+    {
+      title: 'CONTENT & LEADS',
+      items: [
+        { name: 'Content Engine', href: '/dashboard/content', icon: Sparkles },
+        { name: 'Lead Generation', href: '/dashboard/leads', icon: Building },
+      ]
+    },
+    {
+      title: 'AI & REPORTING',
+      items: [
+        { name: 'Rankora AI Agent', href: '/dashboard/copilot', icon: Bot },
+        { name: 'Executive Reports', href: '/dashboard/reports', icon: FileText },
+      ]
+    }
   ];
 
   const bottomNavItems = [
     { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-    { name: 'Help', href: '/contact', icon: HelpCircle },
     { name: 'Account', href: '/dashboard/account', icon: User },
   ];
 
@@ -55,76 +84,73 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   };
 
   return (
-    <aside className={`w-64 border-r border-[#e6dfd8] bg-[#faf9f5] flex flex-col h-screen fixed lg:static left-0 top-0 z-50 transition-transform duration-200 ${
+    <aside className={`w-64 border-r border-gray-200 bg-white flex flex-col h-screen fixed lg:static left-0 top-0 z-50 transition-transform duration-200 ${
       isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
     }`}>
       {/* Brand Logo */}
-      <div className="h-16 flex items-center justify-between px-6 border-b border-[#e6dfd8]">
-        <Link to="/" className="flex items-center gap-1.5">
+      <div className="h-16 flex items-center justify-between px-6 border-b border-gray-100">
+        <Link to="/dashboard" className="flex items-center gap-2">
           <img 
             src="/brand/logo.png" 
-            alt="Rankora Logo" 
-            className="h-9 w-auto object-contain scale-[1.25] -mr-1" 
+            alt="Rankora" 
+            className="h-8 w-auto object-contain" 
           />
-          <span className="text-xl font-bold font-serif text-[#141413] tracking-tight">
+          <span className="text-xl font-bold text-primary tracking-tight">
             Rankora
           </span>
         </Link>
         {onClose && (
           <button 
             onClick={onClose} 
-            className="lg:hidden p-1 text-[#6c6a64] hover:text-[#141413]"
-            aria-label="Close sidebar"
+            className="lg:hidden p-1 text-gray-400 hover:text-gray-600 cursor-pointer"
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         )}
       </div>
 
-      {/* Main Navigation */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
-        <div>
-          <span className="px-3 text-[10px] font-mono font-bold tracking-wider text-[#8e8b82] uppercase">
-            Menu
-          </span>
-          <nav className="mt-2 space-y-1">
-            {mainNavItems.map((item) => {
+      {/* Navigation Links */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+        {navSections.map((section, idx) => (
+          <div key={idx} className="space-y-1">
+            <h3 className="px-3 text-[10px] font-bold tracking-wider text-secondary uppercase mb-2">
+              {section.title}
+            </h3>
+            {section.items.map((item) => {
               const active = isActive(item.href);
               const Icon = item.icon;
               return (
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`flex items-center gap-3 px-3 py-2 text-xs font-sans font-medium rounded-lg transition-colors ${
-                    active
-                      ? 'bg-[#efe9de] text-[#cc785c] font-semibold'
-                      : 'text-[#3d3d3a] hover:bg-[#efe9de] hover:text-[#141413]'
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                    active 
+                      ? 'bg-blue-50 text-primary-accent shadow-xs' 
+                      : 'text-secondary hover:text-primary hover:bg-gray-50'
                   }`}
                 >
-                  <Icon size={16} className={active ? 'text-[#cc785c]' : 'text-[#6c6a64]'} />
+                  <Icon size={16} className={active ? 'text-primary-accent' : 'text-secondary'} />
                   <span>{item.name}</span>
                 </Link>
               );
             })}
-          </nav>
-        </div>
+          </div>
+        ))}
       </div>
 
-      {/* Admin Link if admin */}
-      {user?.role === 'admin' && (
-        <div className="px-3 pb-2">
+      {/* Footer / Account / Admin */}
+      <div className="p-4 border-t border-gray-100 space-y-1">
+        {user?.role === 'admin' && (
           <Link
             to="/admin"
-            className="flex items-center gap-2.5 px-3 py-2 text-xs font-mono font-semibold rounded-lg bg-[#cc785c]/10 text-[#cc785c] border border-[#cc785c]/25 hover:bg-[#cc785c]/20 transition-colors"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 hover:bg-purple-100 transition-colors mb-2"
           >
-            <ShieldCheck size={16} />
-            <span>Admin Console</span>
+            <ShieldCheck size={16} className="text-purple-600" />
+            <span>Admin Portal</span>
           </Link>
-        </div>
-      )}
+        )}
 
-      {/* Bottom Nav / Settings */}
-      <div className="p-3 border-t border-[#e6dfd8] space-y-1">
         {bottomNavItems.map((item) => {
           const active = isActive(item.href);
           const Icon = item.icon;
@@ -132,13 +158,14 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
             <Link
               key={item.name}
               to={item.href}
-              className={`flex items-center gap-3 px-3 py-1.5 text-xs font-sans font-medium rounded-lg transition-colors ${
-                active
-                  ? 'bg-[#efe9de] text-[#cc785c]'
-                  : 'text-[#6c6a64] hover:bg-[#efe9de] hover:text-[#141413]'
+              onClick={onClose}
+              className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                active 
+                  ? 'bg-blue-50 text-primary-accent shadow-xs' 
+                  : 'text-secondary hover:text-primary hover:bg-gray-50'
               }`}
             >
-              <Icon size={15} className={active ? 'text-[#cc785c]' : 'text-[#8e8b82]'} />
+              <Icon size={16} className={active ? 'text-primary-accent' : 'text-secondary'} />
               <span>{item.name}</span>
             </Link>
           );
@@ -146,9 +173,9 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
         <button
           onClick={() => logout()}
-          className="flex items-center gap-3 w-full px-3 py-1.5 text-xs font-sans font-medium text-[#6c6a64] hover:bg-[#efe9de] hover:text-[#c64545] rounded-lg transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
         >
-          <LogOut size={15} className="text-[#8e8b82]" />
+          <LogOut size={16} />
           <span>Sign Out</span>
         </button>
       </div>

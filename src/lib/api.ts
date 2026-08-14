@@ -74,6 +74,10 @@ export async function analyzeWebsite(): Promise<any> {
   return fetchApi('/api/website/analyze', { method: 'GET' });
 }
 
+export async function fetchDeepCrawl(): Promise<any> {
+  return fetchApi('/api/website/deep-crawl', { method: 'GET' });
+}
+
 export async function analyzeCompetitor(competitorUrl: string): Promise<any> {
   return fetchApi('/api/competitors/analyze', { method: 'POST', body: JSON.stringify({ competitorUrl }) });
 }
@@ -91,7 +95,6 @@ export async function fetchIntegrationStatus(): Promise<any> {
 }
 
 export async function connectGoogleSearchConsole(): Promise<void> {
-  // Redirect to OAuth
   window.location.href = (import.meta.env.VITE_API_BASE_URL || '') + '/api/integrations/google/auth';
 }
 
@@ -105,6 +108,25 @@ export async function fetchBacklinks(): Promise<any> {
 
 export async function addBacklink(data: any): Promise<any> {
   return fetchApi('/api/authority/backlinks', { method: 'POST', body: JSON.stringify(data) });
+}
+
+// -----------------------------------------------------------------------------
+// KEYWORDS & VISIBILITY
+// -----------------------------------------------------------------------------
+export async function fetchKeywords(): Promise<any> {
+  return fetchApi('/api/keywords');
+}
+
+export async function addKeyword(keyword: string): Promise<any> {
+  return fetchApi('/api/keywords', { method: 'POST', body: JSON.stringify({ keyword }) });
+}
+
+export async function deleteKeyword(id: string): Promise<any> {
+  return fetchApi(`/api/keywords/${id}`, { method: 'DELETE' });
+}
+
+export async function refreshKeywords(): Promise<any> {
+  return fetchApi('/api/keywords/refresh', { method: 'POST' });
 }
 
 // -----------------------------------------------------------------------------
@@ -151,5 +173,34 @@ export async function updateUserRole(userId: string, role: string): Promise<{ su
   return fetchApi(`/api/admin/users/${userId}/role`, {
     method: 'POST',
     body: JSON.stringify({ role })
+  });
+}
+
+// -----------------------------------------------------------------------------
+// COMPETITIVE INTELLIGENCE & GROWTH ROADMAP
+// -----------------------------------------------------------------------------
+export async function fetchDiscoveredCompetitors(): Promise<any[]> {
+  return fetchApi('/api/competitors/discovered');
+}
+
+export async function discoverCompetitors(): Promise<any[]> {
+  return fetchApi('/api/competitors/discover', { method: 'POST' });
+}
+
+export async function analyzeCompetitorDeep(competitorUrl: string): Promise<any> {
+  return fetchApi('/api/competitors/analyze-deep', { method: 'POST', body: JSON.stringify({ competitorUrl }) });
+}
+
+export async function fetchGrowthRoadmap(): Promise<any> {
+  return fetchApi('/api/growth/roadmap');
+}
+
+// -----------------------------------------------------------------------------
+// AI GROWTH COPILOT
+// -----------------------------------------------------------------------------
+export async function sendCopilotMessage(message: string): Promise<{ reply: string; actions?: Array<{ type: string; label: string; target?: string }> }> {
+  return fetchApi('/api/copilot/chat', {
+    method: 'POST',
+    body: JSON.stringify({ message })
   });
 }

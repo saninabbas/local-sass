@@ -13,6 +13,9 @@ import { Contact } from './pages/marketing/Contact';
 import { Privacy } from './pages/marketing/Privacy';
 import { Terms } from './pages/marketing/Terms';
 import { Resources } from './pages/marketing/Resources';
+import { Features } from './pages/marketing/Features';
+import { HowItWorks } from './pages/marketing/HowItWorks';
+import { Pricing } from './pages/marketing/Pricing';
 import { PublicReport } from './pages/report/PublicReport';
 import { ClaudeShowcasePage } from './pages/ClaudeShowcasePage';
 import { AdminRoute } from './pages/admin/AdminRoute';
@@ -28,10 +31,12 @@ const Score = lazy(() => import('./pages/dashboard/Score').then(m => ({ default:
 const Website = lazy(() => import('./pages/dashboard/Website').then(m => ({ default: m.Website })));
 const Reviews = lazy(() => import('./pages/dashboard/Reviews').then(m => ({ default: m.Reviews })));
 const Competitors = lazy(() => import('./pages/dashboard/Competitors').then(m => ({ default: m.Competitors })));
+const Keywords = lazy(() => import('./pages/dashboard/Keywords').then(m => ({ default: m.Keywords })));
 const Content = lazy(() => import('./pages/dashboard/Content').then(m => ({ default: m.Content })));
 const Leads = lazy(() => import('./pages/dashboard/Leads').then(m => ({ default: m.Leads })));
 const Account = lazy(() => import('./pages/dashboard/Account').then(m => ({ default: m.Account })));
 const AuthorityBuilder = lazy(() => import('./pages/dashboard/AuthorityBuilder').then(m => ({ default: m.AuthorityBuilder })));
+const Copilot = lazy(() => import('./pages/dashboard/Copilot').then(m => ({ default: m.Copilot })));
 
 function DashboardPlaceholder({ title }: { title: string }) {
   return (
@@ -67,6 +72,9 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/features" element={<Features />} />
+          <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="/pricing" element={<Pricing />} />
           <Route path="/resources" element={<Resources />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
@@ -97,6 +105,8 @@ function App() {
             <Route path="/dashboard/actions" element={<DashboardSuspense><ActionPlan /></DashboardSuspense>} />
             <Route path="/dashboard/website" element={<DashboardSuspense><Website /></DashboardSuspense>} />
             <Route path="/dashboard/competitors" element={<DashboardSuspense><Competitors /></DashboardSuspense>} />
+            <Route path="/dashboard/keywords" element={<DashboardSuspense><Keywords /></DashboardSuspense>} />
+            <Route path="/dashboard/copilot" element={<DashboardSuspense><Copilot /></DashboardSuspense>} />
             <Route path="/dashboard/content" element={<DashboardSuspense><Content /></DashboardSuspense>} />
             <Route path="/dashboard/leads" element={<DashboardSuspense><Leads /></DashboardSuspense>} />
             <Route path="/dashboard/reviews" element={<DashboardSuspense><Reviews /></DashboardSuspense>} />

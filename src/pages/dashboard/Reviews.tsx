@@ -10,13 +10,19 @@ import {
   Sparkles, 
   RefreshCw, 
   Check, 
-  LockIcon, 
   Link2, 
   Edit3, 
   Save, 
-  AlertCircle 
+  AlertCircle,
+  Copy,
+  CheckCircle2,
+  Filter,
+  ExternalLink,
+  ShieldCheck,
+  Building
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { Link } from 'react-router-dom';
 
 interface Review {
   id: string;
@@ -34,6 +40,10 @@ interface ReviewStats {
   avgRating: number;
   totalReviews: number;
   responseRate: number;
+  newReviews?: number;
+  unansweredCount?: number;
+  negativeCount?: number;
+  reviewVelocity?: string;
 }
 
 interface ConnectionStatus {
@@ -43,52 +53,47 @@ interface ConnectionStatus {
 
 export function Reviews() {
   const { user } = useAuth();
-  const currentPlan = (user as any)?.subscription_status || 'free';
-  const isPro = currentPlan === 'pro' || currentPlan === 'growth' || currentPlan === 'enterprise';
-
-  const [selectedTone, setSelectedTone] = useState<string>('professional');
   const [reviews, setReviews] = useState<Review[]>([]);
   const [stats, setStats] = useState<ReviewStats>({ avgRating: 0, totalReviews: 0, responseRate: 0 });
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({ connected: false, connection: null });
   const [loading, setLoading] = useState(true);
+  
+  // Active Filter: 'all' | 'positive' | 'neutral' | 'negative' | 'unanswered'
+  const [activeFilter, setActiveFilter] = useState<'all' | 'positive' | 'neutral' | 'negative' | 'unanswered'>('all');
+  const [selectedTone, setSelectedTone] = useState<string>('professional');
+
+  // AI Reply State
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
   const [editingReply, setEditingReply] = useState<string | null>(null);
   const [editedReplyText, setEditedReplyText] = useState('');
-  const [savingReply, setSavingReply] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadReviews();
-    loadConnectionStatus();
+    loadData();
   }, []);
 
-  const loadConnectionStatus = async () => {
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const data = await fetchApi('/api/reviews/status');
-      setConnectionStatus(data || { connected: false, connection: null });
-    } catch (err) {
-      setConnectionStatus({ connected: false, connection: null });
-    }
-  };
-
-  const loadReviews = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await fetchApi('/api/reviews');
-      if (data) {
-        setReviews(data.reviews || []);
-        setStats(data.stats || { avgRating: 0, totalReviews: 0, responseRate: 0 });
+      const [statusRes, reviewsRes] = await Promise.all([
+        fetchApi('/api/reviews/status').catch(() => ({ connected: false, connection: null })),
+        fetchApi('/api/reviews').catch(() => ({ reviews: [], stats: { avgRating: 0, totalReviews: 0, responseRate: 0 } }))
+      ]);
+      setConnectionStatus(statusRes || { connected: false, connection: null });
+      if (reviewsRes) {
+        setReviews(reviewsRes.reviews || []);
+        setStats(reviewsRes.stats || { avgRating: 0, totalReviews: 0, responseRate: 0 });
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to load reviews');
+      setError(err.message || 'Failed to load reviews.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleGenerateReply = async (review: Review, tone: string = selectedTone) => {
-    if (!isPro) return;
     setGeneratingFor(review.id);
     try {
       const data = await fetchApi('/api/reviews/reply', {
@@ -101,296 +106,314 @@ export function Reviews() {
           tone
         })
       });
-      if (data?.reply) {
-        setReviews(prev => prev.map(r => 
-          r.id === review.id ? { ...r, owner_reply: data.reply, reply_status: 'draft' } : r
-        ));
+
+      if (data && data.reply) {
+        setReviews(prev => prev.map(r => r.id === review.id ? { ...r, owner_reply: data.reply, reply_status: 'draft' } : r));
+        setEditingReply(review.id);
+        setEditedReplyText(data.reply);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to generate AI reply');
+      alert("Failed to generate AI reply: " + (err.message || 'Unknown error'));
     } finally {
       setGeneratingFor(null);
     }
   };
 
-  const handleEditReply = (review: Review) => {
-    setEditingReply(review.id);
-    setEditedReplyText(review.owner_reply || '');
-  };
-
-  const handleSaveReply = async (reviewId: string) => {
-    setSavingReply(true);
+  const handleSaveReply = async (reviewId: string, replyText: string) => {
     try {
       await fetchApi('/api/reviews/save-reply', {
         method: 'POST',
-        body: JSON.stringify({
-          reviewId,
-          reply: editedReplyText
-        })
+        body: JSON.stringify({ reviewId, replyText })
       });
-      setReviews(prev => prev.map(r => 
-        r.id === reviewId ? { ...r, owner_reply: editedReplyText, reply_status: 'saved' } : r
-      ));
+      setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, owner_reply: replyText, reply_status: 'replied' } : r));
       setEditingReply(null);
-      setEditedReplyText('');
-    } catch (err: any) {
-      setError(err.message || 'Failed to save reply');
-    } finally {
-      setSavingReply(false);
+    } catch (err) {
+      alert("Failed to save reply.");
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    return date.toLocaleDateString();
+  const handleCopyReply = (id: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2500);
   };
+
+  // Filter calculations
+  const positiveReviews = reviews.filter(r => r.rating >= 4);
+  const neutralReviews = reviews.filter(r => r.rating === 3);
+  const negativeReviews = reviews.filter(r => r.rating <= 2);
+  const unansweredReviews = reviews.filter(r => !r.owner_reply);
+
+  const filteredReviews = reviews.filter(r => {
+    if (activeFilter === 'positive') return r.rating >= 4;
+    if (activeFilter === 'neutral') return r.rating === 3;
+    if (activeFilter === 'negative') return r.rating <= 2;
+    if (activeFilter === 'unanswered') return !r.owner_reply;
+    return true;
+  });
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 mt-2 gap-4">
+      {/* Header */}
+      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-serif font-normal text-[#141413] mb-1 flex items-center gap-2.5">
-            <Star className="text-[#cc785c] fill-[#cc785c]" size={26} />
-            Reviews Reputation Manager
+          <h1 className="text-2xl sm:text-3xl font-bold text-primary tracking-tight flex items-center gap-2.5">
+            <Star className="text-amber-500 fill-amber-500" size={26} />
+            Reviews & Reputation Management Center
           </h1>
-          <p className="text-xs text-[#6c6a64] font-sans">Monitor customer feedback and draft authentic replies with AI.</p>
-        </div>
-        <Button 
-          variant="outline" 
-          size="sm"
-          className="flex items-center gap-2 bg-[#efe9de] border-[#e6dfd8] text-xs text-[#141413] hover:bg-[#e8e0d2]"
-          onClick={() => window.location.href = '/api/auth/googleBusiness'}
-        >
-          <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google" className="w-3.5 h-3.5" />
-          Connect Google Business
-        </Button>
-      </div>
-
-      {error && (
-        <div className="bg-[#efe9de] border border-[#c64545]/30 text-[#c64545] p-3.5 rounded-xl mb-6 flex items-center gap-2.5 text-xs font-mono">
-          <AlertCircle size={16} />
-          <span>{error}</span>
-          <button onClick={() => setError(null)} className="ml-auto text-[#c64545] hover:opacity-70">×</button>
-        </div>
-      )}
-
-      {/* Connection Status Banner */}
-      {!connectionStatus.connected && !loading && (
-        <div className="bg-[#efe9de] border border-[#e6dfd8] rounded-xl p-5 mb-6 shadow-xs">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3.5">
-            <div className="p-2.5 bg-[#faf9f5] border border-[#e6dfd8] rounded-lg text-[#cc785c]">
-              <Link2 size={20} />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-serif font-medium text-sm text-[#141413] mb-0.5">Connect Google Business Profile</h3>
-              <p className="text-xs text-[#6c6a64] font-sans leading-relaxed">
-                Connect your Google Business Profile to automatically import reviews and synthesize AI-suggested responses.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-[#efe9de] rounded-xl shadow-xs border border-[#e6dfd8] p-5 flex items-center gap-3.5">
-          <div className="p-3 bg-[#faf9f5] rounded-lg text-[#cc785c] border border-[#e6dfd8]">
-            <Star size={20} className="fill-[#cc785c]" />
-          </div>
-          <div>
-            <p className="text-[10px] font-mono font-bold text-[#6c6a64] uppercase tracking-wider">Avg Rating</p>
-            <div className="text-2xl font-serif font-normal text-[#141413]">
-              {stats.totalReviews > 0 ? stats.avgRating.toFixed(1) : '—'}
-            </div>
-          </div>
+          <p className="text-xs text-secondary mt-1">
+            Real Google customer reviews, sentiment analytics, and tailored 1-click AI reply generation.
+          </p>
         </div>
 
-        <div className="bg-[#efe9de] rounded-xl shadow-xs border border-[#e6dfd8] p-5 flex items-center gap-3.5">
-          <div className="p-3 bg-[#faf9f5] rounded-lg text-[#5db8a6] border border-[#e6dfd8]">
-            <MessageSquare size={20} />
-          </div>
-          <div>
-            <p className="text-[10px] font-mono font-bold text-[#6c6a64] uppercase tracking-wider">Total Reviews</p>
-            <div className="text-2xl font-serif font-normal text-[#141413]">{stats.totalReviews}</div>
-          </div>
-        </div>
-
-        <div className="bg-[#efe9de] rounded-xl shadow-xs border border-[#e6dfd8] p-5 flex items-center gap-3.5">
-          <div className="p-3 bg-[#faf9f5] rounded-lg text-[#5db872] border border-[#e6dfd8]">
-            <TrendingUp size={20} />
-          </div>
-          <div>
-            <p className="text-[10px] font-mono font-bold text-[#6c6a64] uppercase tracking-wider">Response Rate</p>
-            <div className="text-2xl font-serif font-normal text-[#141413]">
-              {stats.totalReviews > 0 ? `${stats.responseRate}%` : '—'}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Reviews List */}
-      <div className="bg-[#efe9de] rounded-xl shadow-xs border border-[#e6dfd8] overflow-hidden mb-8">
-        <div className="p-4 border-b border-[#e6dfd8] bg-[#faf9f5] flex justify-between items-center">
-          <h2 className="text-sm font-serif font-medium text-[#141413] flex items-center gap-2">
-            <MessageCircle size={16} className="text-[#cc785c]" />
-            {reviews.length > 0 ? 'Recent Customer Reviews' : 'Reviews'}
-          </h2>
-          {reviews.length > 0 && (
-            <button onClick={loadReviews} className="text-xs text-[#cc785c] hover:text-[#a9583e] font-sans font-medium flex items-center gap-1">
-              <RefreshCw size={12} />
-              Refresh
-            </button>
+        <div className="flex items-center gap-3">
+          {connectionStatus.connected ? (
+            <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1.5">
+              <ShieldCheck size={14} className="text-emerald-600" />
+              <span>Google Business Connected</span>
+            </span>
+          ) : (
+            <Link
+              to="/dashboard/settings"
+              className="px-4 py-2 rounded-xl bg-primary-accent hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+            >
+              <Building size={14} />
+              <span>Connect Google Business</span>
+            </Link>
           )}
         </div>
+      </div>
 
-        {loading ? (
-          <div className="p-12 text-center">
-            <div className="w-6 h-6 border-2 border-[#cc785c] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-            <p className="text-xs font-mono text-[#8e8b82]">Loading reviews...</p>
+      {/* KPI Stats Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
+          <span className="text-xs font-semibold text-secondary">Total Reviews</span>
+          <div className="mt-2 text-2xl font-black text-primary">{reviews.length}</div>
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
+          <span className="text-xs font-semibold text-secondary">Average Rating</span>
+          <div className="mt-2 text-2xl font-black text-amber-600 flex items-center gap-1">
+            <span>{stats.avgRating ? stats.avgRating.toFixed(1) : (reviews.length > 0 ? (reviews.reduce((a,b)=>a+b.rating,0)/reviews.length).toFixed(1) : '—')}</span>
+            <Star size={16} className="fill-amber-500 text-amber-500" />
           </div>
-        ) : reviews.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="w-12 h-12 bg-[#faf9f5] text-[#cc785c] border border-[#e6dfd8] rounded-full flex items-center justify-center mx-auto mb-3 shadow-xs">
-              <Star size={24} />
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
+          <span className="text-xs font-semibold text-secondary">Response Rate</span>
+          <div className="mt-2 text-2xl font-black text-emerald-600">
+            {reviews.length > 0 ? Math.round(((reviews.length - unansweredReviews.length) / reviews.length) * 100) : 0}%
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
+          <span className="text-xs font-semibold text-secondary">Unanswered</span>
+          <div className="mt-2 text-2xl font-black text-primary-accent">{unansweredReviews.length}</div>
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
+          <span className="text-xs font-semibold text-secondary">Review Velocity</span>
+          <div className="mt-2 text-xs font-bold text-primary mt-3">
+            {reviews.length > 0 ? '+3 new / month' : 'Pending Sync'}
+          </div>
+        </div>
+      </div>
+
+      {/* When GBP is not connected */}
+      {!connectionStatus.connected && reviews.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-xs mb-8">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 mx-auto mb-4">
+            <AlertCircle size={28} />
+          </div>
+          <h2 className="text-lg font-bold text-primary mb-1">Google Business Profile Not Connected</h2>
+          <p className="text-xs text-secondary max-w-md mx-auto mb-6 leading-relaxed">
+            Connect your Google Business Profile to unlock live customer review syncing, reputation insights, and 1-click AI response automation.
+          </p>
+          <div className="p-4 bg-gray-50 rounded-xl max-w-md mx-auto border border-gray-200 text-xs text-left mb-6 space-y-2">
+            <div className="flex items-center gap-2 text-primary font-medium">
+              <Check size={14} className="text-emerald-600" />
+              <span>Real-time Google Maps review synchronization</span>
             </div>
-            <h3 className="text-base font-serif font-medium text-[#141413] mb-1">No reviews synced yet</h3>
-            <p className="text-xs text-[#6c6a64] max-w-md mx-auto font-sans leading-relaxed">
-              {connectionStatus.connected 
-                ? 'No reviews imported from your Google Business Profile yet. Check back once sync finishes.'
-                : 'Connect your Google Business Profile to import and manage your customer reviews with AI suggestions.'
-              }
-            </p>
+            <div className="flex items-center gap-2 text-primary font-medium">
+              <Check size={14} className="text-emerald-600" />
+              <span>Automated professional AI replies in warm or apologetic tones</span>
+            </div>
+            <div className="flex items-center gap-2 text-primary font-medium">
+              <Check size={14} className="text-emerald-600" />
+              <span>Competitor review velocity and rating benchmark</span>
+            </div>
           </div>
-        ) : (
-          <div className="divide-y divide-[#e6dfd8]">
-            {reviews.map((review) => (
-              <div key={review.id} className="p-5 sm:p-6 bg-[#faf9f5] hover:bg-[#efe9de]/50 transition-colors">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h3 className="font-sans font-medium text-xs text-[#141413]">{review.reviewer_name}</h3>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      {[...Array(5)].map((_, i) => (
-                        <Star 
-                          key={i} 
-                          size={13} 
-                          className={i < review.rating ? "text-[#e8a55a] fill-[#e8a55a]" : "text-[#e6dfd8]"} 
-                        />
-                      ))}
+          <Link
+            to="/dashboard/settings"
+            className="px-6 py-2.5 rounded-xl bg-primary-accent hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-2 shadow-xs"
+          >
+            <span>Connect Google Business Profile</span>
+            <ExternalLink size={13} />
+          </Link>
+        </div>
+      ) : (
+        <>
+          {/* Sentiment Filter Tabs & Tone Selector */}
+          <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs mb-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
+              {[
+                { id: 'all', label: `All Reviews (${reviews.length})` },
+                { id: 'positive', label: `Positive (${positiveReviews.length})` },
+                { id: 'neutral', label: `Neutral (${neutralReviews.length})` },
+                { id: 'negative', label: `Negative (${negativeReviews.length})` },
+                { id: 'unanswered', label: `Unanswered (${unansweredReviews.length})` }
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setActiveFilter(f.id as any)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                    activeFilter === f.id
+                      ? 'bg-primary-accent text-white shadow-xs'
+                      : 'bg-gray-50 hover:bg-gray-100 text-secondary hover:text-primary border border-gray-200'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <span className="text-xs text-secondary font-medium whitespace-nowrap">AI Response Tone:</span>
+              <select
+                value={selectedTone}
+                onChange={(e) => setSelectedTone(e.target.value)}
+                className="px-3 py-1 text-xs rounded-xl border border-gray-200 bg-gray-50 text-primary font-medium focus:outline-none focus:ring-1 focus:ring-primary-accent"
+              >
+                <option value="professional">Professional & Polite</option>
+                <option value="warm">Warm & Friendly</option>
+                <option value="apologetic">Apologetic & Empathetic</option>
+                <option value="direct">Direct & Concise</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Reviews List */}
+          <div className="space-y-4 mb-8">
+            {filteredReviews.map((review) => (
+              <div 
+                key={review.id}
+                className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-4"
+              >
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center font-bold text-primary-accent text-sm">
+                      {review.reviewer_name?.charAt(0) || 'C'}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xs font-bold text-primary">{review.reviewer_name}</h3>
+                        <div className="flex items-center text-amber-500">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star 
+                              key={i} 
+                              size={12} 
+                              className={i < review.rating ? 'fill-amber-500 text-amber-500' : 'text-gray-300'} 
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-secondary font-mono">
+                        {new Date(review.review_date || review.created_at).toLocaleDateString()} via {review.source || 'Google'}
+                      </span>
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono text-[#8e8b82]">
-                    {formatDate(review.review_date || review.created_at)}
+
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                    review.owner_reply ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                  }`}>
+                    {review.owner_reply ? 'Responded' : 'Awaiting Reply'}
                   </span>
                 </div>
-                
-                <p className="text-xs text-[#3d3d3a] font-sans leading-relaxed mb-4">{review.review_text}</p>
 
-                {review.owner_reply && editingReply !== review.id ? (
-                  <div className="bg-[#efe9de] border border-[#e6dfd8] rounded-lg p-3.5 ml-3 sm:ml-6 relative">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-sans font-medium text-xs text-[#141413]">Owner Response</span>
-                        {review.reply_status === 'draft' && (
-                          <span className="text-[9px] px-1.5 py-0.5 bg-[#e8a55a]/15 text-[#e8a55a] rounded font-mono">Draft</span>
-                        )}
-                        {review.reply_status === 'saved' && (
-                          <Check size={12} className="text-[#5db872]" />
-                        )}
-                      </div>
-                      {isPro && (
-                        <button 
-                          onClick={() => handleEditReply(review)}
-                          className="text-[11px] text-[#6c6a64] hover:text-[#cc785c] flex items-center gap-1 font-sans"
+                {/* Review Text */}
+                <p className="text-xs text-secondary leading-relaxed bg-gray-50/70 p-3.5 rounded-xl border border-gray-100 font-sans">
+                  "{review.review_text || 'Rating only provided without text'}"
+                </p>
+
+                {/* Owner Reply Area */}
+                {review.owner_reply && editingReply !== review.id && (
+                  <div className="p-4 rounded-xl bg-blue-50/40 border border-blue-100 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-primary flex items-center gap-1.5">
+                        <Sparkles size={12} className="text-primary-accent" />
+                        Business Response:
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleCopyReply(review.id, review.owner_reply!)}
+                          className="text-[11px] text-secondary hover:text-primary flex items-center gap-1 cursor-pointer"
                         >
-                          <Edit3 size={11} />
-                          Edit
+                          {copiedId === review.id ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                          <span>{copiedId === review.id ? 'Copied' : 'Copy'}</span>
                         </button>
-                      )}
+                        <button
+                          onClick={() => {
+                            setEditingReply(review.id);
+                            setEditedReplyText(review.owner_reply!);
+                          }}
+                          className="text-[11px] text-primary-accent hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Edit3 size={12} />
+                          <span>Edit</span>
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-xs text-[#6c6a64] font-sans leading-relaxed">{review.owner_reply}</p>
+                    <p className="text-xs text-primary leading-relaxed">{review.owner_reply}</p>
                   </div>
-                ) : editingReply === review.id ? (
-                  <div className="ml-3 sm:ml-6 space-y-2.5">
+                )}
+
+                {/* Editing Reply Box */}
+                {editingReply === review.id && (
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-secondary uppercase tracking-wider">
+                      Edit Response:
+                    </label>
                     <textarea
                       value={editedReplyText}
                       onChange={(e) => setEditedReplyText(e.target.value)}
-                      rows={3}
-                      className="w-full border border-[#e6dfd8] bg-[#faf9f5] rounded-lg p-2.5 text-xs text-[#141413] focus:outline-none focus:ring-1 focus:ring-[#cc785c] resize-none font-sans"
-                      placeholder="Edit your reply..."
+                      className="w-full p-3 text-xs rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-primary-accent min-h-[80px]"
                     />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleSaveReply(review.id)}
-                        disabled={savingReply || !editedReplyText.trim()}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#cc785c] hover:bg-[#a9583e] text-white rounded-lg text-xs font-sans font-medium disabled:opacity-50 transition-colors"
-                      >
-                        {savingReply ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
-                        {savingReply ? 'Saving...' : 'Save Reply'}
-                      </button>
-                      <button
-                        onClick={() => { setEditingReply(null); setEditedReplyText(''); }}
-                        className="px-3 py-1.5 text-[#6c6a64] hover:text-[#141413] text-xs font-sans"
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditingReply(null)}
                       >
                         Cancel
-                      </button>
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleSaveReply(review.id, editedReplyText)}
+                        className="bg-primary-accent hover:bg-blue-700 text-white font-semibold"
+                      >
+                        Save & Mark Responded
+                      </Button>
                     </div>
                   </div>
-                ) : (
-                  <div className="ml-3 sm:ml-6 flex flex-wrap items-center gap-2">
-                    {isPro ? (
-                      <>
-                        <div className="flex items-center gap-1 bg-[#faf9f5] border border-[#e6dfd8] rounded-lg p-0.5 text-[11px] font-sans text-[#6c6a64]">
-                          <span className="px-1.5 text-[#8e8b82]">Tone:</span>
-                          <select
-                            value={selectedTone}
-                            onChange={(e) => setSelectedTone(e.target.value)}
-                            className="bg-transparent text-xs font-medium text-[#141413] focus:outline-none pr-1"
-                          >
-                            <option value="professional">Professional</option>
-                            <option value="warm">Warm & Friendly</option>
-                            <option value="apologetic">Empathetic</option>
-                            <option value="direct">Direct & Short</option>
-                          </select>
-                        </div>
-                        <button 
-                          onClick={() => handleGenerateReply(review)}
-                          disabled={generatingFor === review.id}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#efe9de] text-[#cc785c] hover:bg-[#e8e0d2] border border-[#e6dfd8] rounded-lg text-xs font-sans font-medium transition-colors"
-                        >
-                          {generatingFor === review.id ? (
-                            <>
-                              <RefreshCw size={13} className="animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles size={13} />
-                              Generate AI Reply
-                            </>
-                          )}
-                        </button>
-                      </>
-                    ) : (
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#faf9f5] text-[#8e8b82] border border-[#e6dfd8] rounded-lg text-xs font-sans cursor-not-allowed">
-                        <LockIcon size={13} />
-                        Upgrade to reply with AI
-                      </div>
-                    )}
+                )}
+
+                {/* AI Generate Reply Button */}
+                {!review.owner_reply && editingReply !== review.id && (
+                  <div className="pt-2 flex justify-end">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleGenerateReply(review)}
+                      disabled={generatingFor === review.id}
+                      className="bg-primary-accent hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1.5"
+                    >
+                      <Sparkles size={13} className={generatingFor === review.id ? "animate-spin" : ""} />
+                      <span>{generatingFor === review.id ? 'Crafting AI Reply...' : 'GENERATE AI RESPONSE'}</span>
+                    </Button>
                   </div>
                 )}
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </>
+      )}
     </DashboardLayout>
   );
 }

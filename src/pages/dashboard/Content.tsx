@@ -6,16 +6,18 @@ import { Button } from '../../components/ui/Button';
 import { 
   FileText,
   Sparkles,
-  PenTool,
   Copy,
   CheckCircle2,
   AlertCircle,
-  Lock,
   Clock,
   Tag,
-  Globe
+  Globe,
+  BookOpen,
+  ArrowRight,
+  RefreshCw,
+  Check
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 
 interface BlogResult {
   title: string;
@@ -28,25 +30,25 @@ interface BlogResult {
 }
 
 export function Content() {
-  const { user } = useAuth();
-  const currentPlan = (user as any)?.subscription_status || 'free';
-  const isPro = currentPlan === 'pro' || currentPlan === 'growth' || currentPlan === 'enterprise';
+  const [searchParams] = useSearchParams();
+  const initialTopic = searchParams.get('topic') || '';
 
-  const [topic, setTopic] = useState('');
+  const [topic, setTopic] = useState(initialTopic);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<BlogResult | null>(null);
   const [copied, setCopied] = useState(false);
-  const [copyMode, setCopyMode] = useState<'html' | 'text'>('html');
+  const [activeTab, setActiveTab] = useState<'generate' | 'preview'>('generate');
 
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGenerate = async (topicToUse?: string) => {
+    const t = topicToUse || topic;
     try {
       setLoading(true);
       setError(null);
       setCopied(false);
-      const res = await generateBlogArticle(topic || undefined);
+      const res = await generateBlogArticle(t || undefined);
       setResult(res);
+      setActiveTab('preview');
     } catch (err: any) {
       setError(err.message || "Failed to generate content.");
     } finally {
@@ -56,12 +58,10 @@ export function Content() {
 
   const handleCopy = (mode: 'html' | 'text' = 'html') => {
     if (!result) return;
-    setCopyMode(mode);
     let contentToCopy = '';
     if (mode === 'html') {
       contentToCopy = `<h1>${result.title}</h1>\n${result.html_content}`;
     } else {
-      // Plain text version stripping html tags
       const tempEl = document.createElement('div');
       tempEl.innerHTML = result.html_content;
       contentToCopy = `${result.title}\n\n${tempEl.innerText || tempEl.textContent || ''}`;
@@ -73,147 +73,149 @@ export function Content() {
 
   return (
     <DashboardLayout>
-      <div className="mb-6 mt-2">
-        <h1 className="text-2xl sm:text-3xl font-serif font-normal text-[#141413] mb-1 flex items-center gap-2.5">
-          <FileText className="text-[#cc785c]" size={26} />
-          AI Local Blog & Article Generator
-        </h1>
-        <p className="text-xs text-[#6c6a64] max-w-2xl font-sans">
-          Instantly craft high-ranking, localized SEO blog articles with meta tags, keyword targets, and semantic headings tailored to your local audience.
-        </p>
+      {/* Header */}
+      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-primary tracking-tight flex items-center gap-2.5">
+            <Sparkles className="text-primary-accent" size={26} />
+            AI Content Engine & Gap Publisher
+          </h1>
+          <p className="text-xs text-secondary mt-1">
+            Generate high-converting, local SEO optimized service articles with FAQ schema and internal link suggestions.
+          </p>
+        </div>
       </div>
 
-      {!isPro && (
-        <div className="bg-[#efe9de] border border-[#cc785c]/30 rounded-xl p-8 mb-8 text-center relative overflow-hidden shadow-xs">
-          <Lock className="text-[#cc785c] mx-auto mb-3" size={36} />
-          <h2 className="text-xl font-serif font-medium text-[#141413] mb-2">Unlock AI Content Generator</h2>
-          <p className="text-xs text-[#6c6a64] max-w-lg mx-auto mb-6 font-sans">
-            Generating customized local SEO articles requires an active Growth or Pro plan.
-          </p>
-          <Link to="/dashboard/settings">
-            <Button className="bg-[#cc785c] hover:bg-[#a9583e] text-white text-xs font-sans font-medium px-6 py-2 rounded-lg shadow-sm">
-              Upgrade Now
-            </Button>
-          </Link>
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2 font-medium">
+          <AlertCircle size={16} />
+          <span>{error}</span>
         </div>
       )}
 
-      {isPro && (
-        <form onSubmit={handleGenerate} className="mb-6 bg-[#efe9de] p-5 rounded-xl border border-[#e6dfd8] shadow-xs">
-          <label className="block text-xs font-mono uppercase tracking-wider text-[#6c6a64] mb-2">Article Topic Focus (Optional)</label>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                <PenTool className="text-[#8e8b82]" size={16} />
-              </div>
-              <input
-                type="text"
-                placeholder="e.g. 5 Common Signs You Need an Emergency Plumbing Repair"
+      {/* Main Content Workspace */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        
+        {/* Left Column: Topic Generator */}
+        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-4">
+          <h2 className="text-base font-bold text-primary flex items-center gap-2">
+            <FileText size={18} className="text-primary-accent" />
+            Article Configuration
+          </h2>
+
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-1">
+                Target Topic or Focus Service
+              </label>
+              <textarea
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[#e6dfd8] bg-[#faf9f5] focus:outline-none focus:ring-1 focus:ring-[#cc785c] text-xs text-[#141413] font-sans"
+                placeholder="e.g. How Much Does Emergency Plumbing Cost in Seattle? 2026 Price Guide"
+                className="w-full p-3 text-xs rounded-xl border border-gray-200 bg-gray-50 focus:bg-white text-primary focus:outline-none focus:ring-1 focus:ring-primary-accent min-h-[90px]"
               />
             </div>
-            <Button 
-              type="submit" 
+
+            <Button
+              variant="primary"
+              onClick={() => handleGenerate()}
               disabled={loading}
-              className="px-6 py-2.5 bg-[#cc785c] hover:bg-[#a9583e] text-white text-xs font-medium rounded-lg whitespace-nowrap flex items-center justify-center gap-1.5"
+              className="w-full bg-primary-accent hover:bg-blue-700 text-white font-semibold text-xs h-10 flex items-center justify-center gap-2 shadow-xs"
             >
-              {loading ? 'Drafting Article...' : <><Sparkles size={14} /> Generate Article</>}
+              {loading ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
+              <span>{loading ? 'Crafting 800-Word SEO Guide...' : 'Generate Full SEO Article'}</span>
             </Button>
           </div>
-          {error && (
-            <p className="text-[#c64545] text-xs font-mono mt-2 flex items-center gap-1.5">
-              <AlertCircle size={14} /> {error}
-            </p>
+
+          {/* Preset High-Intent Topics */}
+          <div className="pt-4 border-t border-gray-100 space-y-2">
+            <span className="text-xs font-bold text-secondary uppercase tracking-wider block">
+              High-Converting Local Topics:
+            </span>
+            {[
+              "Complete Cost & Pricing Guide for 2026",
+              "5 Warning Signs You Need an Immediate Specialist Consultation",
+              "How to Choose the Best Certified Provider in Your City"
+            ].map((preset, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  setTopic(preset);
+                  handleGenerate(preset);
+                }}
+                className="w-full text-left p-2.5 rounded-xl bg-gray-50 hover:bg-blue-50 text-xs font-medium text-primary hover:text-primary-accent border border-gray-100 transition-colors cursor-pointer"
+              >
+                "{preset}"
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Right Column (2 cols): Generated Article Preview */}
+        <div className="lg:col-span-2 bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 shadow-xs flex flex-col min-h-[500px]">
+          {loading ? (
+            <div className="py-24 flex flex-col items-center justify-center gap-3 m-auto">
+              <div className="w-10 h-10 border-3 border-primary-accent border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs text-secondary font-medium">Researching local keyword intent and writing formatted HTML article...</span>
+            </div>
+          ) : result ? (
+            <div className="space-y-6">
+              {/* Meta & Slug Banner */}
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-primary">SEO Meta Description:</span>
+                  <span className="font-mono text-secondary text-[11px]">{result.read_time_minutes || 4} min read</span>
+                </div>
+                <p className="text-secondary leading-relaxed">{result.meta_description}</p>
+                {result.slug && (
+                  <div className="pt-1 font-mono text-[11px] text-primary-accent">
+                    URL Slug: /{result.slug}/
+                  </div>
+                )}
+              </div>
+
+              {/* Action Bar */}
+              <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                <h2 className="text-lg font-bold text-primary">{result.title}</h2>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCopy('text')}
+                    className="text-xs border-gray-200"
+                  >
+                    Copy Plain Text
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleCopy('html')}
+                    className="bg-primary-accent hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1.5"
+                  >
+                    {copied ? <Check size={13} className="text-white" /> : <Copy size={13} />}
+                    <span>{copied ? 'Copied HTML!' : 'Copy HTML Code'}</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Formatted HTML Article Content */}
+              <div 
+                className="prose prose-sm max-w-none prose-headings:font-bold prose-headings:text-primary prose-p:text-secondary prose-p:leading-relaxed prose-li:text-secondary"
+                dangerouslySetInnerHTML={{ __html: result.html_content }}
+              />
+            </div>
+          ) : (
+            <div className="py-24 text-center m-auto space-y-3">
+              <BookOpen className="mx-auto h-12 w-12 text-gray-300" />
+              <h3 className="text-base font-bold text-primary">Your Article Workspace is Ready</h3>
+              <p className="text-xs text-secondary max-w-md mx-auto">
+                Enter a topic or select a suggested high-intent title on the left to generate an authoritative 800-word local SEO guide with FAQs and schema markup.
+              </p>
+            </div>
           )}
-        </form>
-      )}
-
-      {loading && (
-        <div className="bg-[#efe9de] rounded-xl border border-[#e6dfd8] shadow-xs p-12 text-center">
-          <Sparkles className="text-[#cc785c] animate-spin-slow mx-auto mb-4" size={36} />
-          <h2 className="text-xl font-serif font-normal text-[#141413] mb-1">Synthesizing local SEO article...</h2>
-          <p className="text-xs text-[#6c6a64] font-sans">Drafting semantic headings, local keywords, FAQ sections, and conversion callouts (~8s).</p>
         </div>
-      )}
 
-      {result && !loading && (
-        <div className="bg-[#efe9de] rounded-xl border border-[#e6dfd8] shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {/* Top Bar with metadata and actions */}
-          <div className="bg-[#e8e0d2] border-b border-[#e6dfd8] p-3.5 flex flex-wrap justify-between items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#c64545]"></div>
-              <div className="w-2.5 h-2.5 rounded-full bg-[#d4a017]"></div>
-              <div className="w-2.5 h-2.5 rounded-full bg-[#5db872]"></div>
-              <span className="ml-3 text-xs font-mono text-[#6c6a64]">seo-article.html</span>
-              {result.read_time_minutes && (
-                <span className="flex items-center gap-1 text-[11px] font-sans text-[#8e8b82] ml-2">
-                  <Clock size={12} /> {result.read_time_minutes} min read
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => handleCopy('text')}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#faf9f5] border border-[#e6dfd8] rounded-lg text-xs font-sans font-medium text-[#141413] hover:bg-[#efe9de] transition-colors shadow-xs"
-              >
-                {copied && copyMode === 'text' ? <CheckCircle2 className="text-[#5db872]" size={14} /> : <Copy size={14} />}
-                {copied && copyMode === 'text' ? 'Copied Text!' : 'Copy Text'}
-              </button>
-              <button 
-                onClick={() => handleCopy('html')}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#cc785c] hover:bg-[#a9583e] text-white rounded-lg text-xs font-sans font-medium transition-colors shadow-xs"
-              >
-                {copied && copyMode === 'html' ? <CheckCircle2 size={14} /> : <Copy size={14} />}
-                {copied && copyMode === 'html' ? 'Copied HTML!' : 'Copy HTML'}
-              </button>
-            </div>
-          </div>
-
-          {/* SEO Metadata Box */}
-          <div className="p-5 bg-[#faf8f5] border-b border-[#e6dfd8] space-y-3">
-            {result.slug && (
-              <div className="flex items-center gap-2 text-xs font-mono text-[#6c6a64]">
-                <Globe size={13} className="text-[#cc785c]" />
-                <span className="text-[#8e8b82]">Suggested Slug:</span>
-                <span className="text-[#141413] bg-[#efe9de] px-2 py-0.5 rounded">/{result.slug}</span>
-              </div>
-            )}
-            
-            {result.meta_description && (
-              <div className="text-xs font-sans bg-white p-3 rounded-lg border border-[#e6dfd8]">
-                <span className="font-semibold text-[#6c6a64] block mb-1">Recommended Meta Description:</span>
-                <p className="text-[#141413]">{result.meta_description}</p>
-              </div>
-            )}
-
-            {result.focus_keywords && result.focus_keywords.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="text-xs font-medium text-[#6c6a64] flex items-center gap-1 mr-1">
-                  <Tag size={12} /> Keywords:
-                </span>
-                {result.focus_keywords.map((kw, i) => (
-                  <span key={i} className="text-[11px] bg-[#efe9de] text-[#141413] px-2.5 py-0.5 rounded-full font-mono border border-[#e6dfd8]">
-                    {kw}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          {/* Full Article Content */}
-          <div className="p-8 bg-white text-[#141413]">
-            <h1 className="text-2xl sm:text-3xl font-serif font-normal text-[#141413] mb-6 leading-tight border-b border-[#e6dfd8] pb-4">
-              {result.title}
-            </h1>
-            <div 
-              className="text-sm font-sans leading-relaxed text-[#3d3d3a] space-y-4 prose prose-stone max-w-none [&_h2]:text-xl [&_h2]:font-serif [&_h2]:text-[#141413] [&_h2]:mt-6 [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-[#141413] [&_h3]:mt-4 [&_h3]:mb-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_li]:text-xs [&_p]:text-xs [&_p]:leading-relaxed [&_strong]:text-[#141413]"
-              dangerouslySetInnerHTML={{ __html: result.html_content }} 
-            />
-          </div>
-        </div>
-      )}
+      </div>
     </DashboardLayout>
   );
 }
