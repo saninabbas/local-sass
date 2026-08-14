@@ -619,7 +619,7 @@ export const onRequest = async (context: any) => {
 
         const { email, token, password } = await request.json().catch(() => ({})) as any;
         if (!email || !token || !password) return errorResponse("Missing required fields", 400);
-        if (password.length < 8) return errorResponse("Password must be at least 8 characters long", 400);
+        if (password.length < 6) return errorResponse("Password must be at least 6 characters long", 400);
 
         const cleanEmail = email.toLowerCase().trim();
         const user = await env.DB.prepare(

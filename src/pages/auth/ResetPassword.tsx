@@ -28,8 +28,8 @@ export function ResetPassword() {
       setError('Email parameter is missing from the reset link.');
       return;
     }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long.');
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
       return;
     }
     if (password !== confirmPassword) {
@@ -107,7 +107,7 @@ export function ResetPassword() {
           ) : (
             <form className="space-y-4" onSubmit={handleSubmit}>
               <FormField
-                label="New Password (min 8 characters)"
+                label="New Password (min 6 characters)"
                 id="password"
                 type="password"
                 placeholder="••••••••"
