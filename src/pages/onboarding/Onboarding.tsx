@@ -89,15 +89,42 @@ export function Onboarding() {
           )}
 
           {isLoading ? (
-            <div className="py-12 flex flex-col items-center text-center space-y-4">
-              <div className="w-10 h-10 border-3 border-[#cc785c] border-t-transparent rounded-full animate-spin mb-2" />
-              <h3 className="text-base font-serif font-normal text-[#141413]">
-                Analyzing Your Business & Local Market
-              </h3>
-              <p className="text-xs text-[#6c6a64] font-sans max-w-sm leading-relaxed">
-                {loadingMessages[loadingStep]}
-              </p>
-              <div className="w-full bg-[#faf9f5] h-1.5 rounded-full overflow-hidden mt-4 border border-[#e6dfd8]">
+            <div className="py-8 flex flex-col items-center space-y-5">
+              <div className="w-10 h-10 border-3 border-[#cc785c] border-t-transparent rounded-full animate-spin mb-1" />
+              <div className="text-center">
+                <h3 className="text-base font-serif font-normal text-[#141413]">
+                  Analyzing Your Business & Local Market
+                </h3>
+                <p className="text-xs text-[#6c6a64] font-sans mt-1">
+                  Executing real-time DOM extraction & SERP intelligence benchmark
+                </p>
+              </div>
+
+              {/* 5-Step Visual Pipeline */}
+              <div className="w-full bg-[#faf9f5] p-4 rounded-xl border border-[#e6dfd8] space-y-2.5 font-mono text-xs text-left">
+                {[
+                  { step: 1, label: "STEP 1 — Target Website & DOM Analysis" },
+                  { step: 2, label: "STEP 2 — Local Business & Service Detection" },
+                  { step: 3, label: "STEP 3 — Google SERP Competitor Discovery" },
+                  { step: 4, label: "STEP 4 — 7-Vector Growth Score Baseline" },
+                  { step: 5, label: "STEP 5 — 30-Day Action Roadmap Synthesis" }
+                ].map((item, idx) => {
+                  const isDone = loadingStep > idx;
+                  const isCurrent = loadingStep === idx;
+                  return (
+                    <div key={item.step} className="flex items-center justify-between text-[11px]">
+                      <span className={isCurrent ? 'text-[#cc785c] font-bold' : isDone ? 'text-[#5db872]' : 'text-[#8e8b82]'}>
+                        {item.label}
+                      </span>
+                      <span className="font-bold">
+                        {isDone ? '✓ DONE' : isCurrent ? 'RUNNING...' : 'PENDING'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="w-full bg-[#faf9f5] h-1.5 rounded-full overflow-hidden border border-[#e6dfd8]">
                 <div 
                   className="h-full bg-[#cc785c] rounded-full transition-all duration-500"
                   style={{ width: `${((loadingStep + 1) / loadingMessages.length) * 100}%` }}

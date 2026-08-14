@@ -176,7 +176,7 @@ export function Reports() {
                 <thead>
                   <tr className="bg-[#faf9f5] border-b border-[#e6dfd8] text-[10px] uppercase font-mono text-[#6c6a64]">
                     <th className="py-3 px-4">Metric / Vector</th>
-                    <th className="py-3 px-4">Previous Audit ({progressSummary?.previous?.date || 'N/A'})</th>
+                    <th className="py-3 px-4">Previous Audit ({progressSummary?.previous?.date || 'No previous audit available yet'})</th>
                     <th className="py-3 px-4">Current Audit ({progressSummary?.current?.date || 'Today'})</th>
                     <th className="py-3 px-4">Change Delta</th>
                   </tr>
@@ -184,7 +184,7 @@ export function Reports() {
                 <tbody className="divide-y divide-[#e6dfd8] bg-[#faf9f5]">
                   <tr>
                     <td className="py-3 px-4 font-semibold text-[#141413]">Overall Growth Score</td>
-                    <td className="py-3 px-4 font-mono">{progressSummary?.previous ? `${progressSummary.previous.score}/100` : '—'}</td>
+                    <td className="py-3 px-4 font-mono">{progressSummary?.previous ? `${progressSummary.previous.score}/100` : 'No previous audit'}</td>
                     <td className="py-3 px-4 font-mono font-bold text-[#141413]">{progressSummary?.current?.score || 68}/100</td>
                     <td className="py-3 px-4 font-mono font-bold text-[#5db872]">
                       {progressSummary?.hasComparison 
@@ -194,7 +194,7 @@ export function Reports() {
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-semibold text-[#141413]">Local SEO Signal</td>
-                    <td className="py-3 px-4 font-mono">{progressSummary?.previous ? `${progressSummary.previous.local}/100` : '—'}</td>
+                    <td className="py-3 px-4 font-mono">{progressSummary?.previous ? `${progressSummary.previous.local}/100` : 'No previous audit'}</td>
                     <td className="py-3 px-4 font-mono font-bold text-[#141413]">{progressSummary?.current?.local || 58}/100</td>
                     <td className="py-3 px-4 font-mono font-bold text-[#5db872]">
                       {progressSummary?.hasComparison 
@@ -204,7 +204,7 @@ export function Reports() {
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-semibold text-[#141413]">Technical SEO Hygiene</td>
-                    <td className="py-3 px-4 font-mono">{progressSummary?.previous ? `${progressSummary.previous.technical}/100` : '—'}</td>
+                    <td className="py-3 px-4 font-mono">{progressSummary?.previous ? `${progressSummary.previous.technical}/100` : 'No previous audit'}</td>
                     <td className="py-3 px-4 font-mono font-bold text-[#141413]">{progressSummary?.current?.technical || 72}/100</td>
                     <td className="py-3 px-4 font-mono font-bold text-[#5db872]">
                       {progressSummary?.hasComparison 

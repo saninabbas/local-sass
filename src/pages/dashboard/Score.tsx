@@ -28,6 +28,7 @@ import {
   HelpCircle,
   Clock
 } from 'lucide-react';
+import { FixWithAIModal } from '../../components/modals/FixWithAIModal';
 import type { ProblemItem } from '../../types';
 
 interface LatestAuditData {
@@ -44,6 +45,27 @@ export function Score() {
   
   const initialTab = searchParams.get('tab') || 'overview';
   const [activeCategory, setActiveCategory] = useState<string>(initialTab);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [activeFixType, setActiveFixType] = useState<any>('title');
+  const [activeFixTitle, setActiveFixTitle] = useState('');
+  const [activeFixContext, setActiveFixContext] = useState<any>({});
+
+  const handleOpenFixWithAI = (cat: any) => {
+    let fixType: any = 'title';
+    if (cat.key === 'technical' || cat.key === 'local') fixType = 'faq_schema';
+    else if (cat.key === 'onpage') fixType = 'title';
+    else if (cat.key === 'reputation') fixType = 'review_response';
+    else if (cat.key === 'authority') fixType = 'outreach_email';
+    else if (cat.key === 'content' || cat.key === 'conversion') fixType = 'service_page_structure';
+
+    setActiveFixType(fixType);
+    setActiveFixTitle(`Fix Vector: ${cat.name}`);
+    setActiveFixContext({
+      evidence: cat.mainProblems.join('; '),
+      recommendedFix: cat.recommendedFix
+    });
+    setModalOpen(true);
+  };
 
   const loadData = async () => {
     setIsLoading(true);
@@ -448,7 +470,14 @@ export function Score() {
                 <p className="text-xs text-primary font-semibold leading-relaxed">
                   {selectedCategoryData.recommendedFix}
                 </p>
-                <div className="pt-2 flex items-center gap-3">
+                <div className="pt-2 flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={() => handleOpenFixWithAI(selectedCategoryData)}
+                    className="px-4 py-2 rounded-lg bg-[#cc785c] hover:bg-[#a9583e] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  >
+                    <Sparkles size={13} />
+                    <span>FIX WITH AI</span>
+                  </button>
                   <Link
                     to="/dashboard/actions"
                     className="px-4 py-2 rounded-lg bg-primary-accent hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
@@ -460,7 +489,7 @@ export function Score() {
                     to="/dashboard/copilot"
                     className="px-3.5 py-2 rounded-lg bg-white hover:bg-gray-50 text-primary text-xs font-semibold border border-gray-200 transition-colors"
                   >
-                    Ask Copilot How to Fix
+                    Ask Copilot
                   </Link>
                 </div>
               </div>
@@ -468,6 +497,14 @@ export function Score() {
           </div>
         </div>
       )}
+
+      <FixWithAIModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={activeFixTitle}
+        fixType={activeFixType}
+        context={activeFixContext}
+      />
     </DashboardLayout>
   );
 }

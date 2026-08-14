@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { FormField } from '../../components/ui/FormField';
 import { Button } from '../../components/ui/Button';
 import { ShieldCheck } from 'lucide-react';
@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login } = useAuth();
   
   const [email, setEmail] = useState('');
@@ -15,7 +16,14 @@ export function Login() {
   const [totpCode, setTotpCode] = useState('');
   const [tempToken, setTempToken] = useState('');
   const [requires2FA, setRequires2FA] = useState(false);
-  const [error, setError] = useState('');
+  const initialError = searchParams.get('error') 
+    ? (searchParams.get('error') === 'google_auth_not_configured' 
+        ? 'Google OAuth is not configured on the server. Please sign in with email and password.'
+        : searchParams.get('error') === 'redirect_uri_mismatch'
+        ? 'Google OAuth redirect URI is pending whitelist in Google Cloud Console. Please use email/password login.'
+        : decodeURIComponent(searchParams.get('error') || 'Authentication issue occurred.'))
+    : '';
+  const [error, setError] = useState(initialError);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {

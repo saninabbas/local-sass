@@ -184,35 +184,19 @@ export async function executeGeoGridScan(
     }
   }
 
-  // If no SERP key or points are empty, return deterministic realistic grid simulation without fake ranking claims
+  // If no SERP key or points are empty, return explicit UNAVAILABLE state
   if (gridPoints.length === 0) {
     rawPoints.forEach((pt) => {
-      // Center point is stronger, edge points fade with distance
-      const isCenter = pt.label === 'Center' || (pt.row === 1 && pt.col === 1);
-      const isNearCenter = Math.abs(pt.row - 1) <= 1 && Math.abs(pt.col - 1) <= 1;
-      
-      let rank: number | null = null;
-      let status: GridPoint['status'] = 'UNAVAILABLE';
-
-      if (serpApiKey) {
-        rank = isCenter ? 2 : (isNearCenter ? 4 : 8);
-        status = rank <= 3 ? 'TOP_3' : 'PAGE_1';
-      }
-
       gridPoints.push({
         id: `pt-${pt.row}-${pt.col}`,
         lat: pt.lat,
         lng: pt.lng,
         label: pt.label,
-        rank,
-        localPackRank: rank && rank <= 3 ? rank : null,
-        bestCompetitor: 'Top Local Competitor',
-        status,
-        competitorsAtPoint: [
-          { name: `${city} Premier Services`, position: 1, rating: 4.9, reviews: 142 },
-          { name: `Apex ${keyword} Co`, position: 2, rating: 4.8, reviews: 98 },
-          { name: `Reliable ${cleanCity} Pros`, position: 3, rating: 4.7, reviews: 64 }
-        ]
+        rank: null,
+        localPackRank: null,
+        bestCompetitor: undefined,
+        status: 'UNAVAILABLE',
+        competitorsAtPoint: []
       });
     });
   }
