@@ -102,21 +102,21 @@ export function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-primary flex flex-col">
+    <div className="min-h-screen bg-[#faf9f5] text-[#141413] flex flex-col selection:bg-[#cc785c] selection:text-white">
       {/* Toast Notification */}
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5 duration-200">
-          <div className={`px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 border text-sm font-semibold ${
+          <div className={`px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 border text-xs font-sans font-medium ${
             toast.type === 'success' 
-              ? 'bg-white border-green-200 text-success-dark shadow-green-500/10' 
-              : 'bg-white border-red-200 text-danger shadow-red-500/10'
+              ? 'bg-[#181715] border-[#5db872]/40 text-[#5db872]' 
+              : 'bg-[#181715] border-[#c64545]/40 text-[#c64545]'
           }`}>
             {toast.type === 'success' ? (
-              <CheckCircle2 size={18} className="text-success" />
+              <CheckCircle2 size={16} className="text-[#5db872]" />
             ) : (
-              <AlertCircle size={18} className="text-danger" />
+              <AlertCircle size={16} className="text-[#c64545]" />
             )}
-            <span>{toast.message}</span>
+            <span className="text-[#faf9f5]">{toast.message}</span>
           </div>
         </div>
       )}
@@ -125,7 +125,7 @@ export function AdminDashboard() {
       <AdminNavbar onRefresh={() => loadData(true)} isRefreshing={isRefreshing} />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* User Base Statistics */}
         <AdminStatsCards stats={stats} isLoading={isLoadingStats} />
 

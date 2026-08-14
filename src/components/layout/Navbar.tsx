@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
-import { Button } from '../ui/Button';
+import { AnthropicLogo } from '../claude/AnthropicLogo';
 
 export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -11,6 +11,7 @@ export function Navbar() {
     { name: 'Features', href: '/#features' },
     { name: 'How It Works', href: '/#how-it-works' },
     { name: 'Pricing', href: '/#pricing' },
+    { name: 'Computer Use', href: '/claude', isBadge: true },
     { name: 'Resources', href: '/resources' },
   ];
 
@@ -31,32 +32,34 @@ export function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white shadow-sm">
+    <nav className="sticky top-0 z-50 w-full border-b border-[#e6dfd8] bg-[#faf9f5]/95 backdrop-blur-md">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-20 items-center justify-between">
+        <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <div className="flex items-center">
-            <Link to="/" className="flex items-center gap-1">
-              <img src="/brand/logo.png" alt="Rankora Logo" className="h-10 w-auto object-contain scale-[1.35] -mr-1" />
-              <span className="text-xl font-bold tracking-tight text-gray-900">
-                Rankora
-              </span>
+            <Link to="/" className="flex items-center gap-2">
+              <AnthropicLogo size={22} color="#cc785c" showWordmark={true} wordmarkColor="#141413" brandName="Rankora" />
             </Link>
           </div>
           
           {/* Desktop Navigation */}
           <div className="hidden md:block">
-            <div className="ml-10 flex items-center space-x-8">
+            <div className="ml-10 flex items-center space-x-7">
               {navigation.map((item) => (
                 <Link
                   key={item.name}
                   to={item.href}
                   onClick={(e) => handleNavClick(e, item.href)}
-                  className={`text-sm font-semibold transition-colors hover:text-primary ${
-                    isActive(item.href) ? 'text-primary' : 'text-secondary'
+                  className={`text-[14px] font-medium transition-colors flex items-center gap-1.5 ${
+                    isActive(item.href) ? 'text-[#cc785c] font-semibold' : 'text-[#3d3d3a] hover:text-[#141413]'
                   }`}
                 >
-                  {item.name}
+                  <span>{item.name}</span>
+                  {item.isBadge && (
+                    <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 bg-[#cc785c]/15 text-[#cc785c] rounded font-semibold border border-[#cc785c]/20">
+                      Beta
+                    </span>
+                  )}
                 </Link>
               ))}
             </div>
@@ -64,14 +67,15 @@ export function Navbar() {
           
           {/* Desktop CTAs */}
           <div className="hidden md:block">
-            <div className="flex items-center space-x-6">
-              <Link to="/login" className="text-sm font-semibold text-secondary hover:text-primary transition-colors">
+            <div className="flex items-center space-x-5">
+              <Link to="/login" className="text-[14px] font-medium text-[#3d3d3a] hover:text-[#141413] transition-colors">
                 Log in
               </Link>
-              <Link to="/dashboard">
-                <Button variant="primary" size="sm" className="font-semibold px-5 shadow-sm">
-                  Start Free Audit
-                </Button>
+              <Link
+                to="/dashboard"
+                className="h-10 px-5 bg-[#cc785c] text-white text-[14px] font-medium rounded-lg hover:bg-[#a9583e] active:bg-[#a9583e] transition-colors flex items-center justify-center shadow-sm"
+              >
+                Start Free Audit
               </Link>
             </div>
           </div>
@@ -80,13 +84,13 @@ export function Navbar() {
           <div className="-mr-2 flex md:hidden">
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="inline-flex items-center justify-center rounded-md p-2 text-secondary hover:bg-gray-100 hover:text-primary focus:outline-none"
+              className="inline-flex items-center justify-center rounded-md p-2 text-[#6c6a64] hover:bg-[#efe9de] hover:text-[#141413] focus:outline-none"
             >
               <span className="sr-only">Open main menu</span>
               {isMobileMenuOpen ? (
-                <X className="block h-6 w-6" aria-hidden="true" />
+                <X className="block h-6 w-6 text-[#141413]" aria-hidden="true" />
               ) : (
-                <Menu className="block h-6 w-6" aria-hidden="true" />
+                <Menu className="block h-6 w-6 text-[#141413]" aria-hidden="true" />
               )}
             </button>
           </div>
@@ -95,7 +99,7 @@ export function Navbar() {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden border-t border-gray-100 bg-white">
+        <div className="md:hidden border-t border-[#e6dfd8] bg-[#faf9f5]">
           <div className="space-y-1 px-4 pb-3 pt-4">
             {navigation.map((item) => (
               <Link
@@ -103,8 +107,8 @@ export function Navbar() {
                 to={item.href}
                 className={`block rounded-md px-4 py-3 text-base font-medium ${
                   isActive(item.href)
-                    ? 'bg-gray-50 text-primary'
-                    : 'text-secondary hover:bg-gray-50 hover:text-primary'
+                    ? 'bg-[#efe9de] text-[#cc785c]'
+                    : 'text-[#3d3d3a] hover:bg-[#efe9de] hover:text-[#141413]'
                 }`}
                 onClick={(e) => handleNavClick(e, item.href)}
               >
@@ -112,13 +116,21 @@ export function Navbar() {
               </Link>
             ))}
           </div>
-          <div className="border-t border-gray-100 pb-6 pt-6">
-            <div className="flex flex-col space-y-4 px-6">
-              <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                <Button variant="outline" size="md" className="w-full justify-center">Log in</Button>
+          <div className="border-t border-[#e6dfd8] pb-6 pt-6">
+            <div className="flex flex-col space-y-3 px-6">
+              <Link 
+                to="/login" 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="w-full py-2.5 text-center text-sm font-medium border border-[#e6dfd8] bg-[#faf9f5] rounded-lg text-[#141413]"
+              >
+                Log in
               </Link>
-              <Link to="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
-                <Button variant="primary" size="md" className="w-full justify-center">Start Free Audit</Button>
+              <Link 
+                to="/dashboard" 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="w-full py-2.5 text-center text-sm font-medium bg-[#cc785c] text-white rounded-lg hover:bg-[#a9583e]"
+              >
+                Start Free Audit
               </Link>
             </div>
           </div>

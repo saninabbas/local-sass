@@ -4,69 +4,71 @@ import { Link } from 'react-router-dom';
 export function AIRecommendationsSection() {
   const recommendations = [
     {
-      title: 'Respond to unanswered reviews',
+      title: 'Respond to unanswered customer reviews',
       priority: 'HIGH IMPACT',
-      priorityColor: 'text-danger bg-red-50 border-red-100',
-      explanation: '8 recent reviews are waiting for a response.',
+      priorityColor: 'text-[#c64545] bg-[#c64545]/10 border-[#c64545]/20',
+      explanation: '8 recent customer reviews are waiting for replies. Responding within 24h boosts local search ranking authority by up to 18%.',
       impact: 'High'
     },
     {
-      title: 'Create missing service pages',
+      title: 'Generate missing geo-targeted service pages',
       priority: 'MEDIUM IMPACT',
-      priorityColor: 'text-warning bg-orange-50 border-orange-100',
-      explanation: '3 important services don\'t have dedicated pages.',
+      priorityColor: 'text-[#e8a55a] bg-[#e8a55a]/10 border-[#e8a55a]/20',
+      explanation: '3 core high-intent service keywords lack dedicated landing pages in your top zip codes.',
       impact: 'Medium'
     },
     {
-      title: 'Fix website issues',
+      title: 'Resolve mobile DOM & LCP speed bottlenecks',
       priority: 'MEDIUM IMPACT',
-      priorityColor: 'text-warning bg-orange-50 border-orange-100',
-      explanation: '2 technical issues may be affecting visibility.',
+      priorityColor: 'text-[#e8a55a] bg-[#e8a55a]/10 border-[#e8a55a]/20',
+      explanation: '2 technical asset delivery issues slow down mobile user experiences on 4G connections.',
       impact: 'Medium'
     },
     {
-      title: 'Improve local content',
+      title: 'Publish localized clinical FAQ authority content',
       priority: 'OPPORTUNITY',
-      priorityColor: 'text-primary-accent bg-blue-50 border-blue-100',
-      explanation: '5 content opportunities could help attract more local searches.',
+      priorityColor: 'text-[#5db8a6] bg-[#5db8a6]/10 border-[#5db8a6]/20',
+      explanation: '5 high-volume search queries in your service area can be captured with verified FAQ schema.',
       impact: 'High'
     }
   ];
 
   return (
-    <section className="py-24 sm:py-32 bg-white">
+    <section className="py-24 sm:py-32 bg-[#efe9de] border-b border-[#e6dfd8]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-4xl font-extrabold tracking-tight text-primary sm:text-5xl mb-6">
-            Stop guessing what to fix.
+        <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
+          <span className="text-xs font-mono uppercase tracking-[1.5px] text-[#cc785c] font-semibold">
+            Actionable Intelligence
+          </span>
+          <h2 className="text-3xl sm:text-4xl lg:text-[48px] font-serif font-normal tracking-[-1px] text-[#141413] leading-[1.1]">
+            Stop guessing what to fix next.
           </h2>
-          <p className="text-xl text-secondary">
-            Your AI action plan turns your audit into a simple list of things you can actually do.
+          <p className="text-base text-[#3d3d3a] font-sans max-w-xl mx-auto">
+            Your AI action plan transforms complex diagnostics into a clear prioritized sequence of executable steps.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {recommendations.map((rec, index) => (
-            <div key={index} className="bg-white rounded-2xl p-10 border border-gray-200 shadow-sm flex flex-col hover:-translate-y-1 hover:shadow-md transition-all">
-              <div className="mb-5">
-                <span className={`inline-block text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-md border ${rec.priorityColor}`}>
+            <div key={index} className="bg-[#faf9f5] rounded-xl p-8 border border-[#e6dfd8] shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div className="space-y-3">
+                <span className={`inline-block text-[11px] font-mono font-bold uppercase tracking-wider px-2.5 py-1 rounded border ${rec.priorityColor}`}>
                   {rec.priority}
                 </span>
+                <h3 className="text-xl font-serif font-normal text-[#141413]">{rec.title}</h3>
+                <p className="text-sm text-[#3d3d3a] font-sans leading-relaxed">
+                  {rec.explanation}
+                </p>
               </div>
-              <h3 className="text-2xl font-bold text-primary mb-3">{rec.title}</h3>
-              <p className="text-lg text-secondary mb-10 flex-1 leading-relaxed">
-                {rec.explanation}
-              </p>
               
-              <div className="pt-6 border-t border-gray-100 flex items-center justify-between mt-auto">
-                <div className="flex items-center gap-2">
-                  <span className="text-base text-secondary">Impact:</span>
-                  <span className="text-base font-semibold text-primary">{rec.impact}</span>
+              <div className="pt-6 mt-6 border-t border-[#e6dfd8] flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-sans text-[#6c6a64]">
+                  <span>Estimated Impact:</span>
+                  <span className="font-semibold text-[#141413]">{rec.impact}</span>
                 </div>
-                <Link to="/signup">
-                  <button className="text-base font-semibold text-primary-accent hover:text-blue-700 flex items-center group">
-                    View recommendation <ArrowRight className="ml-1.5 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                  </button>
+                <Link to="/signup" className="text-xs font-sans font-medium text-[#cc785c] hover:text-[#a9583e] flex items-center gap-1 group">
+                  <span>Execute recommendation</span>
+                  <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                 </Link>
               </div>
             </div>

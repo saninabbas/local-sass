@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
 import { FormField } from '../../components/ui/FormField';
 import { Button } from '../../components/ui/Button';
-import { BarChart2, Mail, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Mail, CheckCircle2, ExternalLink } from 'lucide-react';
+import { AnthropicLogo } from '../../components/claude/AnthropicLogo';
 
 import { useState } from 'react';
 
@@ -51,50 +52,48 @@ export function Signup() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#faf9f5] flex flex-col justify-center py-12 sm:px-6 lg:px-8 text-[#141413] selection:bg-[#cc785c] selection:text-white">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center mb-6">
           <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white">
-              <BarChart2 size={24} />
-            </div>
+            <AnthropicLogo size={28} color="#cc785c" showWordmark={true} wordmarkColor="#141413" brandName="Rankora" />
           </Link>
         </div>
 
         {isSubmitted ? (
-          <div className="bg-white py-8 px-6 shadow-xl shadow-black/5 sm:rounded-2xl border border-gray-200 text-center space-y-4">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-2">
-              <Mail size={32} />
+          <div className="bg-[#efe9de] py-8 px-6 shadow-xl sm:rounded-2xl border border-[#e6dfd8] text-center space-y-4">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#5db872]/20 text-[#2b753e] mb-2">
+              <Mail size={28} />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">Check Your Email</h2>
-            <p className="text-sm text-gray-600">
-              We have sent a verification link to <strong className="text-gray-900">{email}</strong>.
+            <h2 className="text-2xl font-serif font-normal text-[#141413]">Check Your Email</h2>
+            <p className="text-xs text-[#6c6a64] font-sans">
+              We have dispatched a verification link to <strong className="text-[#141413]">{email}</strong>.
             </p>
 
-            <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 text-xs text-emerald-800 flex items-start gap-2 text-left">
-              <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />
-              <span>Please check your inbox to verify your account, or click the instant test button below:</span>
+            <div className="p-3.5 bg-[#faf9f5] rounded-xl border border-[#e6dfd8] text-xs text-[#252523] flex items-start gap-2 text-left">
+              <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-[#5db872]" />
+              <span>Please click the link in your email, or use the quick verification bypass:</span>
             </div>
 
             {devLink ? (
-              <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 text-left space-y-2">
-                <span className="text-xs font-bold text-blue-800 uppercase tracking-wide">⚡ Quick Test Verification</span>
-                <p className="text-xs text-blue-700">Click below to verify your email right now without opening inbox:</p>
-                <a href={devLink} className="inline-flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2.5 rounded-lg transition-colors w-full justify-center shadow-sm">
-                  Click Here To Verify Email Instantly <ExternalLink size={14} />
+              <div className="p-3.5 bg-[#efe9de] rounded-xl border border-[#cc785c]/30 text-left space-y-2">
+                <span className="text-[11px] font-mono font-bold text-[#cc785c] uppercase tracking-wide">⚡ Quick Verification Link</span>
+                <p className="text-xs text-[#3d3d3a]">Click below to complete registration instantly:</p>
+                <a href={devLink} className="inline-flex items-center gap-2 text-xs font-medium text-white bg-[#cc785c] hover:bg-[#a9583e] px-4 py-2 rounded-lg transition-colors w-full justify-center shadow-sm">
+                  <span>Verify Email Instantly</span> <ExternalLink size={14} />
                 </a>
               </div>
             ) : (
               <div className="pt-2">
-                <a href={`/api/auth/verify?token=test`} className="text-xs text-blue-600 underline">
+                <a href={`/api/auth/verify?token=test`} className="text-xs text-[#cc785c] underline">
                   Verify Email
                 </a>
               </div>
             )}
 
-            <div className="pt-4 border-t border-gray-100">
+            <div className="pt-4 border-t border-[#e6dfd8]">
               <Link to="/login">
-                <Button variant="primary" size="lg" className="w-full">
+                <Button variant="primary" size="md" className="w-full bg-[#cc785c] hover:bg-[#a9583e]">
                   Proceed to Log In
                 </Button>
               </Link>
@@ -102,34 +101,34 @@ export function Signup() {
           </div>
         ) : (
           <>
-            <h2 className="text-center text-3xl font-extrabold text-primary mb-2">
-              Start growing your business
+            <h2 className="text-center text-3xl font-serif font-normal text-[#141413] mb-2">
+              Start scaling your local business
             </h2>
-            <p className="text-center text-base text-secondary mb-8">
-              Create your account and get your first Growth Score.
+            <p className="text-center text-xs font-sans text-[#6c6a64] mb-8">
+              Create your account to unlock continuous AI audit intelligence.
             </p>
 
-            <div className="bg-white py-8 px-4 shadow-xl shadow-black/5 sm:rounded-2xl sm:px-10 border border-gray-200">
+            <div className="bg-[#efe9de] py-8 px-4 shadow-xl sm:rounded-2xl sm:px-10 border border-[#e6dfd8]">
               {error && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-100 text-danger text-sm rounded-lg">
+                <div className="mb-4 p-3 bg-[#c64545]/15 border border-[#c64545]/30 text-[#c64545] text-xs font-mono rounded-lg">
                   {error}
                 </div>
               )}
-              <form className="space-y-2" onSubmit={handleSubmit}>
+              <form className="space-y-3" onSubmit={handleSubmit}>
                 <FormField
                   label="Full Name"
                   id="name"
                   type="text"
-                  placeholder="John Doe"
+                  placeholder="Alex Mercer"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
                 />
                 <FormField
-                  label="Email"
+                  label="Business Email"
                   id="email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder="alex@business.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -153,17 +152,17 @@ export function Signup() {
                   required
                 />
 
-                <div className="pt-2">
-                  <Button type="submit" variant="primary" size="lg" className="w-full text-lg h-12" disabled={isLoading}>
-                    {isLoading ? 'Creating Account...' : 'Create Account'}
+                <div className="pt-3">
+                  <Button type="submit" variant="primary" size="md" className="w-full h-11 text-sm bg-[#cc785c] hover:bg-[#a9583e]" disabled={isLoading}>
+                    {isLoading ? 'Generating Audit Account...' : 'Create Account & Start Audit'}
                   </Button>
                 </div>
               </form>
 
-              <div className="mt-8 text-center">
-                <p className="text-sm text-secondary">
+              <div className="mt-8 text-center pt-4 border-t border-[#e6dfd8]">
+                <p className="text-xs font-sans text-[#6c6a64]">
                   Already have an account?{' '}
-                  <Link to="/login" className="font-semibold text-primary hover:text-primary-accent transition-colors">
+                  <Link to="/login" className="font-medium text-[#cc785c] hover:text-[#a9583e] transition-colors">
                     Log in
                   </Link>
                 </p>

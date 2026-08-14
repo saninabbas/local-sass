@@ -21,20 +21,20 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref
   ) => {
-    const baseStyles = 'inline-flex items-center justify-center rounded-lg font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-primary-accent focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none';
+    const baseStyles = 'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#cc785c]/30 focus:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none select-none';
     
     const variants = {
-      primary: 'bg-primary-accent text-white hover:bg-blue-700 shadow-sm',
-      secondary: 'bg-primary text-white hover:bg-gray-800 shadow-sm',
-      outline: 'border border-gray-300 bg-transparent hover:bg-gray-50 text-primary',
-      ghost: 'bg-transparent hover:bg-gray-100 text-primary',
-      danger: 'bg-danger text-white hover:bg-red-600 shadow-sm',
+      primary: 'bg-[#cc785c] text-white hover:bg-[#a9583e] active:bg-[#a9583e] shadow-sm',
+      secondary: 'bg-[#faf9f5] border border-[#e6dfd8] text-[#141413] hover:bg-[#efe9de] shadow-sm',
+      outline: 'border border-[#e6dfd8] bg-transparent hover:bg-[#efe9de] text-[#141413]',
+      ghost: 'bg-transparent hover:bg-[#efe9de] text-[#141413]',
+      danger: 'bg-[#c64545] text-white hover:bg-[#a83636] shadow-sm',
     };
     
     const sizes = {
-      sm: 'h-10 px-4 text-sm',
-      md: 'h-11 px-5 text-base',
-      lg: 'h-14 px-8 text-lg',
+      sm: 'h-8 px-3.5 text-xs',
+      md: 'h-10 px-5 text-sm',
+      lg: 'h-12 px-7 text-base',
     };
 
     return (

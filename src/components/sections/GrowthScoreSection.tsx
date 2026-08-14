@@ -2,72 +2,85 @@ import { Check } from 'lucide-react';
 
 export function GrowthScoreSection() {
   return (
-    <section className="py-24 sm:py-32 bg-gray-50">
+    <section className="py-24 sm:py-32 bg-[#faf9f5]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           
-          <div>
-            <h2 className="text-4xl font-extrabold tracking-tight text-primary sm:text-5xl mb-6">
-              Know where your business stands.
+          <div className="space-y-6">
+            <span className="text-xs font-mono uppercase tracking-[1.5px] text-[#cc785c] font-semibold block">
+              Continuous Benchmarking
+            </span>
+            <h2 className="text-3xl sm:text-4xl lg:text-[48px] font-serif font-normal tracking-[-1px] text-[#141413] leading-[1.1]">
+              Know where your business stands in seconds.
             </h2>
-            <p className="text-lg text-secondary mb-10 leading-relaxed max-w-lg">
-              Get one simple score that shows the health of your local online presence. No complicated metrics or SEO jargon.
+            <p className="text-base text-[#3d3d3a] leading-relaxed max-w-lg font-sans">
+              Get one simple, rigorous score that translates search indexing, local map pack rankings, review sentiment, and mobile page velocity into actionable clarity.
             </p>
             
-            <div className="space-y-4">
+            <div className="space-y-3 pt-2">
               {[
-                'See what is working',
-                'Find your biggest problems',
-                'Prioritize what matters',
-                'Track improvement over time',
+                'Pinpoint competitive keyword gaps against top 3 local rivals',
+                'Uncover critical negative sentiment clusters in customer reviews',
+                'Prioritize highest-converting page speed & UX fixes',
+                'Track historical growth trajectory with automated re-audits',
               ].map((benefit, i) => (
                 <div key={i} className="flex gap-3 items-center">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-primary-accent flex-shrink-0">
-                    <Check size={14} strokeWidth={3} />
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#cc785c]/15 text-[#cc785c] flex-shrink-0">
+                    <Check size={12} strokeWidth={3} />
                   </div>
-                  <span className="text-base font-medium text-primary">{benefit}</span>
+                  <span className="text-sm font-sans font-medium text-[#252523]">{benefit}</span>
                 </div>
               ))}
             </div>
           </div>
           
           <div className="relative mx-auto w-full max-w-md lg:max-w-none lg:pl-10">
-            <div className="rounded-2xl bg-white p-8 sm:p-12 shadow-xl border border-gray-200">
-              <div className="text-center mb-10">
-                <h4 className="text-sm font-semibold text-secondary uppercase tracking-widest mb-6">Growth Score</h4>
+            <div className="rounded-2xl bg-[#efe9de] p-8 sm:p-10 shadow-lg border border-[#e6dfd8]">
+              <div className="text-center mb-8">
+                <h4 className="text-xs font-mono uppercase tracking-widest text-[#6c6a64] mb-4">
+                  Growth Score Diagnostic
+                </h4>
                 
                 {/* Circular Visualization Concept */}
-                <div className="relative w-48 h-48 mx-auto mb-4">
+                <div className="relative w-44 h-44 mx-auto mb-4">
                   <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                    {/* Background circle */}
-                    <circle cx="50" cy="50" r="45" fill="none" stroke="#F1F5F9" strokeWidth="8" />
-                    {/* Progress circle */}
-                    <circle cx="50" cy="50" r="45" fill="none" stroke="#2563EB" strokeWidth="8" strokeDasharray="283" strokeDashoffset="62" className="transition-all duration-1000 ease-out" />
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="#e6dfd8" strokeWidth="7" />
+                    <circle 
+                      cx="50" 
+                      cy="50" 
+                      r="45" 
+                      fill="none" 
+                      stroke="#cc785c" 
+                      strokeWidth="7" 
+                      strokeDasharray="283" 
+                      strokeDashoffset="56" 
+                      className="transition-all duration-1000 ease-out" 
+                    />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-6xl font-black text-primary tracking-tighter">78</span>
-                    <span className="text-sm font-medium text-secondary">/ 100</span>
+                    <span className="text-5xl font-serif font-normal text-[#141413] tracking-tight">84</span>
+                    <span className="text-xs font-mono text-[#6c6a64]">/ 100</span>
                   </div>
                 </div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-success text-sm font-semibold">
-                  <Check size={14} /> Good
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#5db872]/20 text-[#2b753e] text-xs font-semibold">
+                  <Check size={13} /> Strong Market Position
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
                 {[
-                  { label: 'SEO', score: 82, bg: 'bg-success' },
-                  { label: 'Reviews', score: 74, bg: 'bg-warning' },
-                  { label: 'Website', score: 86, bg: 'bg-success' },
-                  { label: 'Visibility', score: 69, bg: 'bg-warning' },
+                  { label: 'Local Maps Pack', score: 88, color: 'bg-[#5db872]' },
+                  { label: 'Review Velocity', score: 76, color: 'bg-[#e8a55a]' },
+                  { label: 'Mobile UX & Speed', score: 92, color: 'bg-[#5db872]' },
+                  { label: 'Content Authority', score: 71, color: 'bg-[#e8a55a]' },
                 ].map(metric => (
-                  <div key={metric.label}>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="font-semibold text-secondary">{metric.label}</span>
-                      <span className="font-bold text-primary text-lg">{metric.score}</span>
+                  <div key={metric.label} className="p-3 bg-[#faf9f5] rounded-xl border border-[#e6dfd8]">
+                    <div className="flex justify-between text-xs font-mono mb-1.5">
+                      <span className="text-[#6c6a64]">{metric.label}</span>
+                      <span className="font-bold text-[#141413]">{metric.score}</span>
                     </div>
-                    <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full ${metric.bg} w-[${metric.score}%] rounded-full`} style={{ width: `${metric.score}%` }} />
+                    <div className="h-1.5 w-full bg-[#e6dfd8] rounded-full overflow-hidden">
+                      <div className={`h-full ${metric.color} rounded-full`} style={{ width: `${metric.score}%` }} />
                     </div>
                   </div>
                 ))}

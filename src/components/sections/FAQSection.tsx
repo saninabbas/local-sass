@@ -5,63 +5,66 @@ export function FAQSection() {
   const faqs = [
     {
       question: 'What is Rankora?',
-      answer: 'Rankora is an intelligent platform designed specifically for local businesses. It analyzes your online presence and provides a simple, actionable plan to help you attract more customers.'
+      answer: 'Rankora is an autonomous visual reasoning platform designed specifically for local enterprises. It audits your online footprint, tracks competitors, and deploys high-impact AI workflows to capture local market share.'
     },
     {
-      question: 'Do I need SEO knowledge?',
-      answer: 'Not at all. We built this specifically for business owners who don\'t have time to learn technical SEO. Our AI explains everything in plain English and tells you exactly what to do.'
+      question: 'Do I need technical SEO expertise?',
+      answer: 'Not at all. Claude synthesizes raw technical data into human-readable, prioritized directives. Every recommendation comes with plain-English context and one-click execution.'
     },
     {
-      question: 'How does the Growth Score work?',
-      answer: 'Your Growth Score is a single number from 0 to 100 that represents your overall online health. It\'s calculated by analyzing factors across your website, Google Business Profile, and reviews.'
+      question: 'How is the Growth Score calculated?',
+      answer: 'The Growth Score is a verified benchmark (0–100) calculated across search visibility, local map pack rankings, customer review sentiment, and mobile page speed metrics.'
     },
     {
-      question: 'Will this work for my specific type of business?',
-      answer: 'Whether you run a dental clinic, a restaurant, a law firm, or a hair salon, if you serve local customers, Rankora can help you improve your online visibility.'
+      question: 'Does this support multi-location businesses?',
+      answer: 'Yes. The Pro Scale tier supports multiple physical branches with aggregated group reporting and location-specific local pack tracking.'
     },
     {
-      question: 'How often should I check my score?',
-      answer: 'We recommend checking in once a week. We\'ll send you a simple weekly report highlighting any changes to your score and new recommendations.'
+      question: 'How often does Claude re-audit my presence?',
+      answer: 'Growth accounts receive automated weekly continuous re-audits. Pro accounts receive daily rank tracking updates and instant alert notifications.'
     },
     {
-      question: 'Is the first audit free?',
-      answer: 'Yes, you can run a free initial audit to see your Growth Score and get a preview of the issues holding your business back.'
+      question: 'Can I test the platform before committing?',
+      answer: 'Yes. You can run a comprehensive free audit instantly with zero credit card required.'
     }
   ];
 
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section className="py-24 sm:py-32 bg-gray-50 border-t border-gray-200">
-      <div className="mx-auto max-w-[800px] px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl font-extrabold tracking-tight text-primary sm:text-4xl">
-            Frequently asked questions
+    <section className="py-24 sm:py-32 bg-[#faf9f5] border-b border-[#e6dfd8]">
+      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16 space-y-4">
+          <span className="text-xs font-mono uppercase tracking-[1.5px] text-[#cc785c] font-semibold">
+            Common Inquiries
+          </span>
+          <h2 className="text-3xl sm:text-4xl lg:text-[48px] font-serif font-normal tracking-[-1px] text-[#141413] leading-[1.1]">
+            Frequently asked questions.
           </h2>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           {faqs.map((faq, index) => {
             const isOpen = openIndex === index;
             return (
               <div 
                 key={index} 
-                className={`bg-white border ${isOpen ? 'border-gray-300 shadow-sm' : 'border-gray-200'} rounded-xl overflow-hidden transition-all`}
+                className={`bg-[#efe9de] border ${isOpen ? 'border-[#cc785c]/40' : 'border-[#e6dfd8]'} rounded-xl overflow-hidden transition-all`}
               >
                 <button
-                  className="w-full px-8 py-6 text-left flex justify-between items-center focus:outline-none hover:bg-gray-50 transition-colors"
+                  className="w-full px-6 py-4 text-left flex justify-between items-center focus:outline-none hover:bg-[#e8e0d2] transition-colors"
                   onClick={() => setOpenIndex(isOpen ? null : index)}
                 >
-                  <span className="text-lg font-bold text-primary">{faq.question}</span>
+                  <span className="text-base font-serif font-medium text-[#141413]">{faq.question}</span>
                   {isOpen ? (
-                    <ChevronUp size={24} className="text-secondary flex-shrink-0 ml-6" />
+                    <ChevronUp size={18} className="text-[#cc785c] flex-shrink-0 ml-4" />
                   ) : (
-                    <ChevronDown size={24} className="text-secondary flex-shrink-0 ml-6" />
+                    <ChevronDown size={18} className="text-[#6c6a64] flex-shrink-0 ml-4" />
                   )}
                 </button>
                 {isOpen && (
-                  <div className="px-8 pb-8 pt-0">
-                    <p className="text-lg text-secondary leading-relaxed">{faq.answer}</p>
+                  <div className="px-6 pb-6 pt-0 border-t border-[#e6dfd8]/50">
+                    <p className="text-sm text-[#3d3d3a] font-sans leading-relaxed pt-3">{faq.answer}</p>
                   </div>
                 )}
               </div>

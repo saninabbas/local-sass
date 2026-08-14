@@ -39,65 +39,79 @@ export function ActionPlanCard({
   };
 
   return (
-    <div className={`bg-white rounded-xl p-6 border ${isCompleted ? 'border-green-200 bg-green-50/30' : 'border-gray-200'} shadow-sm hover:shadow-md transition-all relative overflow-hidden`}>
+    <div className={`rounded-xl p-6 border transition-all relative overflow-hidden ${
+      isCompleted 
+        ? 'border-[#5db872]/30 bg-[#5db872]/10' 
+        : 'border-[#e6dfd8] bg-[#efe9de] hover:shadow-md'
+    }`}>
       {isCompleted && (
         <div className="absolute top-0 right-0 p-4">
-          <CheckCircle2 className="text-green-500" size={24} />
+          <CheckCircle2 className="text-[#5db872]" size={22} />
         </div>
       )}
       
-      <div className="mb-4">
-        <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded border ${isCompleted ? 'border-green-200 text-green-700 bg-green-100' : priorityColor}`}>
+      <div className="mb-3">
+        <span className={`inline-block text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+          isCompleted ? 'border-[#5db872]/30 text-[#2b753e] bg-[#5db872]/20' : priorityColor
+        }`}>
           {isCompleted ? 'Completed' : priority}
         </span>
       </div>
-      <h3 className={`text-lg font-bold mb-2 ${isCompleted ? 'text-gray-700' : 'text-primary'}`}>{title}</h3>
-      <p className="text-sm text-secondary mb-6 leading-relaxed">
+      <h3 className={`text-base font-serif font-medium mb-1.5 ${isCompleted ? 'text-[#3d3d3a]' : 'text-[#141413]'}`}>
+        {title}
+      </h3>
+      <p className="text-xs font-sans text-[#3d3d3a] mb-4 leading-relaxed">
         {description}
       </p>
       
       {businessOutcome && (
-        <div className="mb-4">
-          <span className="text-sm font-semibold text-primary">Business Outcome: </span>
-          <span className="text-sm text-secondary">{businessOutcome}</span>
+        <div className="mb-3 text-xs font-sans">
+          <span className="font-semibold text-[#141413]">Target Outcome: </span>
+          <span className="text-[#6c6a64]">{businessOutcome}</span>
         </div>
       )}
 
-      <div className={`grid grid-cols-2 gap-4 mb-4 p-4 rounded-lg border ${isCompleted ? 'bg-green-50/50 border-green-100' : 'bg-gray-50 border-gray-100'}`}>
+      <div className={`grid grid-cols-2 gap-3 mb-4 p-3 rounded-lg border ${
+        isCompleted ? 'bg-white/60 border-[#5db872]/20' : 'bg-[#faf9f5] border-[#e6dfd8]'
+      }`}>
         <div>
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
-            <Activity size={12} /> Impact
+          <span className="flex items-center gap-1 text-[10px] font-mono text-[#8e8b82] uppercase tracking-wider mb-0.5">
+            <Activity size={11} /> Impact
           </span>
-          <span className={`text-sm font-bold ${isCompleted ? 'text-green-700' : 'text-primary'}`}>{impact}</span>
+          <span className={`text-xs font-sans font-bold ${isCompleted ? 'text-[#2b753e]' : 'text-[#141413]'}`}>
+            {impact}
+          </span>
         </div>
         <div>
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
-            <Clock size={12} /> Estimated time
+          <span className="flex items-center gap-1 text-[10px] font-mono text-[#8e8b82] uppercase tracking-wider mb-0.5">
+            <Clock size={11} /> Time
           </span>
-          <span className={`text-sm font-bold ${isCompleted ? 'text-green-700' : 'text-primary'}`}>{estimatedTime}</span>
+          <span className={`text-xs font-sans font-bold ${isCompleted ? 'text-[#2b753e]' : 'text-[#141413]'}`}>
+            {estimatedTime}
+          </span>
         </div>
       </div>
       
       {(difficulty || seoImpact || localImpact || conversionImpact) && (
-        <div className="flex flex-wrap gap-2 mb-6">
+        <div className="flex flex-wrap gap-1.5 mb-4">
           {difficulty && (
-            <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200">
-              Difficulty: {difficulty}
+            <span className="inline-block text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-[#faf9f5] text-[#3d3d3a] border border-[#e6dfd8]">
+              Diff: {difficulty}
             </span>
           )}
           {seoImpact && (
-            <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-blue-50 text-blue-700 border border-blue-200">
+            <span className="inline-block text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-[#faf9f5] text-[#cc785c] border border-[#e6dfd8]">
               SEO: {seoImpact}
             </span>
           )}
           {localImpact && (
-            <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-purple-50 text-purple-700 border border-purple-200">
+            <span className="inline-block text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-[#faf9f5] text-[#5db8a6] border border-[#e6dfd8]">
               Local: {localImpact}
             </span>
           )}
           {conversionImpact && (
-            <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-orange-50 text-orange-700 border border-orange-200">
-              Conversion: {conversionImpact}
+            <span className="inline-block text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-[#faf9f5] text-[#e8a55a] border border-[#e6dfd8]">
+              Conv: {conversionImpact}
             </span>
           )}
         </div>
@@ -107,17 +121,18 @@ export function ActionPlanCard({
         <button 
           onClick={handleComplete}
           disabled={isCompleting}
-          className="text-sm font-semibold text-green-600 hover:text-green-700 flex items-center group w-full justify-between pt-4 border-t border-gray-100"
+          className="text-xs font-sans font-medium text-[#2b753e] hover:text-[#1e582e] flex items-center group w-full justify-between pt-3 border-t border-[#e6dfd8] transition-colors"
         >
-          {isCompleting ? 'Marking as Complete...' : 'Mark as Complete'} 
-          <CheckCircle2 className="ml-1 h-4 w-4 group-hover:scale-110 transition-transform" />
+          <span>{isCompleting ? 'Finalizing with Claude...' : 'Mark Task as Completed'}</span>
+          <CheckCircle2 className="ml-1 h-3.5 w-3.5 group-hover:scale-110 transition-transform" />
         </button>
       )}
       
       {(!onComplete && !isCompleted) && (
         <Link to="/dashboard/actions" className="block w-full">
-          <button className="text-sm font-semibold text-primary-accent hover:text-blue-700 flex items-center group w-full justify-between pt-4 border-t border-gray-100">
-            View Recommendation <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+          <button className="text-xs font-sans font-medium text-[#cc785c] hover:text-[#a9583e] flex items-center group w-full justify-between pt-3 border-t border-[#e6dfd8] transition-colors">
+            <span>View Recommendation Plan</span>
+            <ArrowRight className="ml-1 h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
           </button>
         </Link>
       )}

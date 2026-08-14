@@ -8,7 +8,7 @@ interface PageLayoutProps {
 
 export function PageLayout({ children }: PageLayoutProps) {
   return (
-    <div className="flex min-h-screen flex-col bg-background selection:bg-primary-accent selection:text-white">
+    <div className="flex min-h-screen flex-col bg-[#faf9f5] text-[#141413] selection:bg-[#cc785c] selection:text-white">
       <Navbar />
       <main className="flex-1">
         {children}

@@ -1,10 +1,9 @@
 import { CheckCircle2 } from 'lucide-react';
-import { Button } from '../ui/Button';
-
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { createCheckout } from '../../lib/api';
 import { useState } from 'react';
+
 export function PricingSection() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -30,108 +29,131 @@ export function PricingSection() {
   };
 
   return (
-    <section className="py-24 sm:py-32 bg-white" id="pricing">
+    <section className="py-24 sm:py-32 bg-[#faf9f5] border-b border-[#e6dfd8]" id="pricing">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-20">
-          <h2 className="text-4xl font-extrabold tracking-tight text-primary sm:text-5xl mb-6">
-            Simple, transparent pricing
+        <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
+          <span className="text-xs font-mono uppercase tracking-[1.5px] text-[#cc785c] font-semibold">
+            Predictable Investment
+          </span>
+          <h2 className="text-3xl sm:text-4xl lg:text-[48px] font-serif font-normal tracking-[-1px] text-[#141413] leading-[1.1]">
+            Simple, transparent pricing.
           </h2>
-          <p className="text-xl text-secondary">
-            No contracts. No hidden fees. Cancel anytime.
+          <p className="text-base text-[#3d3d3a] font-sans">
+            No contracts. No hidden consultant retainers. Cancel anytime.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto items-stretch">
           {/* Free Audit Plan */}
-          <div className="bg-white rounded-3xl p-8 lg:p-12 border border-gray-200 flex flex-col">
-            <h3 className="text-2xl font-bold text-primary mb-3">Free Audit</h3>
-            <p className="text-secondary text-base mb-10 h-12">See where you stand right now.</p>
-            <div className="mb-10">
-              <span className="text-6xl font-black text-primary tracking-tight">$0</span>
+          <div className="bg-[#faf9f5] rounded-xl p-8 border border-[#e6dfd8] flex flex-col justify-between shadow-sm">
+            <div>
+              <span className="text-xs font-mono text-[#6c6a64] uppercase tracking-wider">Evaluation</span>
+              <h3 className="text-2xl font-serif font-normal text-[#141413] mt-1 mb-2">Free Audit</h3>
+              <p className="text-xs text-[#6c6a64] font-sans mb-6">See where your business ranks right now.</p>
+              
+              <div className="mb-6">
+                <span className="text-5xl font-serif font-normal text-[#141413]">$0</span>
+              </div>
+              
+              <ul className="space-y-3 mb-8 pt-4 border-t border-[#e6dfd8] text-xs font-sans text-[#3d3d3a]">
+                {[
+                  'Instant Growth Score Diagnostic',
+                  'Basic Local Search Overview',
+                  'Top 3 Prioritized Action Items',
+                  'Public Shareable Report Link'
+                ].map((feature) => (
+                  <li key={feature} className="flex items-center gap-2.5">
+                    <CheckCircle2 size={16} className="text-[#5db872] shrink-0" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            
-            <ul className="space-y-5 mb-12 flex-1">
-              {[
-                'One-time Growth Score',
-                'Basic SEO Overview',
-                'Top 3 Recommendations'
-              ].map((feature) => (
-                <li key={feature} className="flex items-start gap-3 text-base text-secondary font-medium">
-                  <CheckCircle2 size={24} className="text-gray-300 shrink-0" />
-                  <span className="pt-0.5">{feature}</span>
-                </li>
-              ))}
-            </ul>
-            <Button variant="outline" className="w-full h-14 text-lg" size="lg" onClick={() => navigate(user ? '/dashboard' : '/signup')}>Run Free Audit</Button>
+
+            <button 
+              className="w-full py-2.5 bg-[#faf9f5] border border-[#e6dfd8] hover:bg-[#efe9de] text-xs font-sans font-medium text-[#141413] rounded-lg transition-colors"
+              onClick={() => navigate(user ? '/dashboard' : '/signup')}
+            >
+              Run Free Audit
+            </button>
           </div>
 
-          {/* Growth Plan (Recommended) */}
-          <div className="bg-primary rounded-3xl p-8 lg:p-12 border border-primary shadow-xl flex flex-col relative md:-mt-6 md:-mb-6">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-primary-accent text-white text-xs font-bold px-4 py-2 rounded-b-lg tracking-wider">
+          {/* Growth Plan (Featured Tier in Dark Navy) */}
+          <div className="bg-[#181715] text-[#faf9f5] rounded-xl p-8 border border-[#252320] shadow-xl flex flex-col justify-between relative overflow-hidden">
+            <div className="absolute top-0 right-0 bg-[#cc785c] text-white text-[10px] font-mono font-bold uppercase tracking-wider px-3 py-1 rounded-bl-lg">
               RECOMMENDED
             </div>
-            <h3 className="text-2xl font-bold text-white mb-3 mt-4 md:mt-0">Growth</h3>
-            <p className="text-gray-400 text-base mb-10 h-12">Perfect for single-location businesses.</p>
-            <div className="mb-10 flex items-baseline gap-1.5">
-              <span className="text-6xl font-black text-white tracking-tight">$15</span>
-              <span className="text-gray-400 text-lg font-medium">/mo</span>
+
+            <div>
+              <span className="text-xs font-mono text-[#cc785c] uppercase tracking-wider">Single Location</span>
+              <h3 className="text-2xl font-serif font-normal text-[#faf9f5] mt-1 mb-2">Growth Tier</h3>
+              <p className="text-xs text-[#a09d96] font-sans mb-6">Perfect for dedicated single-location businesses.</p>
+              
+              <div className="mb-6 flex items-baseline gap-1.5">
+                <span className="text-5xl font-serif font-normal text-[#faf9f5]">$15</span>
+                <span className="text-xs font-mono text-[#a09d96]">/mo</span>
+              </div>
+              
+              <ul className="space-y-3 mb-8 pt-4 border-t border-[#252320] text-xs font-sans text-[#faf9f5]">
+                {[
+                  'Weekly Automated Growth Audits',
+                  'Full AI Action Queue Execution',
+                  'Live Google Review Sentiment Triage',
+                  'Local Map Pack Competitor Tracking',
+                  'Direct Computer Use Workflow Access'
+                ].map((feature) => (
+                  <li key={feature} className="flex items-center gap-2.5">
+                    <CheckCircle2 size={16} className="text-[#cc785c] shrink-0" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            
-            <ul className="space-y-5 mb-12 flex-1">
-              {[
-                'Weekly Growth Score updates',
-                'Full AI Action Plan',
-                'Review Monitoring',
-                'Competitor Tracking'
-              ].map((feature) => (
-                <li key={feature} className="flex items-start gap-3 text-base text-gray-200 font-medium">
-                  <CheckCircle2 size={24} className="text-primary-accent shrink-0" />
-                  <span className="pt-0.5">{feature}</span>
-                </li>
-              ))}
-            </ul>
-            <Button 
-              variant="primary" 
-              className="w-full h-14 text-lg" 
-              size="lg"
+
+            <button 
+              className="w-full py-2.5 bg-[#cc785c] hover:bg-[#a9583e] text-xs font-sans font-medium text-white rounded-lg transition-colors shadow-sm"
               onClick={() => handleCheckout('7594755d-5580-4b77-86ae-90baae0e20d8')}
               disabled={loadingId === '7594755d-5580-4b77-86ae-90baae0e20d8'}
             >
-              {loadingId === '7594755d-5580-4b77-86ae-90baae0e20d8' ? 'Redirecting...' : 'Start Free Trial'}
-            </Button>
+              {loadingId === '7594755d-5580-4b77-86ae-90baae0e20d8' ? 'Redirecting...' : 'Start 14-Day Free Trial'}
+            </button>
           </div>
           
           {/* Pro Plan */}
-          <div className="bg-white rounded-3xl p-8 lg:p-12 border border-gray-200 flex flex-col">
-            <h3 className="text-2xl font-bold text-primary mb-3">Pro</h3>
-            <p className="text-secondary text-base mb-10 h-12">For growing businesses and agencies.</p>
-            <div className="mb-10 flex items-baseline gap-1.5">
-              <span className="text-6xl font-black text-primary tracking-tight">$30</span>
-              <span className="text-secondary text-lg font-medium">/mo</span>
+          <div className="bg-[#faf9f5] rounded-xl p-8 border border-[#e6dfd8] flex flex-col justify-between shadow-sm">
+            <div>
+              <span className="text-xs font-mono text-[#6c6a64] uppercase tracking-wider">Multi-Location & Agency</span>
+              <h3 className="text-2xl font-serif font-normal text-[#141413] mt-1 mb-2">Pro Scale</h3>
+              <p className="text-xs text-[#6c6a64] font-sans mb-6">For expanding practices and local agencies.</p>
+              
+              <div className="mb-6 flex items-baseline gap-1.5">
+                <span className="text-5xl font-serif font-normal text-[#141413]">$30</span>
+                <span className="text-xs font-mono text-[#6c6a64]">/mo</span>
+              </div>
+              
+              <ul className="space-y-3 mb-8 pt-4 border-t border-[#e6dfd8] text-xs font-sans text-[#3d3d3a]">
+                {[
+                  'Up to 3 Managed Business Locations',
+                  'Daily Continuous Rank Updates',
+                  'Autonomous 1-Click AI Review Drafts',
+                  'Local Authority Citation Engine',
+                  'Priority Model Execution & SLA'
+                ].map((feature) => (
+                  <li key={feature} className="flex items-center gap-2.5">
+                    <CheckCircle2 size={16} className="text-[#5db872] shrink-0" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            
-            <ul className="space-y-5 mb-12 flex-1">
-              {[
-                'Up to 3 Locations',
-                'Real-time Growth Score',
-                'AI Review Replies',
-                'Priority Support'
-              ].map((feature) => (
-                <li key={feature} className="flex items-start gap-3 text-base text-secondary font-medium">
-                  <CheckCircle2 size={24} className="text-primary-accent shrink-0" />
-                  <span className="pt-0.5">{feature}</span>
-                </li>
-              ))}
-            </ul>
-            <Button 
-              variant="outline" 
-              className="w-full h-14 text-lg" 
-              size="lg"
+
+            <button 
+              className="w-full py-2.5 bg-[#faf9f5] border border-[#e6dfd8] hover:bg-[#efe9de] text-xs font-sans font-medium text-[#141413] rounded-lg transition-colors"
               onClick={() => handleCheckout('97ffea75-9d0c-490f-b652-b2bfd360abe2')}
               disabled={loadingId === '97ffea75-9d0c-490f-b652-b2bfd360abe2'}
             >
               {loadingId === '97ffea75-9d0c-490f-b652-b2bfd360abe2' ? 'Redirecting...' : 'Start Free Trial'}
-            </Button>
+            </button>
           </div>
         </div>
       </div>

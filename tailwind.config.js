@@ -7,15 +7,24 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: '#F8FAFC',
+        background: '#faf9f5',
+        canvas: '#faf9f5',
+        card: '#efe9de',
+        border: '#e6dfd8',
         primary: {
-          DEFAULT: '#0F172A',
-          accent: '#2563EB',
+          DEFAULT: '#141413',
+          accent: '#cc785c',
+          coral: '#cc785c',
+          hover: '#a9583e',
+          active: '#a9583e',
+          disabled: '#e6dfd8',
         },
-        secondary: '#64748B',
-        success: '#16A34A',
-        warning: '#F59E0B',
-        danger: '#EF4444',
+        secondary: '#6c6a64',
+        muted: '#6c6a64',
+        'muted-soft': '#8e8b82',
+        success: '#5db872',
+        warning: '#d4a017',
+        danger: '#c64545',
         white: '#FFFFFF',
         // Claude Design System Tokens
         claude: {

@@ -1,7 +1,8 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { FormField } from '../../components/ui/FormField';
 import { Button } from '../../components/ui/Button';
-import { BarChart2, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
+import { AnthropicLogo } from '../../components/claude/AnthropicLogo';
 
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -64,23 +65,21 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#faf9f5] flex flex-col justify-center py-12 sm:px-6 lg:px-8 text-[#141413] selection:bg-[#cc785c] selection:text-white">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center mb-6">
           <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white">
-              <BarChart2 size={24} />
-            </div>
+            <AnthropicLogo size={28} color="#cc785c" showWordmark={true} wordmarkColor="#141413" brandName="Rankora" />
           </Link>
         </div>
 
-        <h2 className="text-center text-3xl font-extrabold text-primary mb-8">
+        <h2 className="text-center text-3xl font-serif font-normal text-[#141413] mb-8">
           {requires2FA ? 'Two-Factor Authentication' : 'Welcome back'}
         </h2>
 
-        <div className="bg-white py-8 px-4 shadow-xl shadow-black/5 sm:rounded-2xl sm:px-10 border border-gray-200">
+        <div className="bg-[#efe9de] py-8 px-4 shadow-xl sm:rounded-2xl sm:px-10 border border-[#e6dfd8]">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-100 text-danger text-sm rounded-lg">
+            <div className="mb-4 p-3 bg-[#c64545]/15 border border-[#c64545]/30 text-[#c64545] text-xs font-mono rounded-lg">
               {error}
             </div>
           )}
@@ -88,8 +87,8 @@ export function Login() {
           {requires2FA ? (
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="text-center mb-2">
-                <ShieldCheck className="mx-auto text-primary mb-2" size={40} />
-                <p className="text-sm text-gray-600">
+                <ShieldCheck className="mx-auto text-[#cc785c] mb-2" size={36} />
+                <p className="text-xs text-[#6c6a64] font-sans">
                   Please enter the 6-digit verification code from your authenticator app.
                 </p>
               </div>
@@ -102,14 +101,14 @@ export function Login() {
                 onChange={(e) => setTotpCode(e.target.value)}
                 required
               />
-              <Button type="submit" variant="primary" size="lg" className="w-full text-lg h-12" disabled={isLoading}>
+              <Button type="submit" variant="primary" size="md" className="w-full h-11 text-sm bg-[#cc785c] hover:bg-[#a9583e]" disabled={isLoading}>
                 {isLoading ? 'Verifying...' : 'Verify & Log In'}
               </Button>
             </form>
           ) : (
-            <form className="space-y-2" onSubmit={handleSubmit}>
+            <form className="space-y-3" onSubmit={handleSubmit}>
               <FormField
-                label="Email"
+                label="Email address"
                 id="email"
                 type="email"
                 placeholder="you@example.com"
@@ -126,29 +125,29 @@ export function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between text-xs font-sans pt-1">
                 <div className="flex items-center">
-                  <input id="remember-me" name="remember-me" type="checkbox" className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded" />
-                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">Remember me</label>
+                  <input id="remember-me" name="remember-me" type="checkbox" className="h-3.5 w-3.5 text-[#cc785c] focus:ring-[#cc785c] border-[#e6dfd8] rounded" />
+                  <label htmlFor="remember-me" className="ml-2 block text-[#3d3d3a]">Remember me</label>
                 </div>
-                <div className="text-sm">
-                  <span className="font-medium text-primary hover:text-primary-dark cursor-not-allowed opacity-70" title="Password reset coming soon">Forgot password?</span>
+                <div>
+                  <span className="font-medium text-[#cc785c] hover:text-[#a9583e] cursor-not-allowed opacity-80">Forgot password?</span>
                 </div>
               </div>
 
-              <div className="pt-2">
-                <Button type="submit" variant="primary" size="lg" className="w-full text-lg h-12" disabled={isLoading}>
+              <div className="pt-3">
+                <Button type="submit" variant="primary" size="md" className="w-full h-11 text-sm bg-[#cc785c] hover:bg-[#a9583e] font-medium" disabled={isLoading}>
                   {isLoading ? 'Logging In...' : 'Log In'}
                 </Button>
               </div>
             </form>
           )}
 
-          <div className="mt-8 text-center">
-            <p className="text-sm text-secondary">
+          <div className="mt-8 text-center pt-4 border-t border-[#e6dfd8]">
+            <p className="text-xs font-sans text-[#6c6a64]">
               Don't have an account?{' '}
-              <Link to="/signup" className="font-semibold text-primary hover:text-primary-accent transition-colors">
-                Create one
+              <Link to="/signup" className="font-medium text-[#cc785c] hover:text-[#a9583e] transition-colors">
+                Create one now
               </Link>
             </p>
           </div>

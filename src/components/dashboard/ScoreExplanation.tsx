@@ -10,46 +10,46 @@ export function ScoreExplanation({ score, type }: ScoreExplanationProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   let status = "Needs Work";
-  let color = "text-danger";
+  let color = "text-[#c64545] bg-[#c64545]/15";
   
   if (score === null) {
     status = "Not Connected";
-    color = "text-gray-400";
+    color = "text-[#8e8b82] bg-[#252320]";
   } else if (score >= 80) {
-    status = "Excellent";
-    color = "text-success-dark";
+    status = "Strong";
+    color = "text-[#5db872] bg-[#5db872]/15";
   } else if (score >= 60) {
-    status = "Good";
-    color = "text-warning-dark";
+    status = "Moderate";
+    color = "text-[#e8a55a] bg-[#e8a55a]/15";
   }
 
   const getExplanation = () => {
     switch (type) {
       case 'seo':
         return {
-          why: "SEO measures how easily search engines can read and index your website content.",
-          improve: "Fix missing meta descriptions, add H1 tags, and ensure your services match search intent."
+          why: "SEO measures how easily search engines can read, index, and surface your local content.",
+          improve: "Fix missing meta descriptions, add semantic H1 tags, and align service pages with high-volume search intent."
         };
       case 'website':
         return {
-          why: "Website score evaluates the technical health, speed, and mobile responsiveness of your site.",
-          improve: "Reduce large images, minify scripts, and ensure all links are working."
+          why: "Website score evaluates Core Web Vitals, mobile DOM rendering speed, and viewport responsiveness.",
+          improve: "Compress hero media, resolve blocking scripts, and eliminate layout shifts."
         };
       case 'visibility':
         return {
-          why: "Visibility checks how often your location and local keywords appear on your homepage.",
-          improve: "Include your city name and primary service directly in your headings and main text."
+          why: "Visibility tracks local 3-pack geographic coverage and keyword density in target zip codes.",
+          improve: "Inject city name, regional landmark references, and NAP consistency across service pages."
         };
       case 'reviews':
         return {
-          why: "Reviews measure your reputation across Google and other local directories.",
-          improve: "Connect your Google Business Profile to track reviews."
+          why: "Review sentiment and velocity directly influence Google Maps algorithmic ranking authority.",
+          improve: "Connect your Google Business Profile and activate automated review reply drafts."
         };
       case 'overall':
       default:
         return {
-          why: "Your Growth Score is an aggregate metric of your online health, calculated deterministically from available signals.",
-          improve: "Follow your AI Action Plan below to improve your score systematically."
+          why: "Your Growth Score is an aggregate metric of your complete local digital footprint.",
+          improve: "Execute your prioritized AI Action Plan items to systematically elevate your score."
         };
     }
   };
@@ -60,28 +60,28 @@ export function ScoreExplanation({ score, type }: ScoreExplanationProps) {
     <div className="relative inline-block mt-2">
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 text-xs text-secondary hover:text-primary transition-colors"
+        className="flex items-center gap-1.5 text-xs text-[#6c6a64] hover:text-[#141413] transition-colors font-sans"
         aria-expanded={isOpen}
       >
-        <HelpCircle size={14} />
-        What does this mean?
+        <HelpCircle size={13} className="text-[#cc785c]" />
+        <span>Interpret this score</span>
       </button>
 
       {isOpen && (
-        <div className="absolute z-10 left-0 top-full mt-2 w-64 sm:w-72 bg-white rounded-xl shadow-xl border border-gray-100 p-4 text-left">
+        <div className="absolute z-30 left-1/2 -translate-x-1/2 top-full mt-2 w-72 bg-[#181715] text-[#faf9f5] rounded-xl shadow-2xl border border-[#252320] p-4 text-left font-sans">
           <div className="flex justify-between items-center mb-3">
-            <span className="font-bold text-sm text-primary capitalize">{type} Score</span>
-            <span className={`text-xs font-bold px-2 py-0.5 rounded-full bg-gray-50 ${color}`}>{status}</span>
+            <span className="font-serif font-medium text-sm text-[#faf9f5] capitalize">{type} Score</span>
+            <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${color}`}>{status}</span>
           </div>
           
-          <div className="space-y-3">
+          <div className="space-y-3 text-xs">
             <div>
-              <span className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Why it matters</span>
-              <p className="text-sm text-secondary leading-relaxed">{explanation.why}</p>
+              <span className="block text-[10px] font-mono text-[#a09d96] uppercase tracking-wider mb-0.5">Why it matters</span>
+              <p className="text-[#a09d96] leading-relaxed">{explanation.why}</p>
             </div>
-            <div>
-              <span className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">How to improve</span>
-              <p className="text-sm text-primary font-medium leading-relaxed">{explanation.improve}</p>
+            <div className="pt-2 border-t border-[#252320]">
+              <span className="block text-[10px] font-mono text-[#cc785c] uppercase tracking-wider mb-0.5">Recommended Action</span>
+              <p className="text-[#faf9f5] font-medium leading-relaxed">{explanation.improve}</p>
             </div>
           </div>
         </div>

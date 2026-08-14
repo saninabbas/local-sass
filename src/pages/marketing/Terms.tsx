@@ -3,35 +3,36 @@ import { PageLayout } from '../../components/layout/PageLayout';
 export function Terms() {
   return (
     <PageLayout>
-      <div className="bg-white py-16 sm:py-24">
-        <div className="mx-auto max-w-3xl px-6 lg:px-8 prose prose-slate">
-          <h1 className="text-3xl font-extrabold text-primary mb-8">Terms of Service</h1>
-          <p className="text-secondary mb-4">Last updated: {new Date().toLocaleDateString()}</p>
+      <div className="bg-[#faf9f5] py-16 sm:py-24 border-b border-[#e6dfd8]">
+        <div className="mx-auto max-w-3xl px-6 lg:px-8 font-sans">
+          <span className="text-xs font-mono uppercase tracking-[1.5px] text-[#cc785c] font-semibold">
+            Legal & Compliance
+          </span>
+          <h1 className="text-3xl sm:text-4xl font-serif font-normal text-[#141413] mt-2 mb-2">Terms of Service</h1>
+          <p className="text-xs font-mono text-[#8e8b82] mb-8">Last revised: {new Date().toLocaleDateString()}</p>
           
-          <h2 className="text-xl font-bold text-primary mt-8 mb-4">1. Agreement to Terms</h2>
-          <p className="text-secondary mb-4">
-            By accessing or using our Services, you agree to be bound by these Terms. If you disagree with any part of the terms then you may not access the Service.
-          </p>
+          <div className="space-y-6 text-sm text-[#3d3d3a] leading-relaxed">
+            <div>
+              <h2 className="text-lg font-serif font-medium text-[#141413] mb-2">1. Agreement to Terms</h2>
+              <p>
+                By registering for an account or using Rankora's diagnostic audit platform, you agree to abide by these Terms of Service. If you disagree with any portion, you must terminate platform usage immediately.
+              </p>
+            </div>
 
-          <h2 className="text-xl font-bold text-primary mt-8 mb-4">2. Description of Service</h2>
-          <p className="text-secondary mb-4">
-            Rankora provides AI-powered digital growth auditing and recommendation services for local businesses. You understand and agree that the Service is provided on an "AS IS" and "AS AVAILABLE" basis.
-          </p>
+            <div>
+              <h2 className="text-lg font-serif font-medium text-[#141413] mb-2">2. Service Provision & AI Diagnostics</h2>
+              <p>
+                Rankora provides automated SEO, mobile performance, and local visibility evaluations powered by Anthropic's visual reasoning models. While we strive for maximum accuracy, search engine algorithms shift dynamically and outcomes cannot be guaranteed.
+              </p>
+            </div>
 
-          <h2 className="text-xl font-bold text-primary mt-8 mb-4">3. Accounts</h2>
-          <p className="text-secondary mb-4">
-            When you create an account with us, you must provide us information that is accurate, complete, and current at all times. Failure to do so constitutes a breach of the Terms, which may result in immediate termination of your account on our Service.
-          </p>
-
-          <h2 className="text-xl font-bold text-primary mt-8 mb-4">4. Intellectual Property</h2>
-          <p className="text-secondary mb-4">
-            The Service and its original content, features and functionality are and will remain the exclusive property of Rankora and its licensors.
-          </p>
-          
-          <h2 className="text-xl font-bold text-primary mt-8 mb-4">5. Contact Us</h2>
-          <p className="text-secondary mb-4">
-            If you have any questions about these Terms, please contact us at support@rankora.com.
-          </p>
+            <div>
+              <h2 className="text-lg font-serif font-medium text-[#141413] mb-2">3. Subscription & Billing</h2>
+              <p>
+                Paid tiers (Growth $15/mo, Pro $30/mo) are billed on a recurring monthly cycle. You may cancel your subscription at any time via your account settings with zero penalty fees.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </PageLayout>
