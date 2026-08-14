@@ -3,7 +3,93 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --claude-primary: #cc785c;
+    --claude-primary-active: #a9583e;
+    --claude-primary-disabled: #e6dfd8;
+    --claude-ink: #141413;
+    --claude-body: #3d3d3a;
+    --claude-body-strong: #252523;
+    --claude-muted: #6c6a64;
+    --claude-muted-soft: #8e8b82;
+    --claude-hairline: #e6dfd8;
+    --claude-hairline-soft: #ebe6df;
+    --claude-canvas: #faf9f5;
+    --claude-surface-soft: #f5f0e8;
+    --claude-surface-card: #efe9de;
+    --claude-surface-cream-strong: #e8e0d2;
+    --claude-surface-dark: #181715;
+    --claude-surface-dark-elevated: #252320;
+    --claude-surface-dark-soft: #1f1e1b;
+  }
+
   html {
     scroll-behavior: smooth;
   }
 }
+
+/* Custom animations for Claude Agentic Computer Use Chrome */
+@keyframes claudePulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.3;
+  }
+}
+
+@keyframes clickRipple {
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+@keyframes scanLine {
+  0% {
+    top: 0%;
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0.2;
+  }
+}
+
+.animate-claude-pulse {
+  animation: claudePulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-click-ripple {
+  animation: clickRipple 0.6s cubic-bezier(0, 0, 0.2, 1) forwards;
+}
+
+.animate-scan-line {
+  animation: scanLine 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Custom scrollbars for code & simulated browser */
+.custom-claude-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-claude-scrollbar::-webkit-scrollbar-track {
+  background: #181715;
+}
+.custom-claude-scrollbar::-webkit-scrollbar-thumb {
+  background: #2e2c28;
+  border-radius: 4px;
+}
+.custom-claude-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #423f39;
+}
+

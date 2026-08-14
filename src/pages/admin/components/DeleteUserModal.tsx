@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
 import type { AdminUser } from '../../../types';
+import { Button } from '../../../components/ui/Button';
 
 interface DeleteUserModalProps {
   user: AdminUser | null;
@@ -38,52 +39,52 @@ export function DeleteUserModal({ user, isOpen, onClose, onConfirmDelete }: Dele
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary/40 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-red-500/10 text-red-400 rounded-xl">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-red-50 text-danger rounded-xl">
               <AlertTriangle size={20} />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Delete User Account</h3>
-              <p className="text-xs text-slate-400">Permanent and irreversible action</p>
+              <h3 className="text-lg font-bold text-primary">Delete User Account</h3>
+              <p className="text-xs text-secondary">Permanent and irreversible action</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         </div>
 
         <form onSubmit={handleDelete} className="p-6 space-y-4">
           {error && (
-            <div className="p-3 bg-red-950/60 border border-red-800 text-red-300 text-xs rounded-xl">
+            <div className="p-3 bg-red-50 border border-red-100 text-danger text-xs rounded-xl">
               {error}
             </div>
           )}
 
           {isPrimaryAdmin ? (
-            <div className="p-4 bg-amber-950/40 border border-amber-800/80 rounded-xl text-amber-200 text-xs leading-relaxed">
-              <strong>Protected Account:</strong> This is the primary system administrator account (<span className="font-mono text-white">{user.email}</span>) and cannot be deleted.
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs leading-relaxed">
+              <strong>Protected Account:</strong> This is the primary system administrator account (<span className="font-mono font-bold text-primary">{user.email}</span>) and cannot be deleted.
             </div>
           ) : (
             <>
-              <div className="p-4 bg-red-950/30 border border-red-900/60 rounded-xl text-xs text-slate-300 space-y-2">
+              <div className="p-4 bg-red-50/70 border border-red-100 rounded-xl text-xs text-secondary space-y-2">
                 <p>
-                  You are about to permanently delete user <strong className="text-white">{user.name}</strong> (<span className="text-red-400 font-mono">{user.email}</span>).
+                  You are about to permanently delete user <strong className="text-primary">{user.name}</strong> (<span className="text-danger font-mono font-semibold">{user.email}</span>).
                 </p>
-                <p className="text-red-300 font-medium">
+                <p className="text-danger font-medium">
                   This will immediately cascade and erase all of their businesses ({user.businessCount}), audit records ({user.auditCount}), generated recommendations, backlinks, and sessions.
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Type <strong className="text-red-400 font-mono">DELETE</strong> to confirm:
+                <label className="block text-xs font-semibold text-primary mb-1.5">
+                  Type <strong className="text-danger font-mono">DELETE</strong> to confirm:
                 </label>
                 <input
                   type="text"
@@ -91,25 +92,26 @@ export function DeleteUserModal({ user, isOpen, onClose, onConfirmDelete }: Dele
                   value={confirmInput}
                   onChange={(e) => setConfirmInput(e.target.value)}
                   placeholder="DELETE"
-                  className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm font-mono"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-primary placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-sm font-mono"
                 />
               </div>
             </>
           )}
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-            <button
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors"
             >
               Cancel
-            </button>
+            </Button>
             {!isPrimaryAdmin && (
               <button
                 type="submit"
                 disabled={isDeleting || confirmInput.trim().toUpperCase() !== 'DELETE'}
-                className="flex items-center gap-2 px-5 py-2 text-xs font-bold text-white rounded-xl bg-red-600 hover:bg-red-500 active:bg-red-700 shadow-md shadow-red-600/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white rounded-xl bg-danger hover:bg-red-600 active:bg-red-700 shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
                 {isDeleting ? (
                   <>

@@ -69,7 +69,7 @@ export function AdminDashboard() {
   const handleGrantPlan = async (userId: string, plan: string) => {
     try {
       const res = await updateUserPlan(userId, plan);
-      showToast(res.message || `Plan updated to ${plan.toUpperCase()}`);
+      showToast(res.message || `Plan granted successfully!`);
       loadData();
     } catch (err: any) {
       showToast(err.message || 'Failed to update plan', 'error');
@@ -78,12 +78,12 @@ export function AdminDashboard() {
   };
 
   const handleRevokePlan = async (user: AdminUser) => {
-    if (!window.confirm(`Are you sure you want to revoke the plan for ${user.name}? This will reset their account to Free tier.`)) {
+    if (!window.confirm(`Are you sure you want to revoke the plan for ${user.name}? This will reset their account to Free Audit tier.`)) {
       return;
     }
     try {
       const res = await revokeUserPlan(user.id);
-      showToast(res.message || 'Plan revoked to Free tier');
+      showToast(res.message || 'Plan revoked to Free Audit tier');
       loadData();
     } catch (err: any) {
       showToast(err.message || 'Failed to revoke plan', 'error');
@@ -102,19 +102,19 @@ export function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-gray-50 text-primary flex flex-col">
       {/* Toast Notification */}
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5 duration-200">
-          <div className={`px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border text-sm font-semibold ${
+          <div className={`px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 border text-sm font-semibold ${
             toast.type === 'success' 
-              ? 'bg-slate-900 border-emerald-500/40 text-emerald-300' 
-              : 'bg-slate-900 border-red-500/40 text-red-300'
+              ? 'bg-white border-green-200 text-success-dark shadow-green-500/10' 
+              : 'bg-white border-red-200 text-danger shadow-red-500/10'
           }`}>
             {toast.type === 'success' ? (
-              <CheckCircle2 size={18} className="text-emerald-400" />
+              <CheckCircle2 size={18} className="text-success" />
             ) : (
-              <AlertCircle size={18} className="text-red-400" />
+              <AlertCircle size={18} className="text-danger" />
             )}
             <span>{toast.message}</span>
           </div>

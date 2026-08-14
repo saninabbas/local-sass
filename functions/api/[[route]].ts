@@ -1682,7 +1682,7 @@ export const onRequest = async (context: any) => {
         }
 
         const freeRow = await env.DB.prepare("SELECT COUNT(*) as c FROM users WHERE subscription_status = 'free' OR subscription_status IS NULL OR subscription_status = ''").first<{ c: number }>();
-        const starterRow = await env.DB.prepare("SELECT COUNT(*) as c FROM users WHERE subscription_status = 'starter'").first<{ c: number }>();
+        const growthRow = await env.DB.prepare("SELECT COUNT(*) as c FROM users WHERE subscription_status = 'growth' OR subscription_status = 'starter'").first<{ c: number }>();
         const proRow = await env.DB.prepare("SELECT COUNT(*) as c FROM users WHERE subscription_status = 'pro'").first<{ c: number }>();
         const enterpriseRow = await env.DB.prepare("SELECT COUNT(*) as c FROM users WHERE subscription_status = 'enterprise'").first<{ c: number }>();
 
@@ -1699,7 +1699,7 @@ export const onRequest = async (context: any) => {
             recentSignups30d: recent30d,
             planBreakdown: {
               free: freeRow?.c || 0,
-              starter: starterRow?.c || 0,
+              growth: growthRow?.c || 0,
               pro: proRow?.c || 0,
               enterprise: enterpriseRow?.c || 0
             }

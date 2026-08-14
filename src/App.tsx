@@ -14,6 +14,7 @@ import { Privacy } from './pages/marketing/Privacy';
 import { Terms } from './pages/marketing/Terms';
 import { Resources } from './pages/marketing/Resources';
 import { PublicReport } from './pages/report/PublicReport';
+import { ClaudeShowcasePage } from './pages/ClaudeShowcasePage';
 import { AdminRoute } from './pages/admin/AdminRoute';
 
 import { DashboardLayout } from './components/dashboard/DashboardLayout';
@@ -76,6 +77,11 @@ function App() {
           <Route path="/verify" element={<VerifyEmail />} />
           <Route path="/api/auth/verify" element={<VerifyEmail />} />
           <Route path="/report/:id" element={<PublicReport />} />
+          
+          {/* Claude Computer Use & Design System Showcase */}
+          <Route path="/claude" element={<ClaudeShowcasePage />} />
+          <Route path="/computer-use" element={<ClaudeShowcasePage />} />
+          <Route path="/claude-design" element={<ClaudeShowcasePage />} />
           
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminRoute />} />

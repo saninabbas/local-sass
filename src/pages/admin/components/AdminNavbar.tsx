@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Shield, LayoutDashboard, LogOut, ExternalLink, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, LogOut, ExternalLink, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 
 interface AdminNavbarProps {
@@ -16,60 +16,60 @@ export function AdminNavbar({ onRefresh, isRefreshing }: AdminNavbarProps) {
     navigate('/admin');
   };
 
+  const initial = user?.name ? user.name.charAt(0).toUpperCase() : 'A';
+
   return (
-    <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 text-white">
+    <header className="sticky top-0 z-40 bg-white border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Brand & Admin Badge */}
-          <div className="flex items-center gap-3">
-            <Link to="/admin" className="flex items-center gap-2 group">
-              <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-600/30 group-hover:bg-blue-500 transition-colors">
-                <Shield size={20} />
-              </div>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-base tracking-tight text-white">Rankora</span>
-                  <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-md">
-                    Admin Portal
-                  </span>
-                </div>
-              </div>
+          <div className="flex items-center gap-4">
+            <Link to="/admin" className="flex items-center gap-1.5 group">
+              <img 
+                src="/brand/logo.png" 
+                alt="Rankora Logo" 
+                className="h-9 w-auto object-contain scale-[1.25] -mr-1" 
+              />
+              <span className="text-xl font-bold text-primary">Rankora</span>
+              <span className="ml-2 px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider bg-blue-50 text-primary-accent border border-blue-200 rounded-md">
+                Admin Console
+              </span>
             </Link>
           </div>
 
           {/* Actions & Profile */}
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={onRefresh}
               disabled={isRefreshing}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors disabled:opacity-50"
-              title="Refresh Data"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-gray-50 hover:bg-gray-100 text-secondary hover:text-primary border border-gray-200 transition-colors disabled:opacity-50 cursor-pointer"
+              title="Refresh Telemetry"
             >
-              <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-blue-400' : ''} />
-              <span className="hidden sm:inline">Refresh</span>
+              <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-primary-accent' : ''} />
+              <span className="hidden sm:inline">Refresh Data</span>
             </button>
 
             <Link
               to="/dashboard"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-gray-50 hover:bg-gray-100 text-secondary hover:text-primary border border-gray-200 transition-colors"
             >
               <LayoutDashboard size={14} />
               <span className="hidden sm:inline">User Dashboard</span>
-              <ExternalLink size={12} className="text-slate-400" />
+              <ExternalLink size={12} className="text-gray-400" />
             </Link>
 
-            <div className="h-6 w-[1px] bg-slate-800 mx-1 hidden sm:block" />
+            <div className="h-6 w-[1px] bg-gray-200 mx-1 hidden sm:block" />
 
             {/* Current Admin Tag */}
-            <div className="flex items-center gap-2 pl-1">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-xs font-bold text-white shadow-inner">
-                {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+            <div className="flex items-center gap-2.5 pl-1">
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-white shadow-sm">
+                {initial}
               </div>
               <div className="hidden md:flex flex-col text-left">
-                <span className="text-xs font-semibold text-slate-200 leading-tight">
+                <span className="text-xs font-bold text-primary leading-tight">
                   {user?.name || 'Administrator'}
                 </span>
-                <span className="text-[10px] text-blue-400 font-mono">
+                <span className="text-[10px] text-secondary font-mono">
                   {user?.email || 'saninabbas@gmail.com'}
                 </span>
               </div>
@@ -77,7 +77,7 @@ export function AdminNavbar({ onRefresh, isRefreshing }: AdminNavbarProps) {
 
             <button
               onClick={handleLogout}
-              className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors ml-1"
+              className="p-2 text-secondary hover:text-danger hover:bg-red-50 rounded-xl transition-colors ml-1 cursor-pointer"
               title="Sign Out of Admin"
             >
               <LogOut size={16} />

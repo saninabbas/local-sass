@@ -19,7 +19,7 @@ export interface AdminStats {
   recentSignups30d: number;
   planBreakdown: {
     free: number;
-    starter: number;
+    growth: number;
     pro: number;
     enterprise: number;
     [key: string]: number;

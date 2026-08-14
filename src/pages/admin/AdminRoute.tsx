@@ -8,11 +8,11 @@ export function AdminRoute() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400">
-        <div className="w-10 h-10 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-          <Shield size={14} className="text-blue-500" />
-          <span>Authenticating Administrator...</span>
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center text-secondary">
+        <div className="w-10 h-10 border-3 border-primary-accent border-t-transparent rounded-full animate-spin mb-4" />
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-secondary">
+          <Shield size={16} className="text-primary-accent" />
+          <span>Verifying Administrator Access...</span>
         </div>
       </div>
     );

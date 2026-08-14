@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ShieldCheck, X, Check, CreditCard } from 'lucide-react';
 import type { AdminUser } from '../../../types';
+import { Button } from '../../../components/ui/Button';
 
 interface GrantPlanModalProps {
   user: AdminUser | null;
@@ -10,7 +11,7 @@ interface GrantPlanModalProps {
 }
 
 export function GrantPlanModal({ user, isOpen, onClose, onGrant }: GrantPlanModalProps) {
-  const [selectedPlan, setSelectedPlan] = useState<string>('pro');
+  const [selectedPlan, setSelectedPlan] = useState<string>('growth');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -19,31 +20,35 @@ export function GrantPlanModal({ user, isOpen, onClose, onGrant }: GrantPlanModa
   const plans = [
     {
       id: 'free',
-      name: 'Free Plan',
-      desc: 'Standard trial tier with basic SEO audit and limited features.',
+      name: 'Free Audit Plan',
+      price: '$0',
+      desc: 'One-time Growth Score, Basic SEO Overview, Top 3 Recommendations.',
       badge: 'Free Tier',
-      color: 'border-slate-700 bg-slate-800/40 text-slate-300'
+      badgeClass: 'bg-gray-100 text-gray-700 border border-gray-200'
     },
     {
-      id: 'starter',
-      name: 'Starter Plan',
-      desc: 'Full website scan, AI action plans, and weekly rank tracking.',
-      badge: '$29/mo Tier',
-      color: 'border-blue-800/60 bg-blue-950/30 text-blue-300'
+      id: 'growth',
+      name: 'Growth Plan',
+      price: '$15/mo',
+      desc: 'Weekly Growth Score updates, Full AI Action Plan, Review Monitoring & Competitor Tracking.',
+      badge: 'Recommended',
+      badgeClass: 'bg-blue-100 text-blue-700 border border-blue-200 font-bold'
     },
     {
       id: 'pro',
-      name: 'Pro Growth (Recommended)',
-      desc: 'Unlimited audits, AI blog writer, Backlink builder & Google Business Sync.',
-      badge: '$79/mo Tier',
-      color: 'border-purple-800/60 bg-purple-950/30 text-purple-300'
+      name: 'Pro Plan',
+      price: '$30/mo',
+      desc: 'Up to 3 Locations, Real-time Growth Score, AI Review Replies & Priority Support.',
+      badge: 'Pro Tier',
+      badgeClass: 'bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold'
     },
     {
       id: 'enterprise',
       name: 'Enterprise / Agency',
-      desc: 'All features + multi-location, white-label PDF reports and highest priority AI compute.',
-      badge: '$199/mo Tier',
-      color: 'border-amber-800/60 bg-amber-950/30 text-amber-300'
+      price: 'Custom / VIP',
+      desc: 'Multi-location accounts, White-label PDF Reports, Authority Builder & Dedicated Compute.',
+      badge: 'VIP Agency',
+      badgeClass: 'bg-amber-100 text-amber-800 border border-amber-200 font-bold'
     }
   ];
 
@@ -62,61 +67,62 @@ export function GrantPlanModal({ user, isOpen, onClose, onGrant }: GrantPlanModa
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary/40 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-blue-500/10 text-blue-400 rounded-xl">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-50 text-primary-accent rounded-xl">
               <CreditCard size={20} />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Grant / Change Plan</h3>
-              <p className="text-xs text-slate-400">
-                Grant access tier to <span className="text-blue-400 font-semibold">{user.name}</span> ({user.email})
+              <h3 className="text-lg font-bold text-primary">Grant Platform Plan</h3>
+              <p className="text-xs text-secondary">
+                Assign plan tier to <span className="font-semibold text-primary">{user.name}</span> ({user.email})
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         </div>
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
-            <div className="p-3 bg-red-950/60 border border-red-800/80 text-red-300 text-xs rounded-xl">
+            <div className="p-3 bg-red-50 border border-red-100 text-danger text-xs rounded-xl">
               {error}
             </div>
           )}
 
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {plans.map((p) => {
               const isSelected = selectedPlan === p.id;
               return (
                 <div
                   key={p.id}
                   onClick={() => setSelectedPlan(p.id)}
-                  className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start justify-between ${
+                  className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex items-start justify-between ${
                     isSelected
-                      ? 'border-blue-500 bg-blue-950/40 ring-2 ring-blue-500/20'
-                      : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'
+                      ? 'border-primary-accent bg-blue-50/50 shadow-sm'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
                   }`}
                 >
-                  <div className="space-y-1">
+                  <div className="space-y-1 pr-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-white">{p.name}</span>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${p.color}`}>
+                      <span className="text-sm font-bold text-primary">{p.name}</span>
+                      <span className="text-xs font-bold text-secondary font-mono">({p.price})</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${p.badgeClass}`}>
                         {p.badge}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400">{p.desc}</p>
+                    <p className="text-xs text-secondary leading-relaxed">{p.desc}</p>
                   </div>
-                  <div className={`mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center ${
-                    isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-700'
+                  <div className={`mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+                    isSelected ? 'bg-primary-accent border-primary-accent text-white' : 'border-gray-300 bg-white'
                   }`}>
                     {isSelected && <Check size={12} strokeWidth={3} />}
                   </div>
@@ -125,31 +131,34 @@ export function GrantPlanModal({ user, isOpen, onClose, onGrant }: GrantPlanModa
             })}
           </div>
 
-          <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-            <button
+          <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              variant="primary"
+              size="sm"
               disabled={isSubmitting}
-              className="flex items-center gap-2 px-5 py-2 text-xs font-bold text-white rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 shadow-md shadow-blue-600/30 transition-all disabled:opacity-50"
+              className="flex items-center gap-1.5"
             >
               {isSubmitting ? (
                 <>
                   <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Updating Plan...</span>
+                  <span>Granting Plan...</span>
                 </>
               ) : (
                 <>
-                  <ShieldCheck size={14} />
-                  <span>Grant Plan</span>
+                  <ShieldCheck size={16} />
+                  <span>Confirm & Grant Plan</span>
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
