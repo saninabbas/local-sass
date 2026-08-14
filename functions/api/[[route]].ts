@@ -558,6 +558,170 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true }, 200, { 'Set-Cookie': cookie });
       }
 
+      // --- AUTH: FORGOT PASSWORD ---
+      if (url.pathname === '/api/auth/forgot-password' && request.method === 'POST') {
+        const { email } = await request.json().catch(() => ({})) as any;
+        if (!email) return errorResponse("Email is required", 400);
+
+        const cleanEmail = email.toLowerCase().trim();
+        const user = await env.DB.prepare("SELECT id, name, email FROM users WHERE LOWER(email) = ?").bind(cleanEmail).first();
+        if (!user) {
+          return jsonResponse({ 
+            success: true, 
+            message: "If an account exists with this email, password reset instructions have been generated." 
+          });
+        }
+
+        const resetToken = crypto.randomUUID();
+        await env.DB.prepare(`
+          UPDATE users 
+          SET reset_token = ?, reset_token_expires_at = datetime('now', '+1 hour') 
+          WHERE id = ?
+        `).bind(resetToken, user.id).run();
+
+        const resetLink = `${url.origin}/reset-password?token=${resetToken}&email=${encodeURIComponent(user.email as string)}`;
+
+        return jsonResponse({
+          success: true,
+          message: "Password reset link generated successfully.",
+          resetLink
+        });
+      }
+
+      // --- AUTH: RESET PASSWORD ---
+      if (url.pathname === '/api/auth/reset-password' && request.method === 'POST') {
+        const { email, token, password } = await request.json().catch(() => ({})) as any;
+        if (!email || !token || !password) return errorResponse("Missing required fields", 400);
+        if (password.length < 8) return errorResponse("Password must be at least 8 characters long", 400);
+
+        const cleanEmail = email.toLowerCase().trim();
+        const user = await env.DB.prepare(
+          "SELECT id, email, reset_token FROM users WHERE LOWER(email) = ? AND reset_token = ?"
+        ).bind(cleanEmail, token).first();
+
+        if (!user) {
+          return errorResponse("Invalid or expired password reset link. Please request a new one.", 400);
+        }
+
+        const newHash = await hashPassword(password);
+        await env.DB.prepare(`
+          UPDATE users 
+          SET password_hash = ?, reset_token = NULL, reset_token_expires_at = NULL, email_verified = 1 
+          WHERE id = ?
+        `).bind(newHash, user.id).run();
+
+        return jsonResponse({
+          success: true,
+          message: "Your password has been successfully reset! You can now log in."
+        });
+      }
+
+      // --- AUTH: GOOGLE OAUTH DIRECT SIGN-IN / SIGN-UP ---
+      if (url.pathname === '/api/auth/google' && request.method === 'GET') {
+        const clientId = env.GOOGLE_CLIENT_ID;
+        if (!clientId) {
+          return Response.redirect(`${url.origin}/signup?error=google_auth_not_configured`, 302);
+        }
+
+        const redirectUri = `${url.origin}/api/auth/google/callback`;
+        const scope = encodeURIComponent('openid email profile');
+        const state = crypto.randomUUID();
+        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account&state=${state}`;
+
+        return Response.redirect(authUrl, 302);
+      }
+
+      if (url.pathname === '/api/auth/google/callback' && request.method === 'GET') {
+        const code = url.searchParams.get('code');
+        const error = url.searchParams.get('error');
+
+        if (error || !code) {
+          return Response.redirect(`${url.origin}/login?error=${encodeURIComponent(error || 'Google authentication cancelled')}`, 302);
+        }
+
+        try {
+          const redirectUri = `${url.origin}/api/auth/google/callback`;
+          const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              code,
+              client_id: env.GOOGLE_CLIENT_ID,
+              client_secret: env.GOOGLE_CLIENT_SECRET,
+              redirect_uri: redirectUri,
+              grant_type: 'authorization_code'
+            }).toString()
+          });
+
+          if (!tokenRes.ok) {
+            const errText = await tokenRes.text();
+            console.error("Google token exchange error:", errText);
+            return Response.redirect(`${url.origin}/login?error=google_token_failed`, 302);
+          }
+
+          const tokens = await tokenRes.json() as any;
+          const profileRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: { Authorization: `Bearer ${tokens.access_token}` }
+          });
+
+          if (!profileRes.ok) {
+            return Response.redirect(`${url.origin}/login?error=google_profile_failed`, 302);
+          }
+
+          const profile = await profileRes.json() as any;
+          const userEmail = (profile.email || '').toLowerCase().trim();
+          const userName = profile.name || profile.given_name || userEmail.split('@')[0] || 'User';
+
+          if (!userEmail) {
+            return Response.redirect(`${url.origin}/login?error=google_missing_email`, 302);
+          }
+
+          // Check if user already exists in D1
+          let user = await env.DB.prepare("SELECT * FROM users WHERE LOWER(email) = ?").bind(userEmail).first();
+          let isNewUser = false;
+
+          if (!user) {
+            isNewUser = true;
+            const newUserId = generateId('usr');
+            const isLifetimePro = userEmail === 'saninabbas@gmail.com' || userEmail === 'salmanali202008@gmail.com';
+            const role = isLifetimePro ? 'admin' : 'user';
+            const subStatus = isLifetimePro ? 'pro' : 'free';
+
+            await env.DB.prepare(`
+              INSERT INTO users (id, name, email, role, subscription_status, email_verified, created_at)
+              VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+            `).bind(newUserId, userName, userEmail, role, subStatus).run();
+
+            user = await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(newUserId).first();
+          } else if (!user.email_verified) {
+            await env.DB.prepare("UPDATE users SET email_verified = 1 WHERE id = ?").bind(user.id).run();
+          }
+
+          // Create session
+          const sessionId = generateId('sess');
+          await env.DB.prepare(
+            "INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, datetime('now', '+7 days'))"
+          ).bind(sessionId, user.id).run();
+
+          const cookie = `session_id=${sessionId}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
+          
+          // Check if business profile exists
+          const business = await env.DB.prepare("SELECT id FROM businesses WHERE user_id = ? LIMIT 1").bind(user.id).first();
+          const redirectTarget = (!business || isNewUser) ? '/onboarding' : '/dashboard';
+
+          return new Response(null, {
+            status: 302,
+            headers: {
+              'Location': `${url.origin}${redirectTarget}`,
+              'Set-Cookie': cookie
+            }
+          });
+        } catch (oauthErr: any) {
+          console.error("Google auth callback failed:", oauthErr);
+          return Response.redirect(`${url.origin}/login?error=auth_internal_error`, 302);
+        }
+      }
+
       // --- AUDIT HISTORY ---
       if (url.pathname === '/api/audits' && request.method === 'GET') {
         const user = await authenticate();
@@ -2942,7 +3106,7 @@ export const onRequest = async (context: any) => {
 
       // --- ADMIN: GRANT / UPDATE PLAN ---
       const adminPlanMatch = url.pathname.match(/^\/api\/admin\/users\/([^\/]+)\/plan$/);
-      if (adminPlanMatch && request.method === 'POST') {
+      if (adminPlanMatch && (request.method === 'POST' || request.method === 'PUT')) {
         await ensureAdminUser();
         const user = await authenticate();
         if (!user || user.role !== 'admin') {
@@ -2950,21 +3114,27 @@ export const onRequest = async (context: any) => {
         }
 
         const targetUserId = adminPlanMatch[1];
-        const { plan } = await request.json() as any;
-        const normalizedPlan = (plan || 'free').toLowerCase();
+        let body: any = {};
+        try { body = await request.json(); } catch { body = {}; }
+        const normalizedPlan = (body.plan || 'free').toLowerCase();
 
         await env.DB.prepare("UPDATE users SET subscription_status = ? WHERE id = ?").bind(normalizedPlan, targetUserId).run();
         await env.DB.prepare("UPDATE businesses SET subscription_status = ? WHERE user_id = ?").bind(normalizedPlan, targetUserId).run().catch(() => {});
 
         return jsonResponse({
           success: true,
-          message: `Plan updated to ${normalizedPlan.toUpperCase()}`
+          message: `Plan updated to ${normalizedPlan.toUpperCase()} successfully!`,
+          data: {
+            userId: targetUserId,
+            plan: normalizedPlan,
+            message: `Plan updated to ${normalizedPlan.toUpperCase()} successfully!`
+          }
         });
       }
 
       // --- ADMIN: REVOKE PLAN ---
       const adminRevokePlanMatch = url.pathname.match(/^\/api\/admin\/users\/([^\/]+)\/revoke-plan$/);
-      if (adminRevokePlanMatch && request.method === 'POST') {
+      if (adminRevokePlanMatch && (request.method === 'POST' || request.method === 'PUT')) {
         await ensureAdminUser();
         const user = await authenticate();
         if (!user || user.role !== 'admin') {
@@ -2978,7 +3148,12 @@ export const onRequest = async (context: any) => {
 
         return jsonResponse({
           success: true,
-          message: "Plan revoked to FREE"
+          message: "Plan revoked to FREE Audit tier",
+          data: {
+            userId: targetUserId,
+            plan: 'free',
+            message: "Plan revoked to FREE Audit tier"
+          }
         });
       }
 

@@ -69,10 +69,10 @@ export function AdminDashboard() {
   const handleGrantPlan = async (userId: string, plan: string) => {
     try {
       const res = await updateUserPlan(userId, plan);
-      showToast(res.message || `Plan granted successfully!`);
+      showToast(res?.message || `Plan updated to ${plan.toUpperCase()} successfully!`);
       loadData();
     } catch (err: any) {
-      showToast(err.message || 'Failed to update plan', 'error');
+      showToast(err?.message || 'Failed to update plan', 'error');
       throw err;
     }
   };
@@ -83,20 +83,20 @@ export function AdminDashboard() {
     }
     try {
       const res = await revokeUserPlan(user.id);
-      showToast(res.message || 'Plan revoked to Free Audit tier');
+      showToast(res?.message || 'Plan revoked to Free Audit tier');
       loadData();
     } catch (err: any) {
-      showToast(err.message || 'Failed to revoke plan', 'error');
+      showToast(err?.message || 'Failed to revoke plan', 'error');
     }
   };
 
   const handleDeleteUser = async (userId: string) => {
     try {
       const res = await deleteUser(userId);
-      showToast(res.message || 'User permanently deleted');
+      showToast(res?.message || 'User permanently deleted');
       loadData();
     } catch (err: any) {
-      showToast(err.message || 'Failed to delete user', 'error');
+      showToast(err?.message || 'Failed to delete user', 'error');
       throw err;
     }
   };

@@ -97,7 +97,7 @@ export function AdminLogin() {
                 label="Admin Password"
                 id="admin-password"
                 type="password"
-                placeholder="••••••••••••"
+                placeholder="Enter admin password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required

@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Home } from './pages/Home';
 import { Signup } from './pages/auth/Signup';
 import { Login } from './pages/auth/Login';
+import { ForgotPassword } from './pages/auth/ForgotPassword';
+import { ResetPassword } from './pages/auth/ResetPassword';
 import { VerifyEmail } from './pages/auth/VerifyEmail';
 import { Onboarding } from './pages/onboarding/Onboarding';
 
@@ -86,6 +88,8 @@ function App() {
           <Route path="/terms" element={<Terms />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify" element={<VerifyEmail />} />
           <Route path="/api/auth/verify" element={<VerifyEmail />} />
           <Route path="/report/:id" element={<PublicReport />} />

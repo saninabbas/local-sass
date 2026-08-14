@@ -60,7 +60,7 @@ export function GrantPlanModal({ user, isOpen, onClose, onGrant }: GrantPlanModa
       await onGrant(user.id, selectedPlan);
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Failed to grant plan');
+      setError(err?.message || 'Failed to grant plan');
     } finally {
       setIsSubmitting(false);
     }

@@ -28,10 +28,10 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   }
 
   if (!response.ok || (json && typeof json === 'object' && 'success' in json && !json.success)) {
-    throw new Error(json?.error || `An API error occurred (${response.status})`);
+    throw new Error(json?.error || json?.message || `An API error occurred (${response.status})`);
   }
   
-  return json?.data;
+  return json?.data !== undefined ? json.data : json;
 }
 
 // -----------------------------------------------------------------------------
@@ -42,6 +42,8 @@ export const login = (data: any) => fetchApi('/api/auth/login', { method: 'POST'
 export const logout = () => fetchApi('/api/auth/logout', { method: 'POST' });
 export const getCurrentUser = () => fetchApi('/api/auth/me');
 export const updateProfile = (data: { name: string }) => fetchApi('/api/auth/profile', { method: 'PUT', body: JSON.stringify(data) });
+export const forgotPassword = (email: string) => fetchApi('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) });
+export const resetPassword = (data: { email: string; token: string; password: string }) => fetchApi('/api/auth/reset-password', { method: 'POST', body: JSON.stringify(data) });
 
 // -----------------------------------------------------------------------------
 // BUSINESS & DASHBOARD
