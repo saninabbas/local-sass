@@ -1,6 +1,6 @@
 (function() {
-  // Config
-  const WIDGET_URL = 'https://local-sass.pages.dev';
+  // Config - dynamically detect API URL from script src
+  let WIDGET_URL = 'https://local-sass.pages.dev';
   
   // Extract businessId from script tag
   const scripts = document.getElementsByTagName('script');
@@ -9,6 +9,7 @@
     if (scripts[i].src.includes('widget.js')) {
       const url = new URL(scripts[i].src);
       businessId = url.searchParams.get('id');
+      WIDGET_URL = url.origin;
       if (businessId) break;
     }
   }

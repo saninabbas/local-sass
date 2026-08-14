@@ -10,11 +10,20 @@ interface ActionPlanCardProps {
   priorityColor: string;
   impact?: string;
   estimatedTime?: string;
+  difficulty?: string;
+  seoImpact?: string;
+  localImpact?: string;
+  conversionImpact?: string;
+  businessOutcome?: string;
   status?: 'pending' | 'in-progress' | 'completed';
   onComplete?: (id: string) => Promise<void>;
 }
 
-export function ActionPlanCard({ id, title, description, priority, priorityColor, impact, estimatedTime, status = 'pending', onComplete }: ActionPlanCardProps) {
+export function ActionPlanCard({ 
+  id, title, description, priority, priorityColor, 
+  impact, estimatedTime, difficulty, seoImpact, localImpact, 
+  conversionImpact, businessOutcome, status = 'pending', onComplete 
+}: ActionPlanCardProps) {
   const [isCompleting, setIsCompleting] = useState(false);
   const isCompleted = status === 'completed';
 
@@ -47,7 +56,14 @@ export function ActionPlanCard({ id, title, description, priority, priorityColor
         {description}
       </p>
       
-      <div className={`grid grid-cols-2 gap-4 mb-6 p-4 rounded-lg border ${isCompleted ? 'bg-green-50/50 border-green-100' : 'bg-gray-50 border-gray-100'}`}>
+      {businessOutcome && (
+        <div className="mb-4">
+          <span className="text-sm font-semibold text-primary">Business Outcome: </span>
+          <span className="text-sm text-secondary">{businessOutcome}</span>
+        </div>
+      )}
+
+      <div className={`grid grid-cols-2 gap-4 mb-4 p-4 rounded-lg border ${isCompleted ? 'bg-green-50/50 border-green-100' : 'bg-gray-50 border-gray-100'}`}>
         <div>
           <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
             <Activity size={12} /> Impact
@@ -61,6 +77,31 @@ export function ActionPlanCard({ id, title, description, priority, priorityColor
           <span className={`text-sm font-bold ${isCompleted ? 'text-green-700' : 'text-primary'}`}>{estimatedTime}</span>
         </div>
       </div>
+      
+      {(difficulty || seoImpact || localImpact || conversionImpact) && (
+        <div className="flex flex-wrap gap-2 mb-6">
+          {difficulty && (
+            <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200">
+              Difficulty: {difficulty}
+            </span>
+          )}
+          {seoImpact && (
+            <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-blue-50 text-blue-700 border border-blue-200">
+              SEO: {seoImpact}
+            </span>
+          )}
+          {localImpact && (
+            <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-purple-50 text-purple-700 border border-purple-200">
+              Local: {localImpact}
+            </span>
+          )}
+          {conversionImpact && (
+            <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-orange-50 text-orange-700 border border-orange-200">
+              Conversion: {conversionImpact}
+            </span>
+          )}
+        </div>
+      )}
 
       {!isCompleted && onComplete && (
         <button 

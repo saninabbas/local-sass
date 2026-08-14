@@ -86,7 +86,7 @@ export const onRequest = async (context: any) => {
       if (!session) return null;
 
       const user = await env.DB.prepare(
-        "SELECT id, name, email FROM users WHERE id = ?"
+        "SELECT id, name, email, subscription_status FROM users WHERE id = ?"
       ).bind(session.user_id).first();
 
       return user;
@@ -118,17 +118,31 @@ export const onRequest = async (context: any) => {
         }
 
         const extractor = new Extractor();
+        extractor.httpStatus = websiteResponse.status;
+        extractor.isHttps = websiteUrl.startsWith('https');
+        extractor.securityHeaders = {
+          'strict-transport-security': websiteResponse.headers.get('strict-transport-security') || '',
+          'x-content-type-options': websiteResponse.headers.get('x-content-type-options') || '',
+          'x-frame-options': websiteResponse.headers.get('x-frame-options') || ''
+        };
+
         const rewriter = new HTMLRewriter()
+          .on('html', extractor.handlers.html)
           .on('title', extractor.handlers.title)
           .on('meta', extractor.handlers.meta)
+          .on('link', extractor.handlers.link)
           .on('h1', extractor.handlers.h1)
+          .on('h2', extractor.handlers.h2)
+          .on('h3', extractor.handlers.h3)
           .on('h1, h2, h3, h4, h5, h6', extractor.handlers.heading)
           .on('script', extractor.handlers.script)
-          .on('a', extractor.handlers.a);
+          .on('a', extractor.handlers.a)
+          .on('img', extractor.handlers.img)
+          .on('body', extractor.handlers.body);
 
         await rewriter.transform(websiteResponse).text(); // consumes the stream
 
-        const scores = computeScores(extractor, websiteUrl, business.city);
+        const scores = computeScores(extractor, websiteUrl, business);
 
         let aiResult;
         try {
@@ -141,17 +155,27 @@ export const onRequest = async (context: any) => {
 
         // Save Results
         const scoreId = generateId('score');
+        
+        // Fetch previous score
+        const previousScoreRow = await env.DB.prepare(
+          "SELECT overall_score FROM growth_scores WHERE business_id = ? ORDER BY created_at DESC LIMIT 1"
+        ).bind(business.id).first();
+        
+        const previousScore = previousScoreRow ? previousScoreRow.overall_score : null;
+        const scoreChange = previousScore ? scores.overall - (previousScore as number) : 0;
+
         await env.DB.prepare(
           `INSERT INTO growth_scores 
-           (id, audit_id, business_id, overall_score, seo_score, reviews_score, website_score, visibility_score, previous_score, score_change) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           (id, audit_id, business_id, overall_score, seo_score, reviews_score, website_score, visibility_score, previous_score, score_change, technical_score, onpage_score, local_score, content_score, performance_score, mobile_score, security_score) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).bind(
-          scoreId, auditId, business.id, scores.overall, scores.seo, -1, scores.website, scores.visibility, null, 0
+          scoreId, auditId, business.id, scores.overall, scores.seo, -1, scores.website, scores.visibility, previousScore, scoreChange,
+          scores.technical, scores.onpage, scores.local, scores.content, scores.performance, scores.mobile, scores.security
         ).run();
 
         // Save Recommendations
         const insertRec = env.DB.prepare(
-          "INSERT INTO recommendations (id, audit_id, business_id, priority, priority_color, title, description, impact, estimated_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+          "INSERT INTO recommendations (id, audit_id, business_id, priority, priority_color, title, description, impact, estimated_minutes, difficulty, seo_impact, local_visibility_impact, conversion_impact, business_outcome) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
         
         const batch = aiResult.recommendations.map((rec: any) => {
@@ -165,7 +189,12 @@ export const onRequest = async (context: any) => {
             rec.title,
             rec.description,
             rec.impact || 'medium',
-            rec.estimatedMinutes || 15
+            rec.estimatedMinutes || 15,
+            rec.difficulty || 'Medium',
+            rec.seo_impact || 'Medium',
+            rec.local_visibility_impact || 'Medium',
+            rec.conversion_impact || 'Medium',
+            rec.business_outcome || ''
           );
         });
         
@@ -295,7 +324,7 @@ export const onRequest = async (context: any) => {
         ).bind(sessionId, user.id).run();
 
         const cookie = `session_id=${sessionId}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
-        return jsonResponse({ success: true, data: { id: user.id, name: user.name, email: user.email } }, 200, { 'Set-Cookie': cookie });
+        return jsonResponse({ success: true, data: { id: user.id, name: user.name, email: user.email, subscription_status: user.subscription_status || 'free' } }, 200, { 'Set-Cookie': cookie });
       }
 
       // --- AUTH: 2FA VERIFY ---
@@ -320,7 +349,7 @@ export const onRequest = async (context: any) => {
         ).bind(newSess, user.id).run();
 
         const cookie = `session_id=${newSess}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
-        return jsonResponse({ success: true, data: { id: user.id, name: user.name, email: user.email } }, 200, { 'Set-Cookie': cookie });
+        return jsonResponse({ success: true, data: { id: user.id, name: user.name, email: user.email, subscription_status: user.subscription_status || 'free' } }, 200, { 'Set-Cookie': cookie });
       }
 
       // --- AUTH: LOGOUT ---
@@ -604,12 +633,18 @@ export const onRequest = async (context: any) => {
 
           const extractor = new Extractor();
           const rewriter = new HTMLRewriter()
+            .on('html', extractor.handlers.html)
             .on('title', extractor.handlers.title)
             .on('meta', extractor.handlers.meta)
+            .on('link', extractor.handlers.link)
             .on('h1', extractor.handlers.h1)
+            .on('h2', extractor.handlers.h2)
+            .on('h3', extractor.handlers.h3)
             .on('h1, h2, h3, h4, h5, h6', extractor.handlers.heading)
             .on('script', extractor.handlers.script)
-            .on('a', extractor.handlers.a);
+            .on('a', extractor.handlers.a)
+            .on('img', extractor.handlers.img)
+            .on('body', extractor.handlers.body);
 
           await rewriter.transform(websiteResponse).text();
 
@@ -691,31 +726,48 @@ export const onRequest = async (context: any) => {
           }
 
           const myExtractor = new Extractor();
+          myExtractor.httpStatus = myRes.value.status;
+          myExtractor.isHttps = (business.website_url as string).startsWith('https');
+          
           const compExtractor = new Extractor();
+          compExtractor.httpStatus = compRes.value.status;
+          compExtractor.isHttps = payload.competitorUrl.startsWith('https');
 
           const myRewriter = new HTMLRewriter()
+            .on('html', myExtractor.handlers.html)
             .on('title', myExtractor.handlers.title)
             .on('meta', myExtractor.handlers.meta)
+            .on('link', myExtractor.handlers.link)
             .on('h1', myExtractor.handlers.h1)
+            .on('h2', myExtractor.handlers.h2)
+            .on('h3', myExtractor.handlers.h3)
             .on('h1, h2, h3, h4, h5, h6', myExtractor.handlers.heading)
             .on('script', myExtractor.handlers.script)
-            .on('a', myExtractor.handlers.a);
+            .on('a', myExtractor.handlers.a)
+            .on('img', myExtractor.handlers.img)
+            .on('body', myExtractor.handlers.body);
 
           const compRewriter = new HTMLRewriter()
+            .on('html', compExtractor.handlers.html)
             .on('title', compExtractor.handlers.title)
             .on('meta', compExtractor.handlers.meta)
+            .on('link', compExtractor.handlers.link)
             .on('h1', compExtractor.handlers.h1)
+            .on('h2', compExtractor.handlers.h2)
+            .on('h3', compExtractor.handlers.h3)
             .on('h1, h2, h3, h4, h5, h6', compExtractor.handlers.heading)
             .on('script', compExtractor.handlers.script)
-            .on('a', compExtractor.handlers.a);
+            .on('a', compExtractor.handlers.a)
+            .on('img', compExtractor.handlers.img)
+            .on('body', compExtractor.handlers.body);
 
           await Promise.all([
             myRewriter.transform(myRes.value).text(),
             compRewriter.transform(compRes.value).text()
           ]);
 
-          const myScores = computeScores(myExtractor, business.website_url as string, (business.city as string) || '');
-          const compScores = computeScores(compExtractor, payload.competitorUrl, (business.city as string) || '');
+          const myScores = computeScores(myExtractor, business.website_url as string, business);
+          const compScores = computeScores(compExtractor, payload.competitorUrl, business);
 
           // Get AI strategy
           let aiStrategy = null;
@@ -751,72 +803,7 @@ export const onRequest = async (context: any) => {
         }
       }
 
-      // --- BACKGROUND CRON AUDITS ---
-      if (url.pathname === '/api/cron/run-audits' && request.method === 'POST') {
-        const authHeader = request.headers.get('Authorization');
-        const expectedSecret = env.CRON_SECRET;
 
-        // Security: Prevent unauthorized execution
-        if (!expectedSecret || authHeader !== `Bearer ${expectedSecret}`) {
-          return errorResponse("Unauthorized cron request", 401);
-        }
-
-        try {
-          const { fetchWithTimeout, Extractor, computeScores } = await import('./auditEngine');
-          
-          // Get all businesses with a website
-          const { results: businesses } = await env.DB.prepare(
-            "SELECT id, website_url, city FROM businesses WHERE website_url IS NOT NULL"
-          ).all();
-
-          const auditResults = [];
-
-          for (const business of businesses) {
-            try {
-              const websiteResponse = await fetchWithTimeout(business.website_url as string, 5000);
-              
-              if (websiteResponse.ok && websiteResponse.headers.get('content-type')?.includes('text/html')) {
-                const extractor = new Extractor();
-                const rewriter = new HTMLRewriter()
-                  .on('title', extractor.handlers.title)
-                  .on('meta', extractor.handlers.meta)
-                  .on('h1', extractor.handlers.h1)
-                  .on('h1, h2, h3, h4, h5, h6', extractor.handlers.heading)
-                  .on('script', extractor.handlers.script)
-                  .on('a', extractor.handlers.a);
-
-                await rewriter.transform(websiteResponse).text();
-
-                // Compute fresh scores
-                const scores = computeScores(extractor, business.website_url as string, (business.city as string) || '');
-                
-                // Save new scores to DB
-                await env.DB.prepare(`
-                  INSERT INTO growth_scores (business_id, overall_score, seo_score, local_visibility_score, website_score, reviews_score)
-                  VALUES (?, ?, ?, ?, ?, ?)
-                `).bind(
-                  business.id, 
-                  scores.overall, 
-                  scores.seo, 
-                  scores.visibility, 
-                  scores.website, 
-                  70 // Default placeholder for reviews
-                ).run();
-
-                auditResults.push({ id: business.id, status: 'success', scores });
-              } else {
-                auditResults.push({ id: business.id, status: 'failed', reason: 'Invalid response' });
-              }
-            } catch (error: any) {
-              auditResults.push({ id: business.id, status: 'failed', reason: error.message });
-            }
-          }
-
-          return jsonResponse({ success: true, processed: businesses.length, results: auditResults });
-        } catch (error: any) {
-          return errorResponse("Cron execution failed: " + error.message, 500);
-        }
-      }
 
       // --- DASHBOARD ---
       if (url.pathname === '/api/dashboard' && request.method === 'GET') {
@@ -881,9 +868,16 @@ export const onRequest = async (context: any) => {
               reviews: growthScore.reviews_score === -1 ? null : growthScore.reviews_score,
               website: growthScore.website_score,
               visibility: growthScore.visibility_score,
+              technical: growthScore.technical_score,
+              onpage: growthScore.onpage_score,
+              local: growthScore.local_score,
+              content: growthScore.content_score,
+              performance: growthScore.performance_score,
+              mobile: growthScore.mobile_score,
+              security: growthScore.security_score,
               previousScore: growthScore.previous_score,
               change: growthScore.score_change,
-              progressHistory: [72, 73, 74, 76, 78],
+              progressHistory: [72, 73, 74, 76, 78], // Still mocked for history chart UI
               lastAudited: new Date((growthScore.created_at as string) + 'Z').toLocaleString()
             },
             recommendations: recommendations.map((r: any) => ({
@@ -895,7 +889,12 @@ export const onRequest = async (context: any) => {
               impact: r.impact,
               estimatedTime: r.estimated_minutes,
               status: r.status,
-              actionLink: r.action_link
+              actionLink: r.action_link,
+              difficulty: r.difficulty,
+              seoImpact: r.seo_impact,
+              localImpact: r.local_visibility_impact,
+              conversionImpact: r.conversion_impact,
+              businessOutcome: r.business_outcome
             }))
           }
         });
@@ -927,7 +926,12 @@ export const onRequest = async (context: any) => {
             impact: r.impact,
             estimatedTime: r.estimated_minutes,
             status: r.status,
-            actionLink: r.action_link
+            actionLink: r.action_link,
+            difficulty: r.difficulty,
+            seoImpact: r.seo_impact,
+            localImpact: r.local_visibility_impact,
+            conversionImpact: r.conversion_impact,
+            businessOutcome: r.business_outcome
           }))
         });
       }
@@ -1226,6 +1230,376 @@ export const onRequest = async (context: any) => {
         ).bind(id, user.id, source_url, target_url, anchor_text, status || 'Active', notes || '').run();
 
         return jsonResponse({ success: true, data: { id } });
+      }
+
+      // --- REVIEWS: CONNECTION STATUS ---
+      if (url.pathname === '/api/reviews/status' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const connection = await env.DB.prepare(
+          "SELECT * FROM review_connections WHERE user_id = ? AND provider = 'google_business' LIMIT 1"
+        ).bind(user.id as string).first();
+
+        return jsonResponse({ success: true, data: { connected: !!connection && connection.status === 'connected', connection: connection || null } });
+      }
+
+      // --- REVIEWS: LIST ---
+      if (url.pathname === '/api/reviews' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const { results: reviews } = await env.DB.prepare(
+          "SELECT * FROM reviews WHERE user_id = ? ORDER BY created_at DESC"
+        ).bind(user.id as string).all();
+
+        // Calculate stats
+        const totalReviews = reviews.length;
+        let avgRating = 0;
+        let respondedCount = 0;
+        if (totalReviews > 0) {
+          avgRating = reviews.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / totalReviews;
+          respondedCount = reviews.filter((r: any) => r.owner_reply && r.owner_reply.length > 0).length;
+        }
+        const responseRate = totalReviews > 0 ? Math.round((respondedCount / totalReviews) * 100) : 0;
+
+        return jsonResponse({
+          success: true,
+          data: {
+            reviews,
+            stats: {
+              avgRating: Math.round(avgRating * 10) / 10,
+              totalReviews,
+              responseRate
+            }
+          }
+        });
+      }
+
+      // --- REVIEWS: AI REPLY ---
+      if (url.pathname === '/api/reviews/reply' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        if (!payload.reviewId || !payload.reviewText || !payload.rating) {
+          return errorResponse("Missing required fields: reviewId, reviewText, rating", 400);
+        }
+
+        // Verify review belongs to user
+        const review = await env.DB.prepare(
+          "SELECT * FROM reviews WHERE id = ? AND user_id = ?"
+        ).bind(payload.reviewId, user.id as string).first();
+
+        if (!review) return errorResponse("Review not found", 404);
+
+        if (!env.NVIDIA_API_KEY) {
+          return errorResponse("AI is not configured on the server.", 500);
+        }
+
+        try {
+          const business = await env.DB.prepare(
+            "SELECT name FROM businesses WHERE user_id = ? LIMIT 1"
+          ).bind(user.id as string).first();
+
+          const { generateReviewReplyWithNVIDIA } = await import('./auditEngine');
+          const reply = await generateReviewReplyWithNVIDIA(
+            env.NVIDIA_API_KEY,
+            (business?.name as string) || 'Our Business',
+            payload.reviewerName || 'Customer',
+            payload.rating,
+            payload.reviewText
+          );
+
+          // Save the reply to the database
+          await env.DB.prepare(
+            "UPDATE reviews SET owner_reply = ?, reply_status = 'draft' WHERE id = ? AND user_id = ?"
+          ).bind(reply, payload.reviewId, user.id as string).run();
+
+          return jsonResponse({ success: true, data: { reply } });
+        } catch (error: any) {
+          return errorResponse("Failed to generate AI reply: " + error.message, 500);
+        }
+      }
+
+      // --- REVIEWS: SAVE REPLY ---
+      if (url.pathname === '/api/reviews/save-reply' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        if (!payload.reviewId || !payload.reply) {
+          return errorResponse("Missing required fields: reviewId, reply", 400);
+        }
+
+        const result = await env.DB.prepare(
+          "UPDATE reviews SET owner_reply = ?, reply_status = 'saved' WHERE id = ? AND user_id = ?"
+        ).bind(payload.reply, payload.reviewId, user.id as string).run();
+
+        if (result.meta.changes === 0) {
+          return errorResponse("Review not found or unauthorized", 404);
+        }
+
+        return jsonResponse({ success: true, message: "Reply saved successfully" });
+      }
+
+      // --- KEYWORDS & RANKINGS ---
+      if (url.pathname === '/api/keywords' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const business = await env.DB.prepare("SELECT id FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        if (!business) return jsonResponse({ success: true, data: [] });
+
+        const { results } = await env.DB.prepare("SELECT * FROM keywords WHERE business_id = ? ORDER BY created_at DESC").bind(business.id).all();
+        return jsonResponse({ success: true, data: results });
+      }
+
+      if (url.pathname === '/api/keywords' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const business = await env.DB.prepare("SELECT id FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        if (!business) return errorResponse("Business not found", 404);
+
+        const payload = await request.json() as any;
+        if (!payload.keyword) return errorResponse("Keyword is required", 400);
+
+        const id = crypto.randomUUID();
+        await env.DB.prepare(
+          "INSERT INTO keywords (id, business_id, keyword, location, intent) VALUES (?, ?, ?, ?, ?)"
+        ).bind(id, business.id, payload.keyword, payload.location || '', payload.intent || '').run();
+
+        // Trigger real SERP fetch immediately on creation
+        let position = null;
+        if (env.SERP_API_KEY && business.website_url) {
+          const { fetchSERPData } = await import('./rankingEngine');
+          // Extract just the domain for searching
+          const domainMatch = (business.website_url as string).replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+          const result = await fetchSERPData(payload.keyword, payload.location || business.city || '', domainMatch, env.SERP_API_KEY);
+          position = result.position;
+
+          if (position !== null) {
+            await env.DB.prepare(
+              "INSERT INTO keyword_rankings (id, keyword_id, business_id, position, checked_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)"
+            ).bind(crypto.randomUUID(), id, business.id, position).run();
+          }
+        }
+
+        return jsonResponse({ success: true, data: { id, position } });
+      }
+
+      if (url.pathname.startsWith('/api/keywords/') && request.method === 'DELETE') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const id = url.pathname.split('/').pop();
+        if (!id) return errorResponse("Invalid ID", 400);
+
+        const business = await env.DB.prepare("SELECT id FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        if (!business) return errorResponse("Business not found", 404);
+
+        await env.DB.prepare("DELETE FROM keywords WHERE id = ? AND business_id = ?").bind(id, business.id).run();
+        return jsonResponse({ success: true });
+      }
+
+      if (url.pathname === '/api/keywords/refresh' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const business = await env.DB.prepare("SELECT * FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        if (!business || !business.website_url) return errorResponse("Business or website not found", 404);
+
+        if (!env.SERP_API_KEY) {
+          return errorResponse("SERP API is not configured", 503);
+        }
+
+        const { results: keywords } = await env.DB.prepare(
+          "SELECT * FROM keywords WHERE business_id = ?"
+        ).bind(business.id as string).all();
+
+        const { fetchSERPData } = await import('./rankingEngine');
+        const domainMatch = (business.website_url as string).replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+        
+        const refreshed = [];
+        for (const kw of keywords) {
+          try {
+            const result = await fetchSERPData(kw.keyword as string, (kw.location || business.city) as string, domainMatch, env.SERP_API_KEY);
+            if (result.position !== null) {
+              await env.DB.prepare(
+                "INSERT INTO keyword_rankings (id, keyword_id, business_id, position, checked_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)"
+              ).bind(crypto.randomUUID(), kw.id, business.id, result.position).run();
+              refreshed.push({ id: kw.id, position: result.position });
+            }
+          } catch (e) {
+            console.error(`Error refreshing keyword ${kw.keyword}:`, e);
+          }
+        }
+
+        return jsonResponse({ success: true, refreshed: refreshed.length });
+      }
+
+      if (url.pathname === '/api/rankings/visibility' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const business = await env.DB.prepare("SELECT id FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        if (!business) return jsonResponse({ success: true, data: { score: 0, history: [] } });
+
+        const { getRankingHistory, calculateLocalVisibilityScore } = await import('./rankingEngine');
+        const history = await getRankingHistory(env.DB, business.id as string);
+        const score = calculateLocalVisibilityScore(history);
+
+        return jsonResponse({ success: true, data: { score, history } });
+      }
+
+      // --- GOOGLE BUSINESS PROFILE ---
+      if (url.pathname === '/api/auth/googleBusiness' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        if (!env.GOOGLE_CLIENT_ID) return errorResponse("Google Client ID not configured", 500);
+
+        const { getGoogleOAuthUrl } = await import('./googleBusiness');
+        const redirectUri = `${url.origin}/api/auth/googleBusiness/callback`;
+        const state = encodeURIComponent(JSON.stringify({ userId: user.id }));
+        const authUrl = getGoogleOAuthUrl(env.GOOGLE_CLIENT_ID, redirectUri, state);
+
+        return Response.redirect(authUrl, 302);
+      }
+
+      if (url.pathname === '/api/auth/googleBusiness/callback' && request.method === 'GET') {
+        const code = url.searchParams.get('code');
+        const stateStr = url.searchParams.get('state');
+        if (!code || !stateStr) return errorResponse("Missing parameters", 400);
+
+        try {
+          const state = JSON.parse(decodeURIComponent(stateStr));
+          const userId = state.userId;
+          if (!userId) throw new Error("Invalid state");
+
+          const redirectUri = `${url.origin}/api/auth/googleBusiness/callback`;
+          const { exchangeGoogleCodeForTokens } = await import('./googleBusiness');
+          
+          const tokens = await exchangeGoogleCodeForTokens(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, code, redirectUri);
+          
+          const id = crypto.randomUUID();
+          await env.DB.prepare(`
+            INSERT INTO integrations (id, user_id, provider, access_token, refresh_token, status)
+            VALUES (?, ?, 'google_business', ?, ?, 'active')
+            ON CONFLICT(user_id, provider) DO UPDATE SET
+            access_token = excluded.access_token,
+            refresh_token = COALESCE(excluded.refresh_token, integrations.refresh_token),
+            status = 'active',
+            updated_at = CURRENT_TIMESTAMP
+          `).bind(id, userId, tokens.access_token, tokens.refresh_token || null).run();
+
+          return Response.redirect(`${url.origin}/dashboard/reviews?integration=success`, 302);
+        } catch (e: any) {
+          console.error("Callback error", e);
+          return Response.redirect(`${url.origin}/dashboard/reviews?integration=error`, 302);
+        }
+      }
+
+      if (url.pathname === '/api/reviews/sync' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const connection = await env.DB.prepare(
+          "SELECT access_token FROM integrations WHERE user_id = ? AND provider = 'google_business' AND status = 'active'"
+        ).bind(user.id as string).first();
+
+        if (!connection || !connection.access_token) {
+          return errorResponse("Google Business Profile not connected", 400);
+        }
+
+        try {
+          const { syncGoogleReviews, fetchGoogleLocations } = await import('./googleBusiness');
+          
+          // 1. Fetch authorized locations
+          const locations = await fetchGoogleLocations(connection.access_token as string);
+          if (!locations || locations.length === 0) {
+            return errorResponse("No Google Business locations found for this account", 404);
+          }
+          
+          // 2. Default to the first location for MVP
+          const locationName = locations[0].name;
+          
+          // 3. Sync reviews
+          const result = await syncGoogleReviews(env.DB, user.id as string, locationName, connection.access_token as string);
+          
+          // 4. Upsert review connection status
+          await env.DB.prepare(`
+            INSERT INTO review_connections (id, user_id, provider, location_id, location_name, status, connected_at)
+            VALUES (?, ?, 'google_business', ?, ?, 'connected', CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id, provider) DO UPDATE SET 
+              status = 'connected',
+              location_id = excluded.location_id,
+              location_name = excluded.location_name,
+              connected_at = CURRENT_TIMESTAMP
+          `).bind(crypto.randomUUID(), user.id, locationName, locations[0].title || locationName).run();
+
+          return jsonResponse({ success: true, message: "Synced successfully", data: result });
+        } catch (e: any) {
+          console.error("Sync failed:", e);
+          return errorResponse("Sync failed: " + e.message, 500);
+        }
+      }
+
+      // --- AUTHORITY AI GENERATION ---
+      if (url.pathname === '/api/authority/generate-opportunities' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const business = await env.DB.prepare("SELECT * FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        if (!business) return errorResponse("Business not found", 404);
+
+        if (!env.NVIDIA_API_KEY) return errorResponse("AI is not configured", 500);
+
+        try {
+          const { generateOpportunities } = await import('./authorityEngine');
+          const opps = await generateOpportunities(
+            env.NVIDIA_API_KEY as string,
+            business.id as string,
+            business.name as string,
+            business.city as string,
+            env.SERP_API_KEY as string | undefined
+          );
+          
+          // Save them to DB
+          for (const opp of opps) {
+             const id = crypto.randomUUID();
+             const status = opp.verification_level === 'VERIFIED' ? 'Verified' : 'Prospect';
+             await env.DB.prepare(
+               "INSERT INTO authority_opportunities (id, user_id, name, url, type, difficulty, value, why_relevant, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             ).bind(id, user.id, opp.name, opp.url || '', opp.type, opp.difficulty, opp.value, opp.why_relevant, status).run();
+          }
+
+          return jsonResponse({ success: true, data: opps });
+        } catch (e: any) {
+          return errorResponse("Failed to generate opportunities: " + e.message, 500);
+        }
+      }
+
+      if (url.pathname === '/api/authority/generate-email' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        if (!payload.opportunityId || !payload.opportunityName || !payload.whyRelevant) {
+          return errorResponse("Missing required fields", 400);
+        }
+
+        if (!env.NVIDIA_API_KEY) return errorResponse("AI is not configured", 500);
+
+        try {
+          const { generateOutreachEmail } = await import('./authorityEngine');
+          const email = await generateOutreachEmail(env.NVIDIA_API_KEY, payload.opportunityId, payload.opportunityName, payload.whyRelevant);
+          
+          return jsonResponse({ success: true, data: email });
+        } catch (e: any) {
+          return errorResponse("Failed to generate email: " + e.message, 500);
+        }
       }
 
       // --- DEBUG ENV ---

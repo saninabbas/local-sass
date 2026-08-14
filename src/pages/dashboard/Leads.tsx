@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
 import { useAuth } from '../../contexts/AuthContext';
-import { fetchLeads } from '../../lib/api';
+import { fetchLeads, getBusiness } from '../../lib/api';
 import { Users, Copy, CheckCircle2, Link as LinkIcon, Download, Mail } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Link } from 'react-router-dom';
@@ -22,32 +22,41 @@ export function Leads() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [businessId, setBusinessId] = useState<string>('');
 
-  // Use the business ID attached to the user object (if available), or a fallback.
-  // In a full implementation, you would fetch the user's business object.
-  const businessId = (user as any)?.business_id || 'YOUR_BUSINESS_ID'; 
-
-  const embedCode = `<script src="https://local-sass.pages.dev/widget.js?id=${businessId}" async></script>`;
+  // Determine the widget base URL from current origin
+  const widgetBaseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://local-sass.pages.dev';
+  const embedCode = businessId 
+    ? `<script src="${widgetBaseUrl}/widget.js?id=${businessId}" async></script>` 
+    : '';
 
   useEffect(() => {
     if (isPro) {
-      loadLeads();
+      loadData();
     } else {
       setLoading(false);
     }
   }, [isPro]);
 
-  const loadLeads = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
-      const data = await fetchLeads();
-      setLeads(data || []);
+      // Fetch real business ID and leads in parallel
+      const [businessData, leadsData] = await Promise.all([
+        getBusiness().catch(() => null),
+        fetchLeads().catch(() => [])
+      ]);
+      if (businessData?.id) {
+        setBusinessId(businessData.id);
+      }
+      setLeads(leadsData || []);
     } catch (error) {
-      console.error("Failed to load leads", error);
+      console.error("Failed to load data", error);
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleCopy = () => {
     navigator.clipboard.writeText(embedCode);
@@ -124,9 +133,9 @@ export function Leads() {
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <code className="flex-1 bg-gray-50 border border-gray-200 rounded-lg p-3 w-full overflow-x-auto text-sm text-gray-700 whitespace-nowrap">
-                {embedCode}
+                {embedCode || 'Loading your widget code...'}
               </code>
-              <Button onClick={handleCopy} className="w-full sm:w-auto flex items-center gap-2 whitespace-nowrap">
+              <Button onClick={handleCopy} disabled={!embedCode} className="w-full sm:w-auto flex items-center gap-2 whitespace-nowrap">
                 {copied ? <CheckCircle2 size={16} /> : <Copy size={16} />}
                 {copied ? 'Copied' : 'Copy Code'}
               </Button>

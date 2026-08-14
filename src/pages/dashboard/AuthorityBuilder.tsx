@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
 import { fetchAuthorityOpportunities, fetchBacklinks } from '../../lib/api';
-import { Link2, Award, Zap, Building, Plus, AlertCircle, ArrowRight, ExternalLink } from 'lucide-react';
+import { Link2, Award, Zap, Building, Plus, AlertCircle, ArrowRight, ExternalLink, Check, Sparkles } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
 export function AuthorityBuilder() {
@@ -92,15 +92,39 @@ export function AuthorityBuilder() {
             </div>
           ) : (
             opportunities.map(opp => (
-              <div key={opp.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-4">
-                  <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 uppercase tracking-wide">
-                    {opp.type.replace('_', ' ')}
-                  </span>
-                  <span className="text-xs font-medium text-gray-500">{opp.difficulty} Difficulty</span>
+              <div key={opp.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col hover:shadow-md transition-shadow relative">
+                {opp.status === 'Prospect' && (
+                  <div className="absolute top-0 right-0 left-0 bg-amber-50 border-b border-amber-100 text-amber-700 text-[10px] uppercase font-bold text-center py-1 rounded-t-xl tracking-wider">
+                    Verify AI Prospect before contacting
+                  </div>
+                )}
+                <div className={`flex justify-between items-start mb-3 ${opp.status === 'Prospect' ? 'mt-4' : ''}`}>
+                  <div className="flex gap-2">
+                    <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 uppercase tracking-wide">
+                      {opp.type.replace('_', ' ')}
+                    </span>
+                    {opp.status === 'Verified' ? (
+                       <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-green-50 text-green-700 flex items-center gap-1">
+                         <Check size={12} /> Verified
+                       </span>
+                    ) : (
+                       <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600 flex items-center gap-1">
+                         <Sparkles size={12} /> AI Prospect
+                       </span>
+                    )}
+                  </div>
+                  <span className="text-xs font-medium text-gray-500">{opp.difficulty}</span>
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">{opp.name}</h3>
-                <p className="text-sm text-gray-600 mb-6 flex-1 line-clamp-3">{opp.why_relevant}</p>
+                
+                <h3 className="text-lg font-bold text-gray-900 mb-1">{opp.name}</h3>
+                {opp.url && (
+                  <a href={opp.url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline flex items-center gap-1 mb-2">
+                    {opp.url.replace(/^https?:\/\//, '').split('/')[0]} <ExternalLink size={10} />
+                  </a>
+                )}
+                
+                <p className="text-sm text-gray-600 mb-6 flex-1 line-clamp-3 mt-2">{opp.why_relevant}</p>
+                
                 <div className="pt-4 border-t border-gray-100 flex items-center justify-between mt-auto">
                   <div className="flex items-center gap-1 text-sm font-medium">
                     <span className="text-gray-500">Value:</span>

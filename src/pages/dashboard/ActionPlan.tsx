@@ -11,6 +11,7 @@ export function ActionPlan() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [activeTab, setActiveTab] = useState<'todo' | 'completed'>('todo');
+  const [selectedGoal, setSelectedGoal] = useState<string>('All');
 
   const loadData = async () => {
     setIsLoading(true);
@@ -63,9 +64,25 @@ export function ActionPlan() {
 
   return (
     <DashboardLayout>
-      <div className="mb-8 mt-4">
-        <h1 className="text-3xl font-bold text-primary mb-2">AI Action Plan</h1>
-        <p className="text-secondary">Manage and track your personalized growth recommendations.</p>
+      <div className="mb-8 mt-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-primary mb-2">AI Action Plan</h1>
+          <p className="text-secondary">Manage and track your personalized growth recommendations.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <label htmlFor="goal-selector" className="text-sm font-semibold text-gray-700">Goal:</label>
+          <select 
+            id="goal-selector"
+            value={selectedGoal}
+            onChange={(e) => setSelectedGoal(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="All">All Goals</option>
+            <option value="More Calls">More Calls</option>
+            <option value="More Leads">More Leads</option>
+            <option value="More Reviews">More Reviews</option>
+          </select>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -107,6 +124,11 @@ export function ActionPlan() {
                   priorityColor={rec.priorityColor}
                   impact={rec.impact}
                   estimatedTime={rec.estimatedTime}
+                  difficulty={(rec as any).difficulty}
+                  seoImpact={(rec as any).seo_impact || (rec as any).seoImpact}
+                  localImpact={(rec as any).local_impact || (rec as any).localImpact}
+                  conversionImpact={(rec as any).conversion_impact || (rec as any).conversionImpact}
+                  businessOutcome={(rec as any).business_outcome || (rec as any).businessOutcome}
                   status={rec.status}
                   onComplete={handleComplete}
                 />
@@ -136,6 +158,11 @@ export function ActionPlan() {
                   priorityColor={rec.priorityColor}
                   impact={rec.impact}
                   estimatedTime={rec.estimatedTime}
+                  difficulty={(rec as any).difficulty}
+                  seoImpact={(rec as any).seo_impact || (rec as any).seoImpact}
+                  localImpact={(rec as any).local_impact || (rec as any).localImpact}
+                  conversionImpact={(rec as any).conversion_impact || (rec as any).conversionImpact}
+                  businessOutcome={(rec as any).business_outcome || (rec as any).businessOutcome}
                   status={rec.status}
                 />
               ))

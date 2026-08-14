@@ -35,6 +35,11 @@ export interface Recommendation {
   estimatedTime: string;
   status: 'pending' | 'in-progress' | 'completed';
   actionLink: string;
+  difficulty?: string;
+  seoImpact?: string;
+  localImpact?: string;
+  conversionImpact?: string;
+  businessOutcome?: string;
 }
 
 export interface Audit {

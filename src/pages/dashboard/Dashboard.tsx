@@ -165,6 +165,11 @@ export function Dashboard() {
                 priorityColor={rec.priorityColor}
                 impact={rec.impact}
                 estimatedTime={rec.estimatedTime}
+                difficulty={rec.difficulty}
+                seoImpact={rec.seoImpact}
+                localImpact={rec.localImpact}
+                conversionImpact={rec.conversionImpact}
+                businessOutcome={rec.businessOutcome}
               />
             ))}
           </div>

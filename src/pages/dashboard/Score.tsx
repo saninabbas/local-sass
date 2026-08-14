@@ -86,6 +86,19 @@ export function Score() {
       </div>
 
       <div className="mb-8">
+        <h3 className="text-xl font-bold text-primary mb-4">Advanced Audit Metrics</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          <ScoreMetric label="Technical SEO" score={scores.technical_score} />
+          <ScoreMetric label="On-Page SEO" score={scores.onpage_score} />
+          <ScoreMetric label="Local Signals" score={scores.local_score} />
+          <ScoreMetric label="Content Quality" score={scores.content_score} />
+          <ScoreMetric label="Performance" score={scores.performance_score} />
+          <ScoreMetric label="Mobile UX" score={scores.mobile_score} />
+          <ScoreMetric label="Security" score={scores.security_score} />
+        </div>
+      </div>
+
+      <div className="mb-8">
         <h3 className="text-xl font-bold text-primary mb-4">Recommended Actions</h3>
         {recommendations && recommendations.length > 0 ? (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm divide-y divide-gray-100">

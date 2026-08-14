@@ -49,7 +49,7 @@ export function HeroSection() {
                   <h3 className="text-sm font-semibold text-secondary uppercase tracking-wider mb-1">Good morning</h3>
                   <p className="text-xl font-bold text-primary flex items-center gap-3">
                     ABC Dental 
-                    <span className="text-sm font-medium px-2.5 py-0.5 bg-gray-100 rounded-md text-secondary">Islamabad</span>
+                    <span className="text-sm font-medium px-2.5 py-0.5 bg-gray-100 rounded-md text-secondary">United States</span>
                   </p>
                 </div>
                 <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white font-bold text-base">
