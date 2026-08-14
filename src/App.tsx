@@ -14,6 +14,7 @@ import { Privacy } from './pages/marketing/Privacy';
 import { Terms } from './pages/marketing/Terms';
 import { Resources } from './pages/marketing/Resources';
 import { PublicReport } from './pages/report/PublicReport';
+import { AdminRoute } from './pages/admin/AdminRoute';
 
 import { DashboardLayout } from './components/dashboard/DashboardLayout';
 
@@ -75,6 +76,11 @@ function App() {
           <Route path="/verify" element={<VerifyEmail />} />
           <Route path="/api/auth/verify" element={<VerifyEmail />} />
           <Route path="/report/:id" element={<PublicReport />} />
+          
+          {/* Admin Routes */}
+          <Route path="/admin" element={<AdminRoute />} />
+          <Route path="/admin/login" element={<AdminRoute />} />
+          <Route path="/admin/dashboard" element={<AdminRoute />} />
           
           <Route element={<ProtectedRoute />}>
             <Route path="/onboarding" element={<Onboarding />} />

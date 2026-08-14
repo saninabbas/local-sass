@@ -73,6 +73,28 @@ export const onRequest = async (context: any) => {
     const errorResponse = (error: string, status = 500) =>
       jsonResponse({ success: false, error }, status);
 
+    // Helper to ensure admin user exists and schema is up to date
+    const ensureAdminUser = async () => {
+      try {
+        await env.DB.prepare("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'").run().catch(() => {});
+        const adminEmail = "saninabbas@gmail.com";
+        const adminPasswordHash = await hashPassword("Pakistan@2026");
+        const existing = await env.DB.prepare("SELECT id, role FROM users WHERE email = ?").bind(adminEmail).first();
+        if (!existing) {
+          const adminId = "usr_admin_sanin";
+          await env.DB.prepare(
+            "INSERT INTO users (id, name, email, password_hash, email_verified, role, subscription_status) VALUES (?, ?, ?, ?, 1, 'admin', 'enterprise')"
+          ).bind(adminId, "Sanin Abbas", adminEmail, adminPasswordHash).run();
+        } else {
+          await env.DB.prepare(
+            "UPDATE users SET role = 'admin', email_verified = 1, password_hash = ? WHERE email = ?"
+          ).bind(adminPasswordHash, adminEmail).run();
+        }
+      } catch (e) {
+        console.error("ensureAdminUser error:", e);
+      }
+    };
+
     // Helper to get authenticated user
     const authenticate = async () => {
       const cookies = parseCookies(request.headers.get('Cookie'));
@@ -85,9 +107,17 @@ export const onRequest = async (context: any) => {
 
       if (!session) return null;
 
-      const user = await env.DB.prepare(
-        "SELECT id, name, email, subscription_status FROM users WHERE id = ?"
-      ).bind(session.user_id).first();
+      let user: any = await env.DB.prepare(
+        "SELECT id, name, email, subscription_status, role FROM users WHERE id = ?"
+      ).bind(session.user_id).first().catch(async () => {
+        return await env.DB.prepare(
+          "SELECT id, name, email, subscription_status FROM users WHERE id = ?"
+        ).bind(session.user_id).first();
+      });
+
+      if (user && !user.role && user.email === 'saninabbas@gmail.com') {
+        user.role = 'admin';
+      }
 
       return user;
     };
@@ -248,7 +278,9 @@ export const onRequest = async (context: any) => {
           await env.DB.prepare("CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at DATETIME NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))").run().catch(() => {});
           await env.DB.prepare("CREATE TABLE IF NOT EXISTS leads (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, name TEXT, email TEXT NOT NULL, website TEXT, captured_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))").run().catch(() => {});
           
-          return jsonResponse({ success: true, message: "Database schema updated successfully!" });
+          await ensureAdminUser();
+
+          return jsonResponse({ success: true, message: "Database schema updated and admin seeded successfully!" });
         } catch (e: any) {
           return jsonResponse({ success: false, error: e.message });
         }
@@ -301,6 +333,10 @@ export const onRequest = async (context: any) => {
       if (url.pathname === '/api/auth/login' && request.method === 'POST') {
         const { email, password } = await request.json() as any;
 
+        if (email === 'saninabbas@gmail.com') {
+          await ensureAdminUser();
+        }
+
         const user = await env.DB.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
         if (!user) return errorResponse("Invalid credentials", 401);
         if (!user.email_verified) return errorResponse("Please verify your email first", 403);
@@ -324,7 +360,16 @@ export const onRequest = async (context: any) => {
         ).bind(sessionId, user.id).run();
 
         const cookie = `session_id=${sessionId}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
-        return jsonResponse({ success: true, data: { id: user.id, name: user.name, email: user.email, subscription_status: user.subscription_status || 'free' } }, 200, { 'Set-Cookie': cookie });
+        return jsonResponse({ 
+          success: true, 
+          data: { 
+            id: user.id, 
+            name: user.name, 
+            email: user.email, 
+            role: user.role || (user.email === 'saninabbas@gmail.com' ? 'admin' : 'user'),
+            subscription_status: user.subscription_status || 'free' 
+          } 
+        }, 200, { 'Set-Cookie': cookie });
       }
 
       // --- AUTH: 2FA VERIFY ---
@@ -1600,6 +1645,277 @@ export const onRequest = async (context: any) => {
         } catch (e: any) {
           return errorResponse("Failed to generate email: " + e.message, 500);
         }
+      }
+
+      // --- ADMIN: STATS ---
+      if (url.pathname === '/api/admin/stats' && request.method === 'GET') {
+        await ensureAdminUser();
+        const user = await authenticate();
+        if (!user || user.role !== 'admin') {
+          return errorResponse("Forbidden: Admin access required", 403);
+        }
+
+        const totalUsersRow = await env.DB.prepare("SELECT COUNT(*) as c FROM users").first<{ c: number }>();
+        const verifiedUsersRow = await env.DB.prepare("SELECT COUNT(*) as c FROM users WHERE email_verified = 1").first<{ c: number }>();
+        const unverifiedUsersRow = await env.DB.prepare("SELECT COUNT(*) as c FROM users WHERE email_verified = 0 OR email_verified IS NULL").first<{ c: number }>();
+        const totalBusinessesRow = await env.DB.prepare("SELECT COUNT(*) as c FROM businesses").first<{ c: number }>();
+        const totalAuditsRow = await env.DB.prepare("SELECT COUNT(*) as c FROM audits").first<{ c: number }>();
+        
+        let totalLeads = 0;
+        try {
+          const leadsRow = await env.DB.prepare("SELECT COUNT(*) as c FROM leads").first<{ c: number }>();
+          totalLeads = leadsRow?.c || 0;
+        } catch {
+          totalLeads = 0;
+        }
+
+        let recent7d = 0;
+        let recent30d = 0;
+        try {
+          const r7 = await env.DB.prepare("SELECT COUNT(*) as c FROM users WHERE created_at >= datetime('now', '-7 days')").first<{ c: number }>();
+          const r30 = await env.DB.prepare("SELECT COUNT(*) as c FROM users WHERE created_at >= datetime('now', '-30 days')").first<{ c: number }>();
+          recent7d = r7?.c || 0;
+          recent30d = r30?.c || 0;
+        } catch {
+          recent7d = 0;
+          recent30d = 0;
+        }
+
+        const freeRow = await env.DB.prepare("SELECT COUNT(*) as c FROM users WHERE subscription_status = 'free' OR subscription_status IS NULL OR subscription_status = ''").first<{ c: number }>();
+        const starterRow = await env.DB.prepare("SELECT COUNT(*) as c FROM users WHERE subscription_status = 'starter'").first<{ c: number }>();
+        const proRow = await env.DB.prepare("SELECT COUNT(*) as c FROM users WHERE subscription_status = 'pro'").first<{ c: number }>();
+        const enterpriseRow = await env.DB.prepare("SELECT COUNT(*) as c FROM users WHERE subscription_status = 'enterprise'").first<{ c: number }>();
+
+        return jsonResponse({
+          success: true,
+          data: {
+            totalUsers: totalUsersRow?.c || 0,
+            verifiedUsers: verifiedUsersRow?.c || 0,
+            unverifiedUsers: unverifiedUsersRow?.c || 0,
+            totalBusinesses: totalBusinessesRow?.c || 0,
+            totalAudits: totalAuditsRow?.c || 0,
+            totalLeads: totalLeads,
+            recentSignups7d: recent7d,
+            recentSignups30d: recent30d,
+            planBreakdown: {
+              free: freeRow?.c || 0,
+              starter: starterRow?.c || 0,
+              pro: proRow?.c || 0,
+              enterprise: enterpriseRow?.c || 0
+            }
+          }
+        });
+      }
+
+      // --- ADMIN: USERS LIST ---
+      if (url.pathname === '/api/admin/users' && request.method === 'GET') {
+        await ensureAdminUser();
+        const user = await authenticate();
+        if (!user || user.role !== 'admin') {
+          return errorResponse("Forbidden: Admin access required", 403);
+        }
+
+        const queryParam = url.searchParams.get('q')?.toLowerCase() || '';
+        const planParam = url.searchParams.get('plan') || '';
+        const roleParam = url.searchParams.get('role') || '';
+
+        const usersResult = await env.DB.prepare(`
+          SELECT 
+            u.id,
+            u.name,
+            u.email,
+            COALESCE(u.role, 'user') as role,
+            COALESCE(u.subscription_status, 'free') as subscription_status,
+            COALESCE(u.email_verified, 0) as email_verified,
+            u.created_at,
+            (SELECT COUNT(*) FROM businesses b WHERE b.user_id = u.id) as businessCount,
+            (SELECT COUNT(*) FROM audits a JOIN businesses b ON a.business_id = b.id WHERE b.user_id = u.id) as auditCount,
+            (SELECT name FROM businesses b WHERE b.user_id = u.id LIMIT 1) as businessName,
+            (SELECT website_url FROM businesses b WHERE b.user_id = u.id LIMIT 1) as businessUrl
+          FROM users u
+          ORDER BY u.created_at DESC
+        `).all();
+
+        let list = (usersResult.results || []) as any[];
+
+        if (queryParam) {
+          list = list.filter(u => 
+            (u.name && u.name.toLowerCase().includes(queryParam)) ||
+            (u.email && u.email.toLowerCase().includes(queryParam)) ||
+            (u.businessName && u.businessName.toLowerCase().includes(queryParam))
+          );
+        }
+
+        if (planParam && planParam !== 'all') {
+          list = list.filter(u => (u.subscription_status || 'free').toLowerCase() === planParam.toLowerCase());
+        }
+
+        if (roleParam && roleParam !== 'all') {
+          list = list.filter(u => (u.role || 'user').toLowerCase() === roleParam.toLowerCase());
+        }
+
+        return jsonResponse({
+          success: true,
+          data: list
+        });
+      }
+
+      // --- ADMIN: USER DETAILS ---
+      const adminUserDetailMatch = url.pathname.match(/^\/api\/admin\/users\/([^\/]+)$/);
+      if (adminUserDetailMatch && request.method === 'GET') {
+        await ensureAdminUser();
+        const user = await authenticate();
+        if (!user || user.role !== 'admin') {
+          return errorResponse("Forbidden: Admin access required", 403);
+        }
+
+        const targetUserId = adminUserDetailMatch[1];
+        const targetUser = await env.DB.prepare(
+          "SELECT id, name, email, role, subscription_status, email_verified, created_at FROM users WHERE id = ?"
+        ).bind(targetUserId).first();
+
+        if (!targetUser) return errorResponse("User not found", 404);
+
+        const businesses = (await env.DB.prepare("SELECT * FROM businesses WHERE user_id = ?").bind(targetUserId).all()).results || [];
+        
+        let audits: any[] = [];
+        let growthScores: any[] = [];
+        let recommendations: any[] = [];
+        let leads: any[] = [];
+        let backlinks: any[] = [];
+
+        if (businesses.length > 0) {
+          const bizIds = businesses.map((b: any) => b.id);
+          const placeholders = bizIds.map(() => '?').join(',');
+          
+          audits = (await env.DB.prepare(`SELECT * FROM audits WHERE business_id IN (${placeholders}) ORDER BY created_at DESC`).bind(...bizIds).all()).results || [];
+          growthScores = (await env.DB.prepare(`SELECT * FROM growth_scores WHERE business_id IN (${placeholders}) ORDER BY created_at DESC`).bind(...bizIds).all()).results || [];
+          recommendations = (await env.DB.prepare(`SELECT * FROM recommendations WHERE business_id IN (${placeholders}) ORDER BY created_at DESC LIMIT 50`).bind(...bizIds).all()).results || [];
+        }
+
+        try {
+          leads = (await env.DB.prepare("SELECT * FROM leads WHERE user_id = ? ORDER BY captured_at DESC").bind(targetUserId).all()).results || [];
+        } catch {}
+
+        try {
+          backlinks = (await env.DB.prepare("SELECT * FROM backlinks WHERE user_id = ? ORDER BY created_at DESC").bind(targetUserId).all()).results || [];
+        } catch {}
+
+        return jsonResponse({
+          success: true,
+          data: {
+            user: targetUser,
+            businesses,
+            audits,
+            growthScores,
+            recommendations,
+            leads,
+            backlinks
+          }
+        });
+      }
+
+      // --- ADMIN: GRANT / UPDATE PLAN ---
+      const adminPlanMatch = url.pathname.match(/^\/api\/admin\/users\/([^\/]+)\/plan$/);
+      if (adminPlanMatch && request.method === 'POST') {
+        await ensureAdminUser();
+        const user = await authenticate();
+        if (!user || user.role !== 'admin') {
+          return errorResponse("Forbidden: Admin access required", 403);
+        }
+
+        const targetUserId = adminPlanMatch[1];
+        const { plan } = await request.json() as any;
+        const normalizedPlan = (plan || 'free').toLowerCase();
+
+        await env.DB.prepare("UPDATE users SET subscription_status = ? WHERE id = ?").bind(normalizedPlan, targetUserId).run();
+        await env.DB.prepare("UPDATE businesses SET subscription_status = ? WHERE user_id = ?").bind(normalizedPlan, targetUserId).run().catch(() => {});
+
+        return jsonResponse({
+          success: true,
+          message: `Plan updated to ${normalizedPlan.toUpperCase()}`
+        });
+      }
+
+      // --- ADMIN: REVOKE PLAN ---
+      const adminRevokePlanMatch = url.pathname.match(/^\/api\/admin\/users\/([^\/]+)\/revoke-plan$/);
+      if (adminRevokePlanMatch && request.method === 'POST') {
+        await ensureAdminUser();
+        const user = await authenticate();
+        if (!user || user.role !== 'admin') {
+          return errorResponse("Forbidden: Admin access required", 403);
+        }
+
+        const targetUserId = adminRevokePlanMatch[1];
+
+        await env.DB.prepare("UPDATE users SET subscription_status = 'free' WHERE id = ?").bind(targetUserId).run();
+        await env.DB.prepare("UPDATE businesses SET subscription_status = 'free' WHERE user_id = ?").bind(targetUserId).run().catch(() => {});
+
+        return jsonResponse({
+          success: true,
+          message: "Plan revoked to FREE"
+        });
+      }
+
+      // --- ADMIN: UPDATE ROLE ---
+      const adminRoleMatch = url.pathname.match(/^\/api\/admin\/users\/([^\/]+)\/role$/);
+      if (adminRoleMatch && request.method === 'POST') {
+        await ensureAdminUser();
+        const user = await authenticate();
+        if (!user || user.role !== 'admin') {
+          return errorResponse("Forbidden: Admin access required", 403);
+        }
+
+        const targetUserId = adminRoleMatch[1];
+        const { role } = await request.json() as any;
+        const targetUser = await env.DB.prepare("SELECT email FROM users WHERE id = ?").bind(targetUserId).first<any>();
+        
+        if (targetUser?.email === 'saninabbas@gmail.com' && role !== 'admin') {
+          return errorResponse("Cannot demote primary administrator", 400);
+        }
+
+        await env.DB.prepare("UPDATE users SET role = ? WHERE id = ?").bind(role, targetUserId).run();
+        return jsonResponse({
+          success: true,
+          message: `User role updated to ${role}`
+        });
+      }
+
+      // --- ADMIN: DELETE USER ---
+      const adminDeleteMatch = url.pathname.match(/^\/api\/admin\/users\/([^\/]+)$/);
+      if (adminDeleteMatch && request.method === 'DELETE') {
+        await ensureAdminUser();
+        const user = await authenticate();
+        if (!user || user.role !== 'admin') {
+          return errorResponse("Forbidden: Admin access required", 403);
+        }
+
+        const targetUserId = adminDeleteMatch[1];
+        const targetUser = await env.DB.prepare("SELECT email FROM users WHERE id = ?").bind(targetUserId).first<any>();
+        if (!targetUser) return errorResponse("User not found", 404);
+
+        if (targetUser.email === 'saninabbas@gmail.com' || targetUserId === user.id) {
+          return errorResponse("Cannot delete primary administrator account", 400);
+        }
+
+        // Cascading deletion
+        const userBusinesses = (await env.DB.prepare("SELECT id FROM businesses WHERE user_id = ?").bind(targetUserId).all()).results || [];
+        for (const biz of userBusinesses) {
+          const bid = (biz as any).id;
+          await env.DB.prepare("DELETE FROM recommendations WHERE business_id = ?").bind(bid).run().catch(() => {});
+          await env.DB.prepare("DELETE FROM growth_scores WHERE business_id = ?").bind(bid).run().catch(() => {});
+          await env.DB.prepare("DELETE FROM audits WHERE business_id = ?").bind(bid).run().catch(() => {});
+        }
+
+        await env.DB.prepare("DELETE FROM businesses WHERE user_id = ?").bind(targetUserId).run().catch(() => {});
+        await env.DB.prepare("DELETE FROM leads WHERE user_id = ?").bind(targetUserId).run().catch(() => {});
+        await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(targetUserId).run().catch(() => {});
+        await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(targetUserId).run();
+
+        return jsonResponse({
+          success: true,
+          message: "User and all associated data deleted successfully"
+        });
       }
 
       // --- DEBUG ENV ---

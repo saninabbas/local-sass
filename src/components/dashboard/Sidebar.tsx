@@ -10,8 +10,10 @@ import {
   HelpCircle, 
   User,
   Users,
-  Award 
+  Award,
+  Shield
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -19,6 +21,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen }: SidebarProps) {
   const location = useLocation();
+  const { user } = useAuth();
 
   const navItems = [
     { name: 'Overview', icon: Home, href: '/dashboard' },
@@ -35,6 +38,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
   ];
 
   const bottomItems = [
+    ...(user?.role === 'admin' ? [{ name: 'Admin Portal', icon: Shield, href: '/admin', highlight: true }] : []),
     { name: 'Help', icon: HelpCircle, href: '/help' },
     { name: 'Account', icon: User, href: '/dashboard/account' },
   ];
@@ -77,14 +81,23 @@ export function Sidebar({ isOpen }: SidebarProps) {
       </div>
 
       <div className="p-4 border-t border-gray-100 flex flex-col gap-1">
-        {bottomItems.map((item) => (
+        {bottomItems.map((item: any) => (
           <Link
             key={item.name}
             to={item.href}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold text-secondary hover:bg-gray-50 hover:text-primary transition-colors"
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              item.highlight
+                ? 'bg-slate-900 text-blue-400 hover:bg-slate-800 font-bold'
+                : 'text-secondary hover:bg-gray-50 hover:text-primary'
+            }`}
           >
             <item.icon size={18} strokeWidth={2} />
-            {item.name}
+            <span className="flex-1">{item.name}</span>
+            {item.highlight && (
+              <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-extrabold border border-blue-500/30">
+                Admin
+              </span>
+            )}
           </Link>
         ))}
       </div>

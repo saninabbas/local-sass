@@ -106,3 +106,50 @@ export async function fetchBacklinks(): Promise<any> {
 export async function addBacklink(data: any): Promise<any> {
   return fetchApi('/api/authority/backlinks', { method: 'POST', body: JSON.stringify(data) });
 }
+
+// -----------------------------------------------------------------------------
+// ADMIN MANAGEMENT
+// -----------------------------------------------------------------------------
+export async function getAdminStats(): Promise<import('../types').AdminStats> {
+  return fetchApi('/api/admin/stats');
+}
+
+export async function getAdminUsers(params?: { search?: string; plan?: string; role?: string }): Promise<import('../types').AdminUser[]> {
+  const query = new URLSearchParams();
+  if (params?.search) query.append('q', params.search);
+  if (params?.plan && params.plan !== 'all') query.append('plan', params.plan);
+  if (params?.role && params.role !== 'all') query.append('role', params.role);
+  
+  const queryString = query.toString();
+  return fetchApi(`/api/admin/users${queryString ? `?${queryString}` : ''}`);
+}
+
+export async function getAdminUserDetails(userId: string): Promise<import('../types').AdminUserDetail> {
+  return fetchApi(`/api/admin/users/${userId}`);
+}
+
+export async function updateUserPlan(userId: string, plan: string): Promise<{ success: boolean; message: string }> {
+  return fetchApi(`/api/admin/users/${userId}/plan`, {
+    method: 'POST',
+    body: JSON.stringify({ plan })
+  });
+}
+
+export async function revokeUserPlan(userId: string): Promise<{ success: boolean; message: string }> {
+  return fetchApi(`/api/admin/users/${userId}/revoke-plan`, {
+    method: 'POST'
+  });
+}
+
+export async function deleteUser(userId: string): Promise<{ success: boolean; message: string }> {
+  return fetchApi(`/api/admin/users/${userId}`, {
+    method: 'DELETE'
+  });
+}
+
+export async function updateUserRole(userId: string, role: string): Promise<{ success: boolean; message: string }> {
+  return fetchApi(`/api/admin/users/${userId}/role`, {
+    method: 'POST',
+    body: JSON.stringify({ role })
+  });
+}
