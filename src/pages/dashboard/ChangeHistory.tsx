@@ -8,16 +8,27 @@ import {
   XCircle, 
   Clock, 
   ExternalLink, 
-  RefreshCw,
-  FileCode,
-  ShieldCheck
+  RefreshCw, 
+  FileCode, 
+  ShieldCheck, 
+  Sparkles,
+  ArrowRight,
+  TrendingUp,
+  X,
+  Layers,
+  Activity
 } from 'lucide-react';
+import { ExecutionStatusBadge } from '../../components/dashboard/ExecutionStatusBadge';
 import { Button } from '../../components/ui/Button';
 
 export const ChangeHistory: React.FC = () => {
   const { activeBusiness } = useBusiness();
   const [changes, setChanges] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedChange, setSelectedChange] = useState<any | null>(null);
+  const [changeEvents, setChangeEvents] = useState<any[]>([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   const loadChanges = async () => {
     try {
@@ -38,6 +49,28 @@ export const ChangeHistory: React.FC = () => {
     loadChanges();
   }, [activeBusiness?.id]);
 
+  const handleOpenDetails = async (change: any) => {
+    setSelectedChange(change);
+    setLoadingDetails(true);
+    try {
+      const res = await fetchApi(`/api/seo/changes/${change.id}`);
+      if (res.success && res.data) {
+        setSelectedChange(res.data.change);
+        setChangeEvents(res.data.events || []);
+      }
+    } catch (err: any) {
+      console.warn("Failed to load change details:", err.message);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  const filteredChanges = changes.filter(c => {
+    if (statusFilter === 'ALL') return true;
+    const st = (c.execution_status || c.verification_status || 'PENDING').toUpperCase();
+    return st.includes(statusFilter);
+  });
+
   return (
     <DashboardLayout>
       <div className="space-y-8 max-w-7xl mx-auto animate-in fade-in duration-300">
@@ -46,16 +79,16 @@ export const ChangeHistory: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#e6dfd8]">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="px-2.5 py-0.5 rounded-full bg-[#cc785c]/10 text-[#cc785c] text-[11px] font-bold tracking-wider uppercase flex items-center gap-1.5">
+              <span className="px-2.5 py-0.5 rounded-full bg-[#cc785c]/10 text-[#cc785c] text-[11px] font-bold tracking-wider uppercase flex items-center gap-1.5 font-mono">
                 <History size={12} />
-                Audit Log & Change Verification
+                Audit Trail & Execution Logs
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-serif font-bold text-[#141413]">
-              Executed SEO Change History
+              SEO Change History & Verification
             </h1>
             <p className="text-xs text-[#6c6a64] font-sans mt-1">
-              Before vs After diff logs for every approved fix with live HTML re-crawl verification status.
+              Complete before/after diffs, live HTTP verification evidence, and ranking impact observations.
             </p>
           </div>
 
@@ -66,80 +99,232 @@ export const ChangeHistory: React.FC = () => {
             className="bg-[#141413] hover:bg-[#252320] text-[#faf9f5] flex items-center gap-2 text-xs font-semibold"
           >
             <RefreshCw size={13} className={loading ? "animate-spin text-[#cc785c]" : "text-[#8e8b82]"} />
-            <span>Refresh Change Logs</span>
+            <span>Refresh Audit Logs</span>
           </Button>
         </div>
 
-        {/* Change Logs List */}
+        {/* Filter Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-[#e6dfd8]">
+          {['ALL', 'VERIFIED', 'APPLIED', 'GENERATED', 'FAILED'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setStatusFilter(tab)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-medium cursor-pointer transition-all ${
+                statusFilter === tab
+                  ? 'bg-[#141413] text-[#faf9f5] shadow-xs font-bold'
+                  : 'text-[#6c6a64] hover:bg-[#efe9de]'
+              }`}
+            >
+              {tab === 'ALL' ? `All Changes (${changes.length})` : tab}
+            </button>
+          ))}
+        </div>
+
+        {/* Table / List */}
         {loading ? (
-          <div className="py-16 text-center text-xs font-mono text-[#6c6a64]">
-            <RefreshCw size={24} className="animate-spin text-[#cc785c] mx-auto mb-2" />
-            <span>Fetching change history logs...</span>
+          <div className="py-20 text-center text-xs font-mono text-[#6c6a64]">
+            <RefreshCw size={28} className="animate-spin text-[#cc785c] mx-auto mb-3" />
+            <span>Loading verified execution history...</span>
           </div>
-        ) : changes.length === 0 ? (
-          <div className="text-center py-16 bg-[#efe9de]/30 rounded-2xl border border-[#e6dfd8] p-8">
-            <FileCode size={32} className="text-[#8e8b82] mx-auto mb-3" />
-            <h3 className="text-base font-serif font-bold text-[#141413]">No Executed Changes Yet</h3>
-            <p className="text-xs text-[#6c6a64] mt-1 max-w-sm mx-auto">
-              Approve and apply campaign fixes in the SEO Campaign module to start tracking verified HTML changes.
+        ) : filteredChanges.length === 0 ? (
+          <div className="text-center py-16 bg-[#efe9de]/30 rounded-3xl border border-[#e6dfd8] p-8 space-y-3">
+            <History size={36} className="text-[#8e8b82] mx-auto" />
+            <h3 className="font-serif text-base font-bold text-[#141413]">No Execution Logs Found</h3>
+            <p className="text-xs text-[#6c6a64] max-w-md mx-auto">
+              Changes applied and verified via the Campaign or Action Plan will appear here with live crawl evidence.
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {changes.map((chg: any) => {
-              const isVerified = chg.verification_status === 'VERIFIED';
-              const isFailed = chg.verification_status === 'FAILED';
-
-              return (
-                <div key={chg.id} className="bg-[#faf9f5] border border-[#e6dfd8] rounded-2xl p-6 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <div className="flex items-center gap-2.5">
-                      <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full ${
-                        isVerified ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
-                        isFailed ? 'bg-red-100 text-red-800 border border-red-200' :
-                        'bg-amber-100 text-amber-800 border border-amber-200'
-                      }`}>
-                        STATUS: {chg.verification_status || 'PENDING'}
-                      </span>
-                      <span className="text-xs font-serif font-bold text-[#141413]">
-                        {chg.change_type} UPDATE
-                      </span>
-                    </div>
-
-                    <span className="text-[10px] font-mono text-[#8e8b82]">
-                      Date: {chg.created_at ? new Date(chg.created_at).toLocaleString() : 'Recent'}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-[10px] font-mono text-[#8e8b82] uppercase block mb-1">Target Page URL:</span>
-                    <a href={chg.target_url} target="_blank" rel="noreferrer" className="text-xs font-mono text-[#cc785c] hover:underline flex items-center gap-1">
-                      {chg.target_url} <ExternalLink size={11} />
-                    </a>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
-                    {chg.before_data && (
-                      <div className="p-3.5 bg-red-50/60 rounded-xl border border-red-200 space-y-1">
-                        <span className="text-[10px] font-bold text-red-800 uppercase block">Before Code / Telemetry:</span>
-                        <div className="text-red-950 font-mono text-[11px] break-all">{chg.before_data}</div>
-                      </div>
-                    )}
-
-                    {chg.generated_data && (
-                      <div className="p-3.5 bg-emerald-50/60 rounded-xl border border-emerald-200 space-y-1">
-                        <span className="text-[10px] font-bold text-emerald-800 uppercase block">Applied & Verified Fix:</span>
-                        <div className="text-emerald-950 font-mono text-[11px] break-all">{chg.generated_data}</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="bg-[#faf9f5] rounded-2xl border border-[#e6dfd8] shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-[#efe9de] border-b border-[#e6dfd8] text-[10px] font-mono uppercase text-[#6c6a64] tracking-wider">
+                    <th className="p-4 font-bold">Change Type & Element</th>
+                    <th className="p-4 font-bold">Target URL</th>
+                    <th className="p-4 font-bold">Execution Status</th>
+                    <th className="p-4 font-bold">Before</th>
+                    <th className="p-4 font-bold">Applied / Proposed</th>
+                    <th className="p-4 font-bold">Verified Date</th>
+                    <th className="p-4 font-bold text-right">Details</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#e6dfd8]">
+                  {filteredChanges.map((change) => {
+                    const status = change.execution_status || change.verification_status || 'GENERATED';
+                    return (
+                      <tr 
+                        key={change.id}
+                        onClick={() => handleOpenDetails(change)}
+                        className="hover:bg-[#efe9de]/50 transition-colors cursor-pointer"
+                      >
+                        <td className="p-4 font-mono font-bold text-[#141413]">
+                          <div>{change.change_type}</div>
+                          <span className="text-[10px] text-[#8e8b82] font-normal">{change.target_element || 'DOM Element'}</span>
+                        </td>
+                        <td className="p-4 font-mono text-[#6c6a64] max-w-[180px] truncate">
+                          {change.page_url || change.target_url || activeBusiness?.website_url}
+                        </td>
+                        <td className="p-4">
+                          <ExecutionStatusBadge status={status} size="sm" />
+                        </td>
+                        <td className="p-4 font-mono text-red-900 max-w-[140px] truncate">
+                          {change.before_value || change.before_data || '—'}
+                        </td>
+                        <td className="p-4 font-mono text-emerald-950 max-w-[160px] truncate">
+                          {change.after_value || change.generated_data || change.generated_content || '—'}
+                        </td>
+                        <td className="p-4 font-mono text-[10px] text-[#8e8b82]">
+                          {change.verified_at ? new Date(change.verified_at).toLocaleDateString() : 'Pending'}
+                        </td>
+                        <td className="p-4 text-right">
+                          <Button size="sm" variant="outline" className="text-[10px] font-semibold py-1 px-2">
+                            View Evidence
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
       </div>
+
+      {/* Change Details Drawer / Modal */}
+      {selectedChange && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#141413]/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-[#faf9f5] border border-[#e6dfd8] rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[#e6dfd8] pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#141413] text-[#faf9f5] flex items-center justify-center">
+                  <FileCode size={18} className="text-[#cc785c]" />
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-lg text-[#141413]">
+                    {selectedChange.change_type} Execution Details
+                  </h3>
+                  <p className="text-xs text-[#8e8b82] font-mono">
+                    ID: {selectedChange.id} &bull; Target: {selectedChange.page_url || selectedChange.target_url}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedChange(null)}
+                className="p-1.5 rounded-xl text-[#8e8b82] hover:text-[#141413] cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Status & Telemetry Banner */}
+            <div className="p-4 rounded-2xl bg-[#efe9de]/50 border border-[#e6dfd8] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono uppercase text-[#6c6a64]">Status:</span>
+                <ExecutionStatusBadge status={selectedChange.execution_status || selectedChange.verification_status} />
+              </div>
+              <span className="text-xs font-mono text-[#8e8b82]">
+                Provider: {selectedChange.provider || 'MANUAL'}
+              </span>
+            </div>
+
+            {/* Before vs After Diff */}
+            <div className="space-y-3">
+              <h4 className="font-mono text-xs font-bold uppercase text-[#141413] flex items-center gap-1.5">
+                <Layers size={14} className="text-[#cc785c]" />
+                Code / Element Comparison Diff
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-xs">
+                <div className="p-3.5 rounded-xl bg-red-50/60 border border-red-200">
+                  <span className="text-[10px] text-red-700 font-bold block mb-1 uppercase">Before Execution</span>
+                  <div className="text-red-950 whitespace-pre-wrap break-all">
+                    {selectedChange.before_value || selectedChange.before_data || 'Missing / Incomplete'}
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200">
+                  <span className="text-[10px] text-emerald-700 font-bold block mb-1 uppercase">Applied / Verified Value</span>
+                  <div className="text-emerald-950 whitespace-pre-wrap break-all">
+                    {selectedChange.after_value || selectedChange.generated_data || selectedChange.generated_content || '—'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Verification Evidence */}
+            {selectedChange.verification_evidence && (
+              <div className="space-y-2">
+                <h4 className="font-mono text-xs font-bold uppercase text-[#141413] flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="text-emerald-600" />
+                  Live HTTP Crawl Evidence
+                </h4>
+                <div className="p-4 rounded-xl bg-[#181715] text-[#faf9f5] border border-[#252320] font-mono text-xs overflow-x-auto">
+                  <pre>{typeof selectedChange.verification_evidence === 'string' 
+                    ? selectedChange.verification_evidence 
+                    : JSON.stringify(selectedChange.verification_evidence, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {/* Execution Audit Trail Timeline */}
+            <div className="space-y-3">
+              <h4 className="font-mono text-xs font-bold uppercase text-[#141413] flex items-center gap-1.5">
+                <Activity size={14} className="text-[#cc785c]" />
+                Execution Event Timeline
+              </h4>
+
+              {loadingDetails ? (
+                <div className="py-4 text-center text-xs font-mono text-[#8e8b82]">
+                  <RefreshCw size={14} className="animate-spin text-[#cc785c] inline mr-1" />
+                  Loading events...
+                </div>
+              ) : changeEvents.length === 0 ? (
+                <div className="text-xs font-mono text-[#8e8b82] p-3 bg-[#efe9de]/30 rounded-xl">
+                  Initial execution record logged.
+                </div>
+              ) : (
+                <div className="divide-y divide-[#e6dfd8] border border-[#e6dfd8] rounded-xl overflow-hidden text-xs">
+                  {changeEvents.map((evt, idx) => (
+                    <div key={idx} className="p-3 bg-white flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-[#cc785c]" />
+                        <span className="font-mono font-bold text-[#141413]">{evt.event_type}</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-[#8e8b82]">
+                        {new Date(evt.created_at).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Ranking Observation Disclaimer */}
+            <div className="p-4 rounded-2xl bg-[#efe9de]/40 border border-[#e6dfd8] text-xs font-sans space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-[#141413] font-mono text-[11px]">
+                <TrendingUp size={13} className="text-[#cc785c]" />
+                <span>Ranking Telemetry Observation</span>
+              </div>
+              <p className="text-[#6c6a64]">
+                Serper SERP positions are refreshed automatically. Any rank movement observed after this verified timestamp is tracked against your target keywords.
+              </p>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button size="sm" onClick={() => setSelectedChange(null)} className="bg-[#141413] text-[#faf9f5]">
+                Close
+              </Button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 };

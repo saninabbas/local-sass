@@ -509,16 +509,69 @@ export const onRequest = async (context: any) => {
 
         await db.prepare(`CREATE TABLE IF NOT EXISTS seo_changes (
           id TEXT PRIMARY KEY,
+          user_id TEXT,
+          business_id TEXT,
           project_id TEXT NOT NULL,
           task_id TEXT,
+          page_url TEXT,
           change_type TEXT NOT NULL,
-          target_url TEXT NOT NULL,
+          target_element TEXT,
+          before_value TEXT,
+          after_value TEXT,
+          generated_content TEXT,
           before_data TEXT,
           generated_data TEXT,
           applied_data TEXT,
+          approval_status TEXT DEFAULT 'PENDING',
+          execution_status TEXT DEFAULT 'GENERATED',
+          provider TEXT DEFAULT 'MANUAL',
+          external_change_id TEXT,
+          applied_at DATETIME,
+          verified_at DATETIME,
           verification_status TEXT DEFAULT 'PENDING',
+          verification_evidence TEXT,
+          rollback_available INTEGER DEFAULT 0,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          verified_at DATETIME
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN user_id TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN business_id TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN page_url TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN target_element TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN before_value TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN after_value TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN generated_content TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN approval_status TEXT DEFAULT 'PENDING'").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN execution_status TEXT DEFAULT 'GENERATED'").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN provider TEXT DEFAULT 'MANUAL'").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN external_change_id TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN applied_at DATETIME").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN verification_evidence TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN rollback_available INTEGER DEFAULT 0").run().catch(() => {});
+
+        await db.prepare(`CREATE TABLE IF NOT EXISTS project_integrations (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          project_id TEXT NOT NULL,
+          integration_type TEXT NOT NULL,
+          status TEXT DEFAULT 'NOT_CONNECTED',
+          provider TEXT NOT NULL,
+          external_project_id TEXT,
+          access_token_reference TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          expires_at DATETIME
+        )`).run().catch(() => {});
+
+        await db.prepare(`CREATE TABLE IF NOT EXISTS execution_events (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          project_id TEXT NOT NULL,
+          change_id TEXT NOT NULL,
+          event_type TEXT NOT NULL,
+          event_payload TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`).run().catch(() => {});
 
         await db.prepare(`CREATE TABLE IF NOT EXISTS internal_link_opportunities (
@@ -4424,7 +4477,7 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true, data: opps });
       }
 
-      // --- SEO CHANGES HISTORY ENDPOINT ---
+      // --- SEO CHANGES & EXECUTION ENDPOINTS ---
       if (url.pathname === '/api/seo/changes' && request.method === 'GET') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
@@ -4445,6 +4498,165 @@ export const onRequest = async (context: any) => {
         ).bind(business.id).all();
 
         return jsonResponse({ success: true, data: changes || [] });
+      }
+
+      if (url.pathname.startsWith('/api/seo/changes/') && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const changeId = url.pathname.replace('/api/seo/changes/', '');
+        const change = await env.DB.prepare(
+          "SELECT * FROM seo_changes WHERE id = ? AND user_id = ?"
+        ).bind(changeId, user.id).first();
+
+        if (!change) return errorResponse("Change not found", 404);
+
+        const { results: events } = await env.DB.prepare(
+          "SELECT * FROM execution_events WHERE change_id = ? ORDER BY created_at ASC"
+        ).bind(changeId).all();
+
+        return jsonResponse({
+          success: true,
+          data: {
+            change,
+            events: events || []
+          }
+        });
+      }
+
+      if (url.pathname === '/api/seo/changes/generate' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const { generateSeoFix } = await import('./executionEngine');
+        const fix = await generateSeoFix(env.DB, business, user.id, {
+          taskId: payload.taskId,
+          pageUrl: payload.pageUrl,
+          changeType: payload.changeType || 'SEO_TITLE',
+          currentValue: payload.currentValue,
+          issueDescription: payload.issueDescription,
+          targetKeyword: payload.targetKeyword
+        });
+
+        return jsonResponse({ success: true, data: fix });
+      }
+
+      if ((url.pathname === '/api/seo/changes/approve' || url.pathname.endsWith('/approve')) && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        const changeId = payload.changeId || url.pathname.split('/')[4];
+        if (!changeId) return errorResponse("Change ID required", 400);
+
+        const { approveSeoFix } = await import('./executionEngine');
+        const res = await approveSeoFix(env.DB, changeId, user.id, payload.editedContent);
+
+        return jsonResponse(res);
+      }
+
+      if ((url.pathname === '/api/seo/changes/apply' || url.pathname.endsWith('/apply')) && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        const changeId = payload.changeId || url.pathname.split('/')[4];
+        if (!changeId) return errorResponse("Change ID required", 400);
+
+        const { applySeoFix } = await import('./executionEngine');
+        const res = await applySeoFix(env.DB, changeId, user.id);
+
+        return jsonResponse(res);
+      }
+
+      if ((url.pathname === '/api/seo/changes/verify' || url.pathname.endsWith('/verify')) && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        const changeId = payload.changeId || url.pathname.split('/')[4];
+        if (!changeId) return errorResponse("Change ID required", 400);
+
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const { verifySeoFix } = await import('./executionEngine');
+        const res = await verifySeoFix(env.DB, changeId, user.id, business);
+
+        return jsonResponse(res);
+      }
+
+      // --- INTEGRATIONS ENDPOINTS ---
+      if (url.pathname === '/api/integrations' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden", 403);
+          throw err;
+        }
+
+        if (!business) return jsonResponse({ success: true, data: [] });
+
+        const { results: integrations } = await env.DB.prepare(
+          "SELECT id, project_id, integration_type, status, provider, created_at, updated_at FROM project_integrations WHERE project_id = ?"
+        ).bind(business.id).all();
+
+        return jsonResponse({ success: true, data: integrations || [] });
+      }
+
+      if (url.pathname === '/api/integrations/connect' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const integrationId = `int_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const provider = payload.provider || 'MANUAL';
+        const integrationType = payload.integrationType || 'CMS';
+        const status = payload.status || 'CONNECTED';
+
+        await env.DB.prepare(`
+          INSERT OR REPLACE INTO project_integrations 
+          (id, user_id, project_id, integration_type, status, provider, external_project_id, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `).bind(integrationId, user.id, business.id, integrationType, status, provider, payload.externalProjectId || '').run();
+
+        return jsonResponse({ success: true, message: `Connected to ${provider}`, integrationId });
       }
 
       // --- RE-AUDIT ENDPOINT ---

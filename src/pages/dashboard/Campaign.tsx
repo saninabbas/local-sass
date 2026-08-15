@@ -18,6 +18,8 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { FixWithAIModal } from '../../components/modals/FixWithAIModal';
+import { ExecutionStatusBadge } from '../../components/dashboard/ExecutionStatusBadge';
 
 export const Campaign: React.FC = () => {
   const { activeBusiness } = useBusiness();
@@ -29,6 +31,7 @@ export const Campaign: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'TODAY' | 'WEEK' | 'MONTH'>('TODAY');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
+  const [fixTaskModal, setFixTaskModal] = useState<any | null>(null);
 
   const loadCampaign = async () => {
     try {
@@ -344,15 +347,14 @@ export const Campaign: React.FC = () => {
                       [View Evidence Details]
                     </button>
 
-                    {!isVerified && !isWaiting && (
+                    {!isVerified && (
                       <Button
                         size="sm"
-                        onClick={() => handleExecuteTask(task)}
-                        disabled={isExec}
+                        onClick={() => setFixTaskModal(task)}
                         className="bg-[#141413] hover:bg-[#252320] text-[#faf9f5] flex items-center gap-2 text-xs font-bold cursor-pointer"
                       >
                         <Sparkles size={13} className="text-[#cc785c]" />
-                        <span>{isExec ? 'Approving...' : 'Approve & Apply Fix'}</span>
+                        <span>Fix with AI</span>
                       </Button>
                     )}
 
@@ -379,6 +381,31 @@ export const Campaign: React.FC = () => {
               );
             })}
           </div>
+        )}
+
+        {/* Fix with AI Modal */}
+        {fixTaskModal && (
+          <FixWithAIModal
+            isOpen={!!fixTaskModal}
+            onClose={() => setFixTaskModal(null)}
+            fixType={fixTaskModal.type || 'SEO_TITLE'}
+            title={fixTaskModal.title}
+            taskId={fixTaskModal.id}
+            context={{
+              businessName: business?.name,
+              websiteUrl: fixTaskModal.target_url || business?.website_url,
+              city: business?.city,
+              category: business?.type,
+              targetKeyword: fixTaskModal.target_keyword,
+              issueEvidence: fixTaskModal.evidence,
+              currentValue: fixTaskModal.before_value,
+              expectedValue: fixTaskModal.expected_value
+            }}
+            onSuccess={() => {
+              loadCampaign();
+              setFixTaskModal(null);
+            }}
+          />
         )}
 
         {/* Evidence Modal */}
