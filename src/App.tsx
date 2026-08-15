@@ -9,6 +9,7 @@ import { VerifyEmail } from './pages/auth/VerifyEmail';
 import { Onboarding } from './pages/onboarding/Onboarding';
 
 import { AuthProvider } from './contexts/AuthContext';
+import { BusinessProvider } from './context/BusinessContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { About } from './pages/marketing/About';
 import { Contact } from './pages/marketing/Contact';
@@ -26,6 +27,7 @@ import { DashboardLayout } from './components/dashboard/DashboardLayout';
 
 // Lazy load dashboard pages to optimize initial bundle size
 const Dashboard = lazy(() => import('./pages/dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
+const Businesses = lazy(() => import('./pages/dashboard/Businesses').then(m => ({ default: m.Businesses })));
 const ActionPlan = lazy(() => import('./pages/dashboard/ActionPlan').then(m => ({ default: m.ActionPlan })));
 const Settings = lazy(() => import('./pages/dashboard/Settings').then(m => ({ default: m.Settings })));
 const Reports = lazy(() => import('./pages/dashboard/Reports').then(m => ({ default: m.Reports })));
@@ -76,60 +78,63 @@ function DashboardSuspense({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/features" element={<Features />} />
-          <Route path="/how-it-works" element={<HowItWorks />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/resources" element={<Resources />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/verify" element={<VerifyEmail />} />
-          <Route path="/api/auth/verify" element={<VerifyEmail />} />
-          <Route path="/report/:id" element={<PublicReport />} />
-          
-          {/* Claude Computer Use & Design System Showcase */}
-          <Route path="/claude" element={<ClaudeShowcasePage />} />
-          <Route path="/computer-use" element={<ClaudeShowcasePage />} />
-          <Route path="/claude-design" element={<ClaudeShowcasePage />} />
-          
-          {/* Admin Routes */}
-          <Route path="/admin" element={<AdminRoute />} />
-          <Route path="/admin/login" element={<AdminRoute />} />
-          <Route path="/admin/dashboard" element={<AdminRoute />} />
-          
-          <Route element={<ProtectedRoute />}>
-            <Route path="/onboarding" element={<Onboarding />} />
+      <BusinessProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/features" element={<Features />} />
+            <Route path="/how-it-works" element={<HowItWorks />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/resources" element={<Resources />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/verify" element={<VerifyEmail />} />
+            <Route path="/api/auth/verify" element={<VerifyEmail />} />
+            <Route path="/report/:id" element={<PublicReport />} />
             
-            {/* Lazy Loaded Dashboard Routes */}
-            <Route path="/dashboard" element={<DashboardSuspense><Dashboard /></DashboardSuspense>} />
-            <Route path="/dashboard/score" element={<DashboardSuspense><Score /></DashboardSuspense>} />
-            <Route path="/dashboard/actions" element={<DashboardSuspense><ActionPlan /></DashboardSuspense>} />
-            <Route path="/dashboard/website" element={<DashboardSuspense><Website /></DashboardSuspense>} />
-            <Route path="/dashboard/competitors" element={<DashboardSuspense><Competitors /></DashboardSuspense>} />
-            <Route path="/dashboard/keywords" element={<DashboardSuspense><Keywords /></DashboardSuspense>} />
-            <Route path="/dashboard/copilot" element={<DashboardSuspense><Copilot /></DashboardSuspense>} />
-            <Route path="/dashboard/content" element={<DashboardSuspense><Content /></DashboardSuspense>} />
-            <Route path="/dashboard/leads" element={<DashboardSuspense><Leads /></DashboardSuspense>} />
-            <Route path="/dashboard/reviews" element={<DashboardSuspense><Reviews /></DashboardSuspense>} />
-            <Route path="/dashboard/reports" element={<DashboardSuspense><Reports /></DashboardSuspense>} />
-            <Route path="/dashboard/settings" element={<DashboardSuspense><Settings /></DashboardSuspense>} />
-            <Route path="/dashboard/account" element={<DashboardSuspense><Account /></DashboardSuspense>} />
-            <Route path="/dashboard/backlinks" element={<DashboardSuspense><BacklinksAuthority /></DashboardSuspense>} />
-            <Route path="/dashboard/authority" element={<DashboardSuspense><BacklinksAuthority /></DashboardSuspense>} />
-            <Route path="/dashboard/geogrid" element={<DashboardSuspense><GeoGrid /></DashboardSuspense>} />
+            {/* Claude Computer Use & Design System Showcase */}
+            <Route path="/claude" element={<ClaudeShowcasePage />} />
+            <Route path="/computer-use" element={<ClaudeShowcasePage />} />
+            <Route path="/claude-design" element={<ClaudeShowcasePage />} />
             
-            <Route path="/dashboard/*" element={<DashboardPlaceholder title="Page Not Found" />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+            {/* Admin Routes */}
+            <Route path="/admin" element={<AdminRoute />} />
+            <Route path="/admin/login" element={<AdminRoute />} />
+            <Route path="/admin/dashboard" element={<AdminRoute />} />
+            
+            <Route element={<ProtectedRoute />}>
+              <Route path="/onboarding" element={<Onboarding />} />
+              
+              {/* Lazy Loaded Dashboard Routes */}
+              <Route path="/dashboard" element={<DashboardSuspense><Dashboard /></DashboardSuspense>} />
+              <Route path="/dashboard/businesses" element={<DashboardSuspense><Businesses /></DashboardSuspense>} />
+              <Route path="/dashboard/score" element={<DashboardSuspense><Score /></DashboardSuspense>} />
+              <Route path="/dashboard/actions" element={<DashboardSuspense><ActionPlan /></DashboardSuspense>} />
+              <Route path="/dashboard/website" element={<DashboardSuspense><Website /></DashboardSuspense>} />
+              <Route path="/dashboard/competitors" element={<DashboardSuspense><Competitors /></DashboardSuspense>} />
+              <Route path="/dashboard/keywords" element={<DashboardSuspense><Keywords /></DashboardSuspense>} />
+              <Route path="/dashboard/copilot" element={<DashboardSuspense><Copilot /></DashboardSuspense>} />
+              <Route path="/dashboard/content" element={<DashboardSuspense><Content /></DashboardSuspense>} />
+              <Route path="/dashboard/leads" element={<DashboardSuspense><Leads /></DashboardSuspense>} />
+              <Route path="/dashboard/reviews" element={<DashboardSuspense><Reviews /></DashboardSuspense>} />
+              <Route path="/dashboard/reports" element={<DashboardSuspense><Reports /></DashboardSuspense>} />
+              <Route path="/dashboard/settings" element={<DashboardSuspense><Settings /></DashboardSuspense>} />
+              <Route path="/dashboard/account" element={<DashboardSuspense><Account /></DashboardSuspense>} />
+              <Route path="/dashboard/backlinks" element={<DashboardSuspense><BacklinksAuthority /></DashboardSuspense>} />
+              <Route path="/dashboard/authority" element={<DashboardSuspense><BacklinksAuthority /></DashboardSuspense>} />
+              <Route path="/dashboard/geogrid" element={<DashboardSuspense><GeoGrid /></DashboardSuspense>} />
+              
+              <Route path="/dashboard/*" element={<DashboardPlaceholder title="Page Not Found" />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </BusinessProvider>
     </AuthProvider>
   );
 }

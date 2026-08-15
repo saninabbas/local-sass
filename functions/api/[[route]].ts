@@ -292,9 +292,10 @@ export const onRequest = async (context: any) => {
             "SELECT COUNT(id) as count FROM discovered_competitors WHERE business_id = ?"
           ).bind(business.id).first().catch(() => ({ count: 0 }));
 
-          if ((compCount as any)?.count === 0 && env.SERPER_API_KEY) {
+          const serpKey = env.SERP_API_KEY || env.SERPER_API_KEY;
+          if ((compCount as any)?.count === 0 && serpKey) {
             const { autoDiscoverCompetitors } = await import('./competitorEngine');
-            await autoDiscoverCompetitors(env.SERPER_API_KEY, { ...business, ...discovery }, env.DB);
+            await autoDiscoverCompetitors(serpKey, { ...business, ...discovery }, env.DB);
           }
         } catch (compErr) {
           console.warn("Auto competitor discovery skipped or failed:", compErr);
@@ -3961,7 +3962,18 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare("SELECT id FROM businesses WHERE user_id = ? LIMIT 1").bind(user.id as string).first();
+        let bodyJson: any = {};
+        try { bodyJson = await request.clone().json(); } catch {}
+        const targetBizId = bodyJson?.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
         if (!business) return errorResponse("Business not found", 404);
 
         const convId = crypto.randomUUID();
@@ -4023,7 +4035,15 @@ export const onRequest = async (context: any) => {
         try { payload = await request.json(); } catch { return errorResponse("Invalid JSON", 400); }
         const actionType = payload.actionType;
 
-        const business = await env.DB.prepare("SELECT * FROM businesses WHERE user_id = ? LIMIT 1").bind(user.id as string).first();
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
         if (!business) return errorResponse("Business not found", 404);
 
         if (actionType === 'run_audit') {

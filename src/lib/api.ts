@@ -1,18 +1,43 @@
 import type { DashboardData } from '../types';
 
 // -----------------------------------------------------------------------------
+// ACTIVE WORKSPACE BUSINESS HELPER
+// -----------------------------------------------------------------------------
+export const getActiveBusinessId = (): string | null => {
+  try {
+    return localStorage.getItem('rankora_active_business_id') || null;
+  } catch {
+    return null;
+  }
+};
+
+export const setActiveBusinessId = (id: string | null): void => {
+  try {
+    if (id) {
+      localStorage.setItem('rankora_active_business_id', id);
+    } else {
+      localStorage.removeItem('rankora_active_business_id');
+    }
+  } catch {}
+};
+
+// -----------------------------------------------------------------------------
 // BASE API FETCHER
 // -----------------------------------------------------------------------------
 export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
   const url = `${baseUrl}${endpoint}`;
+  const activeBizId = getActiveBusinessId();
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(activeBizId ? { 'X-Business-Id': activeBizId } : {}),
+    ...(options.headers as Record<string, string> || {}),
+  };
 
   const response = await fetch(url, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers,
   });
   
   if (response.status === 401) {
@@ -46,18 +71,29 @@ export const forgotPassword = (email: string) => fetchApi('/api/auth/forgot-pass
 export const resetPassword = (data: { email: string; token: string; password: string }) => fetchApi('/api/auth/reset-password', { method: 'POST', body: JSON.stringify(data) });
 
 // -----------------------------------------------------------------------------
-// BUSINESS & DASHBOARD
+// MULTI-WEBSITE / WORKSPACE BUSINESSES
 // -----------------------------------------------------------------------------
-export const getBusiness = () => fetchApi('/api/business', { method: 'GET' });
+export const getBusinesses = () => fetchApi('/api/businesses', { method: 'GET' });
+export const createWorkspaceWebsite = (data: { name?: string; type?: string; city?: string; country?: string; websiteUrl: string; setAsActive?: boolean }) => 
+  fetchApi('/api/businesses', { method: 'POST', body: JSON.stringify(data) });
+export const updateWorkspaceWebsite = (id: string, data: any) => 
+  fetchApi(`/api/businesses/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteWorkspaceWebsite = (id: string) => 
+  fetchApi(`/api/businesses/${id}`, { method: 'DELETE' });
+export const setActiveWorkspaceBusiness = (id: string) => 
+  fetchApi(`/api/businesses/${id}/set-active`, { method: 'POST' });
+
+export const getBusiness = (businessId?: string) => 
+  fetchApi(businessId ? `/api/business?business_id=${encodeURIComponent(businessId)}` : '/api/business', { method: 'GET' });
 export const createBusiness = (data: any) => fetchApi('/api/business', { method: 'POST', body: JSON.stringify(data) });
 export const updateBusiness = (data: any) => fetchApi('/api/business', { method: 'PUT', body: JSON.stringify(data) });
 
-export async function getDashboard(): Promise<DashboardData> {
-  return fetchApi('/api/dashboard');
+export async function getDashboard(businessId?: string): Promise<DashboardData> {
+  return fetchApi(businessId ? `/api/dashboard?business_id=${encodeURIComponent(businessId)}` : '/api/dashboard');
 }
 
-export async function runAudit(): Promise<any> {
-  return fetchApi('/api/audit', { method: 'POST' });
+export async function runAudit(businessId?: string): Promise<any> {
+  return fetchApi('/api/audit', { method: 'POST', body: JSON.stringify(businessId ? { business_id: businessId } : {}) });
 }
 
 export async function getRecommendations(): Promise<any> {

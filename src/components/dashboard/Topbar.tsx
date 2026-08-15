@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Menu, User as UserIcon, Settings, LogOut, ChevronDown } from 'lucide-react';
+import { Bell, Menu, User as UserIcon, Settings, LogOut, ChevronDown, Globe, FolderKanban } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useBusiness } from '../../context/BusinessContext';
 import { Link, useNavigate } from 'react-router-dom';
 
 interface TopbarProps {
@@ -9,6 +10,7 @@ interface TopbarProps {
 
 export function Topbar({ onMenuClick }: TopbarProps) {
   const { user, logout } = useAuth();
+  const { activeBusiness } = useBusiness();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -45,6 +47,20 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         >
           <Menu size={20} />
         </button>
+
+        {/* Active Project Breadcrumb */}
+        {activeBusiness && (
+          <div className="hidden sm:flex items-center gap-2 text-xs">
+            <span className="text-[#8e8b82] font-mono text-[11px] uppercase tracking-wider">Project:</span>
+            <Link 
+              to="/dashboard/businesses"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#efe9de] border border-[#e6dfd8] text-[#141413] font-serif font-bold hover:border-[#cc785c]/40 transition-colors shadow-2xs"
+            >
+              <Globe className="w-3.5 h-3.5 text-[#cc785c]" />
+              <span className="truncate max-w-[200px]">{activeBusiness.name || activeBusiness.website_url.replace(/^https?:\/\//, '')}</span>
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-3">

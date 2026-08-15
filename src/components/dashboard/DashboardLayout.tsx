@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { GrowthCopilot } from './GrowthCopilot';
+import { AddWebsiteModal } from './AddWebsiteModal';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -36,6 +37,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Persistent Rankora Growth Copilot Assistant */}
       <GrowthCopilot />
+
+      {/* Global Add Website / Workspace Project Modal */}
+      <AddWebsiteModal />
     </div>
   );
 }
+
