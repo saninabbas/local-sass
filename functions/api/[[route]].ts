@@ -395,6 +395,74 @@ export const onRequest = async (context: any) => {
       }
     };
 
+    // Auto-migrate schema columns on startup
+    const ensureD1Schema = async (db: any) => {
+      try {
+        await db.prepare("ALTER TABLE users ADD COLUMN password_hash TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN polar_customer_id TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN subscription_status TEXT DEFAULT 'free'").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN verification_token TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN totp_secret TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN reset_token TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN reset_token_expires_at DATETIME").run().catch(() => {});
+
+        await db.prepare("ALTER TABLE growth_scores ADD COLUMN gbp_score INTEGER DEFAULT -1").run().catch(() => {});
+        await db.prepare("ALTER TABLE growth_scores ADD COLUMN rankings_score INTEGER DEFAULT -1").run().catch(() => {});
+        await db.prepare("ALTER TABLE growth_scores ADD COLUMN authority_score INTEGER DEFAULT -1").run().catch(() => {});
+        await db.prepare("ALTER TABLE growth_scores ADD COLUMN conversion_score INTEGER DEFAULT 0").run().catch(() => {});
+
+        await db.prepare("ALTER TABLE businesses ADD COLUMN primary_keywords TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE businesses ADD COLUMN main_services TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE businesses ADD COLUMN discovered_data TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE businesses ADD COLUMN last_crawled_at DATETIME").run().catch(() => {});
+        await db.prepare("ALTER TABLE businesses ADD COLUMN normalized_domain TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE businesses ADD COLUMN is_default INTEGER DEFAULT 0").run().catch(() => {});
+        await db.prepare("ALTER TABLE businesses ADD COLUMN is_archived INTEGER DEFAULT 0").run().catch(() => {});
+        await db.prepare("ALTER TABLE businesses ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_businesses_user_id ON businesses(user_id)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_businesses_norm_domain ON businesses(user_id, normalized_domain)").run().catch(() => {});
+
+        await db.prepare("CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at DATETIME NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))").run().catch(() => {});
+        await db.prepare("CREATE TABLE IF NOT EXISTS leads (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, name TEXT, email TEXT NOT NULL, website TEXT, captured_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))").run().catch(() => {});
+        
+        await db.prepare(`CREATE TABLE IF NOT EXISTS discovered_competitors (
+          id TEXT PRIMARY KEY,
+          business_id TEXT NOT NULL,
+          domain TEXT NOT NULL,
+          name TEXT NOT NULL,
+          ranking_position INTEGER,
+          keyword TEXT,
+          url TEXT NOT NULL,
+          location TEXT,
+          organic_title TEXT,
+          organic_snippet TEXT,
+          health_score INTEGER DEFAULT 0,
+          discovered_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+
+        await db.prepare(`CREATE TABLE IF NOT EXISTS growth_roadmap_items (
+          id TEXT PRIMARY KEY,
+          business_id TEXT NOT NULL,
+          timeframe TEXT NOT NULL,
+          priority TEXT NOT NULL DEFAULT 'medium',
+          impact TEXT NOT NULL DEFAULT 'High',
+          difficulty TEXT NOT NULL DEFAULT 'Medium',
+          title TEXT NOT NULL,
+          category TEXT NOT NULL,
+          description TEXT NOT NULL,
+          action_label TEXT NOT NULL,
+          action_type TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          completed_at DATETIME,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+      } catch (err) {
+        console.warn("Auto-migration notice:", err);
+      }
+    };
+
     try {
       if (request.method === 'OPTIONS') {
         return new Response(null, {
@@ -405,6 +473,9 @@ export const onRequest = async (context: any) => {
           }
         });
       }
+
+      // Auto ensure migrations on database access
+      await ensureD1Schema(env.DB);
 
       // --- HEALTH ---
       if (url.pathname === '/api/health') {
