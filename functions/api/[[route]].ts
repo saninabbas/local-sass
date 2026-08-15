@@ -4295,18 +4295,10 @@ export const onRequest = async (context: any) => {
         ).bind(business.id).all();
 
         if (!tasks || tasks.length === 0) {
-          const latestAudit = await env.DB.prepare(
-            "SELECT audit_data FROM audits WHERE business_id = ? AND status = 'completed' ORDER BY created_at DESC LIMIT 1"
-          ).bind(business.id).first();
-
-          let auditResult = null;
-          if (latestAudit && (latestAudit as any).audit_data) {
-            try { auditResult = JSON.parse((latestAudit as any).audit_data); } catch {}
-          }
-
-          const { generateCampaignTasksFromTelemetry } = await import('./campaignEngine');
-          const generatedTasks = await generateCampaignTasksFromTelemetry(env.DB, business.id as string, auditResult || { url: business.website_url });
-          tasks = generatedTasks as any;
+          const { generateProjectCampaign } = await import('./campaignEngine');
+          const generated = await generateProjectCampaign(env.DB, business, user.id);
+          campaign = generated.campaign;
+          tasks = generated.tasks as any;
         }
 
         return jsonResponse({
@@ -4333,16 +4325,16 @@ export const onRequest = async (context: any) => {
 
         if (!task) return errorResponse("Task not found or unauthorized", 404);
 
-        const changeId = `chg_${crypto.randomUUID().slice(0, 8)}`;
+        const changeId = `chg_${Date.now()}`;
         await env.DB.prepare(
-          "INSERT INTO seo_changes (id, project_id, task_id, change_type, target_url, before_data, generated_data, verification_status) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')"
-        ).bind(changeId, task.project_id, task.id, task.type, task.target_url, task.before_value || '', payload.appliedContent || task.expected_value || '').run().catch(() => {});
+          "INSERT INTO seo_changes (id, project_id, user_id, task_id, change_type, target_url, before_data, generated_data, verification_status) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')"
+        ).bind(changeId, task.project_id, user.id, task.id, task.type, task.target_url, task.before_value || '', payload.appliedContent || task.expected_value || '').run().catch(() => {});
 
         await env.DB.prepare(
-          "UPDATE campaign_tasks SET status = 'WAITING_APPROVAL', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+          "UPDATE campaign_tasks SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
         ).bind(taskId).run();
 
-        return jsonResponse({ success: true, message: "Task marked for user approval and verification", changeId });
+        return jsonResponse({ success: true, message: "Task marked in progress for user deployment & verification", changeId });
       }
 
       if (url.pathname === '/api/campaigns/tasks/verify' && request.method === 'POST') {
@@ -4353,23 +4345,19 @@ export const onRequest = async (context: any) => {
         const taskId = payload.taskId;
         if (!taskId) return errorResponse("Task ID required", 400);
 
-        const task = await env.DB.prepare(
-          "SELECT * FROM campaign_tasks WHERE id = ?"
-        ).bind(taskId).first();
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden", 403);
+          throw err;
+        }
 
-        if (!task) return errorResponse("Task not found", 404);
+        if (!business) return errorResponse("Business not found", 404);
 
-        const { verifyAppliedChange } = await import('./campaignEngine');
-        const verification = await verifyAppliedChange(task.target_url as string, task.type as string, (task.expected_value as string) || '');
-
-        const finalStatus = verification.verified ? 'VERIFIED' : 'FAILED';
-        await env.DB.prepare(
-          "UPDATE campaign_tasks SET status = ?, after_value = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?"
-        ).bind(finalStatus, verification.actualValue || '', taskId).run();
-
-        await env.DB.prepare(
-          "UPDATE seo_changes SET verification_status = ?, verified_at = CURRENT_TIMESTAMP WHERE task_id = ?"
-        ).bind(finalStatus, taskId).run().catch(() => {});
+        const { verifyTaskExecution } = await import('./campaignEngine');
+        const verification = await verifyTaskExecution(env.DB, taskId, business);
 
         return jsonResponse({ success: true, verification });
       }
@@ -4403,7 +4391,7 @@ export const onRequest = async (context: any) => {
         ];
 
         for (const c of candidates) {
-          const id = `kw_${crypto.randomUUID().slice(0, 8)}`;
+          const id = `kw_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
           await env.DB.prepare(`
             INSERT OR IGNORE INTO keyword_targets 
             (id, project_id, keyword, intent, location, target_url, status, source)
@@ -4415,7 +4403,7 @@ export const onRequest = async (context: any) => {
       }
 
       // --- INTERNAL LINK OPPORTUNITIES ENDPOINT ---
-      if (url.pathname === '/api/internal-links/discover' && (request.method === 'GET' || request.method === 'POST')) {
+      if ((url.pathname === '/api/internal-links/discover' || url.pathname === '/api/internal-links') && (request.method === 'GET' || request.method === 'POST')) {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
@@ -4430,8 +4418,8 @@ export const onRequest = async (context: any) => {
 
         if (!business) return jsonResponse({ success: true, data: [] });
 
-        const { discoverInternalLinkOpportunities } = await import('./internalLinkEngine');
-        const opps = await discoverInternalLinkOpportunities(env.DB, business.id as string, business);
+        const { discoverInternalLinks } = await import('./internalLinkEngine');
+        const opps = await discoverInternalLinks(env.DB, business);
 
         return jsonResponse({ success: true, data: opps });
       }

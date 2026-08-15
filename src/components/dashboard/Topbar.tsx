@@ -10,16 +10,21 @@ interface TopbarProps {
 
 export function Topbar({ onMenuClick }: TopbarProps) {
   const { user, logout } = useAuth();
-  const { activeBusiness } = useBusiness();
+  const { businesses, activeBusiness, switchBusiness, planLimit, openAddWebsiteModal } = useBusiness();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const projectDropdownRef = useRef<HTMLDivElement>(null);
   const initial = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setDropdownOpen(false);
+      }
+      if (projectDropdownRef.current && !projectDropdownRef.current.contains(event.target as Node)) {
+        setProjectDropdownOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -48,19 +53,85 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           <Menu size={20} />
         </button>
 
-        {/* Active Project Breadcrumb */}
-        {activeBusiness && (
-          <div className="hidden sm:flex items-center gap-2 text-xs">
-            <span className="text-[#8e8b82] font-mono text-[11px] uppercase tracking-wider">Project:</span>
-            <Link 
-              to="/dashboard/businesses"
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#efe9de] border border-[#e6dfd8] text-[#141413] font-serif font-bold hover:border-[#cc785c]/40 transition-colors shadow-2xs"
-            >
-              <Globe className="w-3.5 h-3.5 text-[#cc785c]" />
-              <span className="truncate max-w-[200px]">{activeBusiness.name || activeBusiness.website_url.replace(/^https?:\/\//, '')}</span>
-            </Link>
-          </div>
-        )}
+        {/* Global Project Switcher Dropdown */}
+        <div className="relative" ref={projectDropdownRef}>
+          <button 
+            onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#efe9de] border border-[#e6dfd8] text-[#141413] hover:border-[#cc785c]/40 transition-colors shadow-2xs cursor-pointer text-xs"
+          >
+            <Globe className="w-3.5 h-3.5 text-[#cc785c]" />
+            <div className="flex flex-col text-left">
+              <span className="text-[9px] font-mono uppercase text-[#8e8b82] leading-none">Current Website</span>
+              <span className="font-serif font-bold text-xs truncate max-w-[160px] sm:max-w-[200px]">
+                {activeBusiness?.name || activeBusiness?.website_url.replace(/^https?:\/\//, '') || 'Select Website'}
+              </span>
+            </div>
+            <ChevronDown size={14} className="text-[#8e8b82] ml-1" />
+          </button>
+
+          {/* Project Dropdown Menu */}
+          {projectDropdownOpen && (
+            <div className="absolute left-0 mt-2 w-72 bg-[#faf9f5] border border-[#e6dfd8] rounded-2xl shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="px-4 py-2 border-b border-[#e6dfd8] flex items-center justify-between">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#8e8b82]">
+                  Your Websites ({businesses.length}/{planLimit})
+                </span>
+                <Link 
+                  to="/dashboard/businesses" 
+                  onClick={() => setProjectDropdownOpen(false)}
+                  className="text-[10px] font-mono text-[#cc785c] hover:underline font-bold"
+                >
+                  Manage All
+                </Link>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto py-1 divide-y divide-[#e6dfd8]/50">
+                {businesses.map((biz) => {
+                  const isActive = biz.id === activeBusiness?.id;
+                  return (
+                    <button
+                      key={biz.id}
+                      onClick={async () => {
+                        await switchBusiness(biz.id);
+                        setProjectDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-2.5 text-left flex items-center justify-between hover:bg-[#efe9de]/60 transition-colors cursor-pointer ${
+                        isActive ? 'bg-[#efe9de]/40 font-bold' : ''
+                      }`}
+                    >
+                      <div className="truncate pr-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                          <span className="text-xs font-serif text-[#141413] truncate">{biz.name || biz.website_url.replace(/^https?:\/\//, '')}</span>
+                        </div>
+                        <span className="text-[10px] text-[#8e8b82] font-mono block pl-3">
+                          {biz.city ? `${biz.city} • ` : ''}{biz.type || 'Local Business'}
+                        </span>
+                      </div>
+                      {biz.score != null && (
+                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#181715] text-[#faf9f5]">
+                          {biz.score}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="p-2 border-t border-[#e6dfd8]">
+                <button
+                  onClick={() => {
+                    setProjectDropdownOpen(false);
+                    openAddWebsiteModal();
+                  }}
+                  className="w-full py-1.5 px-3 rounded-lg bg-[#141413] hover:bg-[#252320] text-[#faf9f5] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <span>+ Add Website Project</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-3">

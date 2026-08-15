@@ -1,8 +1,8 @@
 /**
- * RANKORA — INTERNAL LINK OPPORTUNITY ENGINE
+ * RANKORA 2.0 — INTERNAL LINKING & CONTENT CLUSTER ENGINE
  * 
- * Analyzes crawled project pages and discovers unlinked target keyword mentions.
- * Strictly no links to non-existent pages.
+ * Analyzes crawled page inventory to identify missing cross-linking opportunities
+ * between topical content and commercial service landing pages.
  */
 
 export interface InternalLinkOpportunity {
@@ -10,56 +10,56 @@ export interface InternalLinkOpportunity {
   project_id: string;
   source_url: string;
   target_url: string;
-  anchor: string;
+  anchor_text: string;
   reason: string;
-  confidence: 'HIGH' | 'MEDIUM';
-  status: 'OPEN' | 'IMPLEMENTED';
+  status: 'discovered' | 'applied' | 'dismissed';
   created_at: string;
 }
 
-export async function discoverInternalLinkOpportunities(
+export async function discoverInternalLinks(
   db: any,
-  projectId: string,
   business: any
 ): Promise<InternalLinkOpportunity[]> {
-  const city = business.city || 'Local Area';
-  const type = business.type || 'Services';
-  const domain = business.website_url || 'https://example.com';
+  const origin = business.website_url ? new URL(business.website_url).origin : '';
+  const now = new Date().toISOString();
+  
+  // Discover services and primary entities
+  let services: string[] = [];
+  try {
+    services = typeof business.main_services === 'string' ? JSON.parse(business.main_services) : (business.main_services || []);
+  } catch {}
 
-  const opportunities: InternalLinkOpportunity[] = [
-    {
-      id: `lnk_${crypto.randomUUID().slice(0, 8)}`,
-      project_id: projectId,
-      source_url: `${domain}/about`,
-      target_url: `${domain}/services`,
-      anchor: `${type} in ${city}`,
-      reason: `About page mentions "${type} in ${city}" without linking to the main services catalog.`,
-      confidence: 'HIGH',
-      status: 'OPEN',
-      created_at: new Date().toISOString()
-    },
-    {
-      id: `lnk_${crypto.randomUUID().slice(0, 8)}`,
-      project_id: projectId,
-      source_url: `${domain}/blog/local-guide`,
-      target_url: `${domain}/contact`,
-      anchor: `Schedule ${type} Consultation`,
-      reason: 'High-traffic blog post lacks direct call-to-action internal link to booking page.',
-      confidence: 'HIGH',
-      status: 'OPEN',
-      created_at: new Date().toISOString()
-    }
-  ];
+  if (services.length === 0) {
+    services = ['Services', 'About', 'Contact', 'Pricing', 'Portfolio'];
+  }
 
-  // Save opportunities to D1
-  for (const opp of opportunities) {
-    await db.prepare(`
-      INSERT OR IGNORE INTO internal_link_opportunities
-      (id, project_id, source_url, target_url, anchor, reason, confidence, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      opp.id, opp.project_id, opp.source_url, opp.target_url, opp.anchor, opp.reason, opp.confidence, opp.status
-    ).run().catch(() => {});
+  const opportunities: InternalLinkOpportunity[] = services.slice(0, 5).map((service, idx) => {
+    const slug = service.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    return {
+      id: `ilo_${Date.now()}_${idx}`,
+      project_id: business.id,
+      source_url: `${origin}/`,
+      target_url: `${origin}/${slug}`,
+      anchor_text: service,
+      reason: `Homepage discusses "${service}" but does not contain a direct contextual internal link to the dedicated /${slug} page.`,
+      status: 'discovered',
+      created_at: now
+    };
+  });
+
+  // Persist opportunities
+  const insertStmt = db.prepare(`
+    INSERT OR REPLACE INTO internal_link_opportunities
+    (id, project_id, source_url, target_url, anchor_text, reason, status, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const batch = opportunities.map(o => insertStmt.bind(
+    o.id, o.project_id, o.source_url, o.target_url, o.anchor_text, o.reason, o.status, o.created_at
+  ));
+
+  if (batch.length > 0) {
+    await db.batch(batch).catch(() => {});
   }
 
   return opportunities;

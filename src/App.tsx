@@ -118,6 +118,7 @@ function App() {
               {/* Lazy Loaded Dashboard Routes */}
               <Route path="/dashboard" element={<DashboardSuspense><Dashboard /></DashboardSuspense>} />
               <Route path="/dashboard/businesses" element={<DashboardSuspense><Businesses /></DashboardSuspense>} />
+              <Route path="/dashboard/websites" element={<DashboardSuspense><Businesses /></DashboardSuspense>} />
               <Route path="/dashboard/score" element={<DashboardSuspense><Score /></DashboardSuspense>} />
               <Route path="/dashboard/actions" element={<DashboardSuspense><ActionPlan /></DashboardSuspense>} />
               <Route path="/dashboard/website" element={<DashboardSuspense><Website /></DashboardSuspense>} />
@@ -135,6 +136,7 @@ function App() {
               <Route path="/dashboard/campaign" element={<DashboardSuspense><Campaign /></DashboardSuspense>} />
               <Route path="/dashboard/keywords/discover" element={<DashboardSuspense><KeywordDiscovery /></DashboardSuspense>} />
               <Route path="/dashboard/content/links" element={<DashboardSuspense><InternalLinks /></DashboardSuspense>} />
+              <Route path="/dashboard/internal-links" element={<DashboardSuspense><InternalLinks /></DashboardSuspense>} />
               <Route path="/dashboard/changes" element={<DashboardSuspense><ChangeHistory /></DashboardSuspense>} />
               <Route path="/dashboard/geogrid" element={<DashboardSuspense><GeoGrid /></DashboardSuspense>} />
               
