@@ -474,6 +474,65 @@ export const onRequest = async (context: any) => {
         await db.prepare("CREATE INDEX IF NOT EXISTS idx_businesses_user_id ON businesses(user_id)").run().catch(() => {});
         await db.prepare("CREATE INDEX IF NOT EXISTS idx_businesses_norm_domain ON businesses(user_id, normalized_domain)").run().catch(() => {});
 
+        await db.prepare(`CREATE TABLE IF NOT EXISTS campaigns (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          status TEXT DEFAULT 'ACTIVE',
+          goal TEXT DEFAULT 'Local 3-Pack Rank Elevation',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          completed_at DATETIME
+        )`).run().catch(() => {});
+
+        await db.prepare(`CREATE TABLE IF NOT EXISTS campaign_tasks (
+          id TEXT PRIMARY KEY,
+          campaign_id TEXT,
+          project_id TEXT NOT NULL,
+          type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          description TEXT,
+          priority TEXT DEFAULT 'MEDIUM',
+          status TEXT DEFAULT 'PENDING',
+          source TEXT DEFAULT 'audit',
+          target_url TEXT,
+          target_keyword TEXT,
+          evidence TEXT,
+          before_value TEXT,
+          expected_value TEXT,
+          after_value TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          completed_at DATETIME
+        )`).run().catch(() => {});
+
+        await db.prepare(`CREATE TABLE IF NOT EXISTS seo_changes (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          task_id TEXT,
+          change_type TEXT NOT NULL,
+          target_url TEXT NOT NULL,
+          before_data TEXT,
+          generated_data TEXT,
+          applied_data TEXT,
+          verification_status TEXT DEFAULT 'PENDING',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          verified_at DATETIME
+        )`).run().catch(() => {});
+
+        await db.prepare(`CREATE TABLE IF NOT EXISTS internal_link_opportunities (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          source_url TEXT NOT NULL,
+          target_url TEXT NOT NULL,
+          anchor TEXT NOT NULL,
+          reason TEXT,
+          confidence TEXT DEFAULT 'HIGH',
+          status TEXT DEFAULT 'OPEN',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+
         await db.prepare("CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at DATETIME NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))").run().catch(() => {});
         await db.prepare("CREATE TABLE IF NOT EXISTS leads (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, name TEXT, email TEXT NOT NULL, website TEXT, captured_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))").run().catch(() => {});
         
@@ -4202,7 +4261,222 @@ export const onRequest = async (context: any) => {
           return jsonResponse({ success: true, message: "Keywords visibility refreshed!", redirectUrl: "/dashboard/score" });
         }
 
-        return errorResponse("Unknown action type", 400);
+      // --- SEO CAMPAIGN ENGINE ENDPOINTS ---
+      if (url.pathname === '/api/campaigns' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return jsonResponse({ success: true, data: null });
+
+        let campaign = await env.DB.prepare(
+          "SELECT * FROM campaigns WHERE project_id = ? AND status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1"
+        ).bind(business.id).first();
+
+        if (!campaign) {
+          const cId = `cmp_${crypto.randomUUID().slice(0, 8)}`;
+          await env.DB.prepare(
+            "INSERT INTO campaigns (id, project_id, name, status, goal) VALUES (?, ?, ?, 'ACTIVE', 'Local 3-Pack Rank Elevation')"
+          ).bind(cId, business.id, `${business.name || 'Local'} Growth Campaign`).run().catch(() => {});
+
+          campaign = await env.DB.prepare("SELECT * FROM campaigns WHERE id = ?").bind(cId).first();
+        }
+
+        let { results: tasks } = await env.DB.prepare(
+          "SELECT * FROM campaign_tasks WHERE project_id = ? ORDER BY priority = 'HIGH' DESC, created_at DESC"
+        ).bind(business.id).all();
+
+        if (!tasks || tasks.length === 0) {
+          const latestAudit = await env.DB.prepare(
+            "SELECT audit_data FROM audits WHERE business_id = ? AND status = 'completed' ORDER BY created_at DESC LIMIT 1"
+          ).bind(business.id).first();
+
+          let auditResult = null;
+          if (latestAudit && (latestAudit as any).audit_data) {
+            try { auditResult = JSON.parse((latestAudit as any).audit_data); } catch {}
+          }
+
+          const { generateCampaignTasksFromTelemetry } = await import('./campaignEngine');
+          const generatedTasks = await generateCampaignTasksFromTelemetry(env.DB, business.id as string, auditResult || { url: business.website_url });
+          tasks = generatedTasks as any;
+        }
+
+        return jsonResponse({
+          success: true,
+          data: {
+            campaign,
+            tasks: tasks || [],
+            business
+          }
+        });
+      }
+
+      if (url.pathname === '/api/campaigns/tasks/execute' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        const taskId = payload.taskId;
+        if (!taskId) return errorResponse("Task ID required", 400);
+
+        const task = await env.DB.prepare(
+          "SELECT * FROM campaign_tasks WHERE id = ? AND project_id IN (SELECT id FROM businesses WHERE user_id = ?)"
+        ).bind(taskId, user.id).first();
+
+        if (!task) return errorResponse("Task not found or unauthorized", 404);
+
+        const changeId = `chg_${crypto.randomUUID().slice(0, 8)}`;
+        await env.DB.prepare(
+          "INSERT INTO seo_changes (id, project_id, task_id, change_type, target_url, before_data, generated_data, verification_status) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')"
+        ).bind(changeId, task.project_id, task.id, task.type, task.target_url, task.before_value || '', payload.appliedContent || task.expected_value || '').run().catch(() => {});
+
+        await env.DB.prepare(
+          "UPDATE campaign_tasks SET status = 'WAITING_APPROVAL', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+        ).bind(taskId).run();
+
+        return jsonResponse({ success: true, message: "Task marked for user approval and verification", changeId });
+      }
+
+      if (url.pathname === '/api/campaigns/tasks/verify' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        const taskId = payload.taskId;
+        if (!taskId) return errorResponse("Task ID required", 400);
+
+        const task = await env.DB.prepare(
+          "SELECT * FROM campaign_tasks WHERE id = ?"
+        ).bind(taskId).first();
+
+        if (!task) return errorResponse("Task not found", 404);
+
+        const { verifyAppliedChange } = await import('./campaignEngine');
+        const verification = await verifyAppliedChange(task.target_url as string, task.type as string, (task.expected_value as string) || '');
+
+        const finalStatus = verification.verified ? 'VERIFIED' : 'FAILED';
+        await env.DB.prepare(
+          "UPDATE campaign_tasks SET status = ?, after_value = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?"
+        ).bind(finalStatus, verification.actualValue || '', taskId).run();
+
+        await env.DB.prepare(
+          "UPDATE seo_changes SET verification_status = ?, verified_at = CURRENT_TIMESTAMP WHERE task_id = ?"
+        ).bind(finalStatus, taskId).run().catch(() => {});
+
+        return jsonResponse({ success: true, verification });
+      }
+
+      // --- KEYWORD DISCOVERY ENDPOINT ---
+      if (url.pathname === '/api/keywords/discover' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const city = business.city || 'Austin';
+        const type = business.type || 'Dental Clinic';
+        const name = business.name || 'Local Business';
+
+        const candidates = [
+          { keyword: `${type} in ${city}`, intent: 'LOCAL_TRANSACTIONAL', target_url: `${business.website_url}` },
+          { keyword: `best ${type} ${city}`, intent: 'COMMERCIAL', target_url: `${business.website_url}` },
+          { keyword: `top rated ${type} near me`, intent: 'LOCAL_TRANSACTIONAL', target_url: `${business.website_url}` },
+          { keyword: `${type} services cost ${city}`, intent: 'INFORMATIONAL', target_url: `${business.website_url}/services` },
+          { keyword: `${name} ${city}`, intent: 'NAVIGATIONAL', target_url: `${business.website_url}` }
+        ];
+
+        for (const c of candidates) {
+          const id = `kw_${crypto.randomUUID().slice(0, 8)}`;
+          await env.DB.prepare(`
+            INSERT OR IGNORE INTO keyword_targets 
+            (id, project_id, keyword, intent, location, target_url, status, source)
+            VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', 'discovery')
+          `).bind(id, business.id, c.keyword, c.intent, city, c.target_url).run().catch(() => {});
+        }
+
+        return jsonResponse({ success: true, data: candidates });
+      }
+
+      // --- INTERNAL LINK OPPORTUNITIES ENDPOINT ---
+      if (url.pathname === '/api/internal-links/discover' && (request.method === 'GET' || request.method === 'POST')) {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return jsonResponse({ success: true, data: [] });
+
+        const { discoverInternalLinkOpportunities } = await import('./internalLinkEngine');
+        const opps = await discoverInternalLinkOpportunities(env.DB, business.id as string, business);
+
+        return jsonResponse({ success: true, data: opps });
+      }
+
+      // --- SEO CHANGES HISTORY ENDPOINT ---
+      if (url.pathname === '/api/seo/changes' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return jsonResponse({ success: true, data: [] });
+
+        const { results: changes } = await env.DB.prepare(
+          "SELECT * FROM seo_changes WHERE project_id = ? ORDER BY created_at DESC"
+        ).bind(business.id).all();
+
+        return jsonResponse({ success: true, data: changes || [] });
+      }
+
+      // --- RE-AUDIT ENDPOINT ---
+      if (url.pathname === '/api/seo/re-audit' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const auditData = await executeAudit(business);
+        return jsonResponse({ success: true, data: auditData });
       }
 
       // --- DEBUG ENV ---

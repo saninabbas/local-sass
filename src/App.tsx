@@ -42,6 +42,10 @@ const Account = lazy(() => import('./pages/dashboard/Account').then(m => ({ defa
 const BacklinksAuthority = lazy(() => import('./pages/dashboard/AuthorityBuilder').then(m => ({ default: m.AuthorityBuilder })));
 const GeoGrid = lazy(() => import('./pages/dashboard/GeoGrid').then(m => ({ default: m.GeoGrid })));
 const Copilot = lazy(() => import('./pages/dashboard/Copilot').then(m => ({ default: m.Copilot })));
+const Campaign = lazy(() => import('./pages/dashboard/Campaign').then(m => ({ default: m.Campaign })));
+const KeywordDiscovery = lazy(() => import('./pages/dashboard/KeywordDiscovery').then(m => ({ default: m.KeywordDiscovery })));
+const InternalLinks = lazy(() => import('./pages/dashboard/InternalLinks').then(m => ({ default: m.InternalLinks })));
+const ChangeHistory = lazy(() => import('./pages/dashboard/ChangeHistory').then(m => ({ default: m.ChangeHistory })));
 
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -128,6 +132,10 @@ function App() {
               <Route path="/dashboard/account" element={<DashboardSuspense><Account /></DashboardSuspense>} />
               <Route path="/dashboard/backlinks" element={<DashboardSuspense><BacklinksAuthority /></DashboardSuspense>} />
               <Route path="/dashboard/authority" element={<DashboardSuspense><BacklinksAuthority /></DashboardSuspense>} />
+              <Route path="/dashboard/campaign" element={<DashboardSuspense><Campaign /></DashboardSuspense>} />
+              <Route path="/dashboard/keywords/discover" element={<DashboardSuspense><KeywordDiscovery /></DashboardSuspense>} />
+              <Route path="/dashboard/content/links" element={<DashboardSuspense><InternalLinks /></DashboardSuspense>} />
+              <Route path="/dashboard/changes" element={<DashboardSuspense><ChangeHistory /></DashboardSuspense>} />
               <Route path="/dashboard/geogrid" element={<DashboardSuspense><GeoGrid /></DashboardSuspense>} />
               
               <Route path="/dashboard/*" element={<DashboardPlaceholder title="Page Not Found" />} />

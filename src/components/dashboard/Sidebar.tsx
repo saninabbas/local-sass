@@ -22,7 +22,9 @@ import {
   ChevronsUpDown,
   FolderKanban,
   Plus,
-  Check
+  Check,
+  Flag,
+  History
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBusiness } from '../../context/BusinessContext';
@@ -62,42 +64,47 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   
   const navSections = [
     {
-      title: 'OVERVIEW',
+      title: 'GROWTH ENGINE',
       items: [
         { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'SEO Campaign', href: '/dashboard/campaign', icon: Flag },
         { name: 'Growth Score', href: '/dashboard/score', icon: TrendingUp },
+        { name: 'Website Audit', href: '/dashboard/website', icon: Globe },
+        { name: 'Keywords', href: '/dashboard/keywords', icon: Search },
+        { name: 'Competitor Radar', href: '/dashboard/competitors', icon: Users },
+        { name: 'Local Geo-Grid', href: '/dashboard/geogrid', icon: Navigation },
         { name: 'Websites & Projects', href: '/dashboard/businesses', icon: FolderKanban },
       ]
     },
     {
-      title: 'GROWTH',
+      title: 'AUTHORITY',
       items: [
-        { name: 'Local Rankings', href: '/dashboard/keywords', icon: Search },
-        { name: 'Local Geo-Grid', href: '/dashboard/geogrid', icon: Navigation },
-        { name: 'Competitor Radar', href: '/dashboard/competitors', icon: Users },
-      ]
-    },
-    {
-      title: 'LOCAL PRESENCE',
-      items: [
-        { name: 'Website Audit', href: '/dashboard/website', icon: Globe },
+        { name: 'Backlinks', href: '/dashboard/backlinks', icon: Link2 },
+        { name: 'Citations', href: '/dashboard/authority', icon: Building },
         { name: 'Reviews & Reputation', href: '/dashboard/reviews', icon: Star },
-        { name: 'Backlinks & Authority', href: '/dashboard/backlinks', icon: Link2 },
       ]
     },
     {
-      title: 'CONTENT & LEADS',
+      title: 'CONTENT',
       items: [
         { name: 'Content Studio', href: '/dashboard/content', icon: Sparkles },
-        { name: 'Lead Gen Widget', href: '/dashboard/leads', icon: Building },
+        { name: 'Keyword Discovery', href: '/dashboard/keywords/discover', icon: Search },
+        { name: 'Internal Links', href: '/dashboard/content/links', icon: Link2 },
       ]
     },
     {
-      title: 'AI & REPORTING',
+      title: 'EXECUTION',
       items: [
-        { name: 'AI Action Plan', href: '/dashboard/actions', icon: ListTodo },
-        { name: 'RANKORA AI Agent', href: '/dashboard/copilot', icon: Bot },
-        { name: 'Reports', href: '/dashboard/reports', icon: FileText },
+        { name: 'Action Plan', href: '/dashboard/actions', icon: ListTodo },
+        { name: 'Fix With AI', href: '/dashboard/actions?fix=ai', icon: Bot },
+        { name: 'Change History', href: '/dashboard/changes', icon: History },
+      ]
+    },
+    {
+      title: 'REPORTING',
+      items: [
+        { name: 'Lead Gen Widget', href: '/dashboard/leads', icon: Building },
+        { name: 'Reports & Audits', href: '/dashboard/reports', icon: FileText },
       ]
     }
   ];
