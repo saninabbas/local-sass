@@ -2324,7 +2324,32 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true, data: { id } });
       }
 
-      // --- REVIEWS: CONNECTION STATUS ---
+      // --- AUTHORITY: UPDATE OPPORTUNITY STATUS ---
+      if (url.pathname.startsWith('/api/authority/opportunities/') && url.pathname.endsWith('/status') && request.method === 'PATCH') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const parts = url.pathname.split('/');
+        const oppId = parts[parts.length - 2]; // /api/authority/opportunities/{id}/status
+        const { status } = await request.json() as any;
+
+        const validStatuses = ['DISCOVERED', 'CONTACTED', 'IN_PROGRESS', 'ACQUIRED', 'REJECTED', 'NOT_RELEVANT'];
+        if (!validStatuses.includes(status)) {
+          return errorResponse("Invalid status value", 400);
+        }
+
+        // Ensure status column exists
+        await env.DB.prepare("ALTER TABLE authority_opportunities ADD COLUMN status TEXT DEFAULT 'DISCOVERED'").run().catch(() => {});
+
+        // Only update if this opportunity belongs to the authenticated user
+        await env.DB.prepare(
+          "UPDATE authority_opportunities SET status = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?"
+        ).bind(status, oppId, user.id).run();
+
+        return jsonResponse({ success: true, data: { id: oppId, status } });
+      }
+
+
       if (url.pathname === '/api/reviews/status' && request.method === 'GET') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);

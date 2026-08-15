@@ -10,52 +10,63 @@ export function Pricing() {
 
   const plans = [
     {
-      name: "Free Baseline Audit",
-      description: "Essential website health evaluation and baseline Growth Score for local businesses.",
+      name: "Starter",
+      badge: "Free",
+      who: "For local businesses ready to understand why they're not ranking.",
+      description: "Get your full Growth Score and discover your top 3 blockers.",
       price: "$0",
       period: "forever",
       features: [
-        "Full 7-Vector Diagnostic Audit",
-        "Overall Growth Score (0-100)",
-        "Top 5 Biggest Problems Identification",
-        "Executive PDF Report Export",
-        "Email Support"
+        "Full website diagnostic audit",
+        "Growth Score (11 vectors)",
+        "Top 3 growth bottlenecks identified",
+        "Competitor discovery (up to 3)",
+        "1 AI action plan",
+        "Basic Growth Report"
       ],
-      cta: "Run Free Audit",
+      cta: "Start Free Audit",
+      ctaHref: "/signup",
       popular: false
     },
     {
-      name: "Growth Plan",
-      description: "Complete competitive intelligence, daily keyword tracking, and AI action plans.",
+      name: "Growth",
+      badge: "Most Popular",
+      who: "For businesses serious about dominating local search.",
+      description: "Track rankings weekly, monitor competitors, and execute an AI plan that keeps improving.",
       price: billingCycle === 'monthly' ? "$15" : "$12",
       period: "/month",
       features: [
-        "Everything in Free Audit",
-        "Unlimited Website Re-Crawls",
-        "Track up to 25 Local Keywords",
-        "Live SERP Competitor Spy Tool",
-        "9-Point Gap Analysis Matrix",
-        "Rankora Growth Copilot Assistant",
-        "Weekly Progress Tracking"
+        "Everything in Starter",
+        "Weekly rank tracking (25 keywords)",
+        "Geo-Grid local visibility map",
+        "Competitor monitoring (up to 5)",
+        "AI Copilot (unlimited questions)",
+        "Backlink & authority opportunities",
+        "Review monitoring & AI replies",
+        "Monthly progress reports"
       ],
       cta: "Start 14-Day Free Trial",
+      ctaHref: "/signup",
       popular: true
     },
     {
-      name: "Pro Plan",
-      description: "Advanced automation, AI content generation, reputation management, and lead widgets.",
-      price: billingCycle === 'monthly' ? "$30" : "$25",
+      name: "Agency",
+      badge: "For Teams",
+      who: "For agencies and multi-location businesses.",
+      description: "White-label reports, advanced AI content, and full client workflow management.",
+      price: billingCycle === 'monthly' ? "$49" : "$39",
       period: "/month",
       features: [
-        "Everything in Growth Plan",
-        "AI Local Content & Article Studio",
-        "Reputation & Review AI Replies",
-        "Embeddable Lead Gen Widget",
-        "Authority Link Prospecting & Tracking",
-        "Track up to 100 Local Keywords",
-        "Priority 24/7 Strategic Support"
+        "Everything in Growth",
+        "Up to 10 business locations",
+        "White-label report exports",
+        "AI Content Studio (unlimited)",
+        "Lead Gen Widget embed",
+        "Priority 24/7 support",
+        "API access"
       ],
-      cta: "Upgrade to Pro",
+      cta: "Contact for Agency Pricing",
+      ctaHref: "/contact",
       popular: false
     }
   ];
@@ -122,7 +133,15 @@ export function Pricing() {
                     </span>
                   )}
 
-                  <h3 className="font-serif text-xl font-medium text-[#141413] mb-1">{plan.name}</h3>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-serif text-xl font-medium text-[#141413]">{plan.name}</h3>
+                    {plan.badge && !plan.popular && (
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#efe9de] text-[#6c6a64] border border-[#e6dfd8] uppercase">
+                        {plan.badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[#cc785c] font-sans italic mb-1">{plan.who}</p>
                   <p className="text-xs text-[#6c6a64] font-sans mb-6 leading-relaxed">{plan.description}</p>
 
                   <div className="flex items-baseline gap-1 mb-6 pb-6 border-b border-[#e6dfd8]">
@@ -140,7 +159,7 @@ export function Pricing() {
                   </ul>
                 </div>
 
-                <Link to="/signup" className="w-full block">
+                <Link to={plan.ctaHref || '/signup'} className="w-full block">
                   <Button
                     className={`w-full py-2.5 text-xs font-medium rounded-xl shadow-xs ${
                       plan.popular
@@ -155,6 +174,7 @@ export function Pricing() {
             ))}
           </div>
         </section>
+
       </main>
 
       <Footer />
