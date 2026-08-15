@@ -232,16 +232,16 @@ export function Competitors() {
                 <div className="flex items-center justify-between">
                   <span className="text-secondary">Reviews:</span>
                   <span className="font-bold text-primary">
-                    {dashboardData?.growthScore?.reviews !== null ? `${dashboardData?.growthScore?.reviews}/100` : 'Syncing'}
+                    {dashboardData?.growthScore?.reviews != null ? `${dashboardData.growthScore.reviews}/100` : 'Connecting GBP'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-secondary">Local SEO:</span>
-                  <span className="font-bold text-primary">{dashboardData?.growthScore?.local || 60}/100</span>
+                  <span className="font-bold text-primary">{dashboardData?.growthScore?.local ?? 60}/100</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-secondary">Website Health:</span>
-                  <span className="font-bold text-primary">{dashboardData?.growthScore?.technical || 70}/100</span>
+                  <span className="font-bold text-primary">{dashboardData?.growthScore?.technical ?? 70}/100</span>
                 </div>
               </div>
             </div>
