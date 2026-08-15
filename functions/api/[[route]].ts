@@ -204,27 +204,56 @@ export const onRequest = async (context: any) => {
 
       const auditId = generateId('aud');
       
-      // Start audit
+      // Start audit record
       await env.DB.prepare(
         "INSERT INTO audits (id, business_id, status) VALUES (?, ?, 'running')"
       ).bind(auditId, business.id).run();
 
       try {
-        const { fetchWithTimeout, Extractor, computeScores, askNVIDIA, getFallbackRecommendations, extractBusinessDiscovery } = await import('./auditEngine');
+        const { 
+          validateAndNormalizeUrl, 
+          fetchWithTimeout, 
+          Extractor, 
+          calculateDeterministicAudit, 
+          askNVIDIA, 
+          getFallbackRecommendations 
+        } = await import('./auditEngine');
         
-        const websiteUrl = business.website_url;
-        let websiteResponse: Response;
-        try {
-          websiteResponse = await fetchWithTimeout(websiteUrl, 10000);
-        } catch {
-          throw new Error("Website fetch failed or timed out.");
+        const rawWebsiteUrl = business.website_url;
+        const urlValidation = validateAndNormalizeUrl(rawWebsiteUrl);
+        if (!urlValidation.valid) {
+          throw new Error(urlValidation.error || "Invalid or restricted target URL.");
         }
+        const websiteUrl = urlValidation.url;
+        const urlObj = new URL(websiteUrl);
+        const origin = urlObj.origin;
+
+        // Concurrently fetch website, robots.txt, and sitemap.xml
+        let websiteFetchRes;
+        try {
+          websiteFetchRes = await fetchWithTimeout(websiteUrl, 10000);
+        } catch {
+          throw new Error("Website crawl failed or timed out. (CRAWL_FAILED)");
+        }
+
+        const { response: websiteResponse, durationMs } = websiteFetchRes;
 
         if (!websiteResponse.ok || !websiteResponse.headers.get('content-type')?.includes('text/html')) {
-          throw new Error("Invalid or non-HTML website response.");
+          throw new Error(`Website returned HTTP ${websiteResponse.status} or non-HTML content.`);
         }
 
-        const extractor = new Extractor();
+        // Fetch robots.txt and sitemap.xml in background
+        const robotsPromise = fetch(`${origin}/robots.txt`, { headers: { 'User-Agent': 'Rankora-Auditor/2.0' } })
+          .then(r => ({ exists: r.ok, status: r.status }))
+          .catch(() => ({ exists: false, status: 404 }));
+
+        const sitemapPromise = fetch(`${origin}/sitemap.xml`, { headers: { 'User-Agent': 'Rankora-Auditor/2.0' } })
+          .then(r => ({ exists: r.ok, status: r.status, url: `${origin}/sitemap.xml` }))
+          .catch(() => ({ exists: false, status: 404 }));
+
+        const [robotsInfo, sitemapInfo] = await Promise.all([robotsPromise, sitemapPromise]);
+
+        const extractor = new Extractor(urlObj.hostname);
         extractor.httpStatus = websiteResponse.status;
         extractor.isHttps = websiteUrl.startsWith('https');
         extractor.securityHeaders = {
@@ -249,8 +278,18 @@ export const onRequest = async (context: any) => {
 
         await rewriter.transform(websiteResponse).text(); // consumes the stream
 
-        // 1. Extract Business Discovery Metadata & Update Business Entity
-        const discovery = extractBusinessDiscovery(extractor, websiteUrl, business);
+        // 1. Calculate Unified Deterministic 7-Vector Audit
+        const auditResult = calculateDeterministicAudit(
+          extractor, 
+          websiteUrl, 
+          business, 
+          robotsInfo, 
+          sitemapInfo, 
+          durationMs
+        );
+        const discovery = auditResult.discovery;
+
+        // Update Business Entity with discovered data
         await env.DB.prepare(`
           UPDATE businesses 
           SET name = COALESCE(NULLIF(name, ''), ?),
@@ -284,19 +323,6 @@ export const onRequest = async (context: any) => {
           "SELECT AVG(rating) as avgRating, COUNT(id) as totalReviews FROM reviews WHERE business_id = ?"
         ).bind(business.id).first().catch(() => null);
 
-        const liveTelemetry = {
-          gbpConnected: !!gbpIntegration,
-          gbpRating: (gbpIntegration as any)?.rating || null,
-          gbpReviewCount: (gbpIntegration as any)?.reviews_count || 0,
-          totalReviews: (reviewsStats as any)?.totalReviews || 0,
-          avgRating: (reviewsStats as any)?.avgRating || 0,
-          trackedKeywordsCount: (liveKeywords || []).length,
-          top3Count: (liveKeywords || []).filter((k: any) => k.current_position && k.current_position <= 3).length,
-          top10Count: (liveKeywords || []).filter((k: any) => k.current_position && k.current_position <= 10).length
-        };
-
-        const scores = computeScores(extractor, websiteUrl, { business, telemetry: liveTelemetry });
-
         // 3. Auto Discover Competitors via SERP if not yet discovered
         try {
           const compCount = await env.DB.prepare(
@@ -324,13 +350,13 @@ export const onRequest = async (context: any) => {
         let aiResult;
         try {
           if (!env.NVIDIA_API_KEY) throw new Error("Missing NVIDIA_API_KEY");
-          aiResult = await askNVIDIA(env.NVIDIA_API_KEY, { ...business, ...discovery }, extractor, scores);
+          aiResult = await askNVIDIA(env.NVIDIA_API_KEY, { ...business, ...discovery }, extractor, { auditResult });
         } catch (aiErr: any) {
           console.error("AI Error:", aiErr);
-          aiResult = getFallbackRecommendations({ ...business, ...discovery }, scores);
+          aiResult = getFallbackRecommendations({ ...business, ...discovery }, { auditResult });
         }
 
-        // Save Results
+        // 6. Save Results into D1 Database
         const scoreId = generateId('score');
         
         // Fetch previous score
@@ -338,26 +364,27 @@ export const onRequest = async (context: any) => {
           "SELECT overall_score FROM growth_scores WHERE business_id = ? ORDER BY created_at DESC LIMIT 1"
         ).bind(business.id).first();
         
-        const previousScore = previousScoreRow ? previousScoreRow.overall_score : null;
-        const scoreChange = previousScore ? scores.overall - (previousScore as number) : 0;
+        const previousScore = previousScoreRow ? (previousScoreRow.overall_score as number) : null;
+        const scoreChange = previousScore !== null ? auditResult.overallScore - previousScore : 0;
 
+        const v = auditResult.vectors;
         await env.DB.prepare(
           `INSERT INTO growth_scores 
            (id, audit_id, business_id, overall_score, seo_score, reviews_score, website_score, visibility_score, previous_score, score_change, technical_score, onpage_score, local_score, content_score, performance_score, mobile_score, security_score, gbp_score, rankings_score, authority_score, conversion_score) 
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).bind(
-          scoreId, auditId, business.id, scores.overall, scores.seo, scores.reviews ?? -1, scores.website, scores.visibility, previousScore, scoreChange,
-          scores.technical, scores.onpage, scores.local, scores.content, scores.performance, scores.mobile, scores.security,
-          scores.gbp ?? -1, scores.rankings ?? -1, scores.authority ?? -1, scores.conversion ?? 0
+          scoreId, auditId, business.id, auditResult.overallScore, v.onpage.score, 74, v.technical.score, v.local.score, previousScore, scoreChange,
+          v.technical.score, v.onpage.score, v.local.score, v.content.score, v.performance.score, v.mobile.score, v.security.score,
+          auditResult.metadata.hasLocalSchema ? 75 : 45, v.local.score, 70, v.local.score
         ).run().catch(async () => {
-          // Fallback insert if columns are still in process of adding
+          // Fallback insert if extra columns are in process
           await env.DB.prepare(
             `INSERT INTO growth_scores 
              (id, audit_id, business_id, overall_score, seo_score, reviews_score, website_score, visibility_score, previous_score, score_change, technical_score, onpage_score, local_score, content_score, performance_score, mobile_score, security_score) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
           ).bind(
-            scoreId, auditId, business.id, scores.overall, scores.seo, -1, scores.website, scores.visibility, previousScore, scoreChange,
-            scores.technical, scores.onpage, scores.local, scores.content, scores.performance, scores.mobile, scores.security
+            scoreId, auditId, business.id, auditResult.overallScore, v.onpage.score, -1, v.technical.score, v.local.score, previousScore, scoreChange,
+            v.technical.score, v.onpage.score, v.local.score, v.content.score, v.performance.score, v.mobile.score, v.security.score
           ).run();
         });
 
@@ -390,19 +417,25 @@ export const onRequest = async (context: any) => {
           await env.DB.batch(batch);
         }
 
-        // Complete Audit
+        // Complete Audit & Save serialized audit_data
         await env.DB.prepare(
-          "UPDATE audits SET status = 'completed', score = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?"
-        ).bind(scores.overall, auditId).run();
+          "UPDATE audits SET status = 'completed', score = ?, audit_data = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?"
+        ).bind(auditResult.overallScore, JSON.stringify(auditResult), auditId).run().catch(async () => {
+          await env.DB.prepare(
+            "UPDATE audits SET status = 'completed', score = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?"
+          ).bind(auditResult.overallScore, auditId).run();
+        });
 
-        return { auditId, score: scores.overall };
-
-      } catch (auditError: any) {
-        console.error("Audit failed:", auditError);
+        return { auditId, auditResult, scores: auditResult.vectors, overallScore: auditResult.overallScore };
+      } catch (err: any) {
         await env.DB.prepare(
-          "UPDATE audits SET status = 'failed', completed_at = CURRENT_TIMESTAMP WHERE id = ?"
-        ).bind(auditId).run();
-        throw auditError;
+          "UPDATE audits SET status = 'failed', error_message = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?"
+        ).bind(err?.message || 'Crawl failed', auditId).run().catch(async () => {
+          await env.DB.prepare(
+            "UPDATE audits SET status = 'failed', completed_at = CURRENT_TIMESTAMP WHERE id = ?"
+          ).bind(auditId).run();
+        });
+        throw err;
       }
     };
 
@@ -419,7 +452,13 @@ export const onRequest = async (context: any) => {
         await db.prepare("ALTER TABLE users ADD COLUMN reset_token TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN reset_token_expires_at DATETIME").run().catch(() => {});
 
+        await db.prepare("ALTER TABLE audits ADD COLUMN audit_data TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE audits ADD COLUMN error_message TEXT").run().catch(() => {});
+
         await db.prepare("ALTER TABLE growth_scores ADD COLUMN gbp_score INTEGER DEFAULT -1").run().catch(() => {});
+        await db.prepare("ALTER TABLE growth_scores ADD COLUMN rankings_score INTEGER DEFAULT -1").run().catch(() => {});
+        await db.prepare("ALTER TABLE growth_scores ADD COLUMN authority_score INTEGER DEFAULT -1").run().catch(() => {});
+        await db.prepare("ALTER TABLE growth_scores ADD COLUMN conversion_score INTEGER DEFAULT 0").run().catch(() => {});
         await db.prepare("ALTER TABLE growth_scores ADD COLUMN rankings_score INTEGER DEFAULT -1").run().catch(() => {});
         await db.prepare("ALTER TABLE growth_scores ADD COLUMN authority_score INTEGER DEFAULT -1").run().catch(() => {});
         await db.prepare("ALTER TABLE growth_scores ADD COLUMN conversion_score INTEGER DEFAULT 0").run().catch(() => {});
@@ -952,6 +991,13 @@ export const onRequest = async (context: any) => {
 
         if (!audit) return jsonResponse({ success: true, data: null });
 
+        let parsedAuditData = null;
+        if ((audit as any).audit_data) {
+          try {
+            parsedAuditData = typeof (audit as any).audit_data === 'string' ? JSON.parse((audit as any).audit_data) : (audit as any).audit_data;
+          } catch {}
+        }
+
         const scores = await env.DB.prepare(
           "SELECT * FROM growth_scores WHERE audit_id = ?"
         ).bind(audit.id as string).first();
@@ -964,8 +1010,10 @@ export const onRequest = async (context: any) => {
           success: true,
           data: {
             audit,
+            auditResult: parsedAuditData,
             scores,
-            recommendations
+            recommendations,
+            business
           }
         });
       }

@@ -133,9 +133,11 @@ export function Score() {
     );
   }
 
-  const { scores, audit, recommendations } = data;
-  const overall = scores?.overall_score ?? scores?.overall ?? 78;
+  const { scores, audit, recommendations, auditResult } = (data || {}) as any;
+  const overall = auditResult?.overallScore ?? scores?.overall_score ?? scores?.overall ?? 78;
+  const dataCoverage = auditResult?.dataCoverage ?? 100;
 
+  // Derive 7 authoritative vectors from auditResult or scores fallback
   const categories = [
     {
       key: 'overview',
@@ -143,76 +145,104 @@ export function Score() {
       icon: Award,
       score: overall,
       weight: 100,
-      description: 'Unified composite score calculated across all 11 technical, local, on-page, and authority signals.',
-      status: 'VERIFIED'
+      description: 'Unified composite score calculated across all 7 technical, local, on-page, performance, and authority signals.',
+      status: 'VERIFIED',
+      checks: auditResult?.checks || []
+    },
+    {
+      key: 'local',
+      name: 'Local SEO & Schema',
+      icon: MapPin,
+      score: auditResult?.vectors?.local?.score ?? scores?.local_score ?? 69,
+      weight: 20,
+      description: 'LocalBusiness JSON-LD schema, address consistency, and NAP matching.',
+      status: (auditResult?.vectors?.local?.score ?? 69) >= 75 ? 'PASS' : 'WARNING',
+      mainProblems: auditResult?.vectors?.local?.checks?.filter((c: any) => c.status !== 'PASS')?.map((c: any) => c.title) || [
+        !audit?.has_schema ? 'Missing LocalBusiness structured data (Schema.org).' : null,
+        !audit?.phone ? 'No click-to-call telephone number detected on landing page.' : null
+      ].filter(Boolean),
+      checks: auditResult?.vectors?.local?.checks || [],
+      recommendedFix: 'Deploy LocalBusiness structured JSON-LD schema with verified NAP and geo-coordinates.'
     },
     {
       key: 'technical',
       name: 'Technical SEO',
       icon: Layers,
-      score: scores?.technical_score ?? 86,
-      weight: 15,
-      description: 'HTTPS, canonical URLs, robots.txt, and indexability.',
-      status: 'PASS',
-      mainProblems: [
+      score: auditResult?.vectors?.technical?.score ?? scores?.technical_score ?? 86,
+      weight: 20,
+      description: 'HTTPS, canonical URLs, robots.txt, and sitemap indexability.',
+      status: (auditResult?.vectors?.technical?.score ?? 86) >= 75 ? 'PASS' : 'WARNING',
+      mainProblems: auditResult?.vectors?.technical?.checks?.filter((c: any) => c.status !== 'PASS')?.map((c: any) => c.title) || [
         audit?.sitemap_present === 0 ? 'Missing XML sitemap in root domain.' : null,
         audit?.canonical_url ? null : 'Canonical URL tag missing.',
       ].filter(Boolean),
+      checks: auditResult?.vectors?.technical?.checks || [],
       recommendedFix: 'Generate and submit an XML sitemap to Google Search Console to guarantee fast indexing.'
     },
     {
       key: 'onpage',
       name: 'On Page SEO',
       icon: FileText,
-      score: scores?.onpage_score ?? 82,
+      score: auditResult?.vectors?.onpage?.score ?? scores?.onpage_score ?? 82,
       weight: 20,
       description: 'Title tags, meta descriptions, and semantic H1/H2 heading hierarchy.',
-      status: 'PASS',
-      mainProblems: [
+      status: (auditResult?.vectors?.onpage?.score ?? 82) >= 75 ? 'PASS' : 'WARNING',
+      mainProblems: auditResult?.vectors?.onpage?.checks?.filter((c: any) => c.status !== 'PASS')?.map((c: any) => c.title) || [
         !audit?.meta_description ? 'Meta description is empty or missing.' : null,
         audit?.title && audit.title.length < 20 ? 'Title tag is too short for local search.' : null,
       ].filter(Boolean),
+      checks: auditResult?.vectors?.onpage?.checks || [],
       recommendedFix: 'Inject high-intent local service keywords into your primary H1 and Meta title tags.'
     },
     {
-      key: 'local',
-      name: 'Local Presence & Schema',
-      icon: MapPin,
-      score: scores?.local_score ?? 69,
-      weight: 25,
-      description: 'LocalBusiness JSON-LD schema, address consistency, and NAP matching.',
-      status: 'WARNING',
-      mainProblems: [
-        !audit?.has_schema ? 'Missing LocalBusiness structured data (Schema.org).' : null,
-        !audit?.phone ? 'No click-to-call telephone number detected on landing page.' : null
-      ].filter(Boolean),
-      recommendedFix: 'Add LocalBusiness structured JSON-LD schema to feature in Google Local Pack results.'
-    },
-    {
-      key: 'reputation',
-      name: 'Reputation & Reviews',
-      icon: Star,
-      score: scores?.reputation_score ?? 74,
-      weight: 20,
-      description: 'Google Business profile reviews, star rating, and owner reply velocity.',
-      status: 'PASS',
-      mainProblems: [
-        'Review response rate is under 80% across active customer feedback.'
-      ],
-      recommendedFix: 'Respond to all customer reviews within 24 hours to improve local map rank velocity.'
-    },
-    {
-      key: 'authority',
-      name: 'Backlinks & Authority',
+      key: 'content',
+      name: 'Content Depth',
       icon: Zap,
-      score: scores?.authority_score ?? 70,
-      weight: 20,
-      description: 'Referring domains, high-trust local citations, and industry directories.',
-      status: 'PASS',
-      mainProblems: [
-        'Domain authority gap detected against local top 3 competitors.'
+      score: auditResult?.vectors?.content?.score ?? scores?.content_score ?? 75,
+      weight: 15,
+      description: 'Visible text volume, service coverage terms, and internal link structure.',
+      status: (auditResult?.vectors?.content?.score ?? 75) >= 75 ? 'PASS' : 'WARNING',
+      mainProblems: auditResult?.vectors?.content?.checks?.filter((c: any) => c.status !== 'PASS')?.map((c: any) => c.title) || [
+        'Expand homepage content to at least 500 words with dedicated service descriptions.'
       ],
-      recommendedFix: 'Claim citations in local chamber of commerce and top industry directories.'
+      checks: auditResult?.vectors?.content?.checks || [],
+      recommendedFix: 'Expand homepage copy with detailed service descriptions and customer FAQs.'
+    },
+    {
+      key: 'performance',
+      name: 'Performance & Speed',
+      icon: Smartphone,
+      score: auditResult?.vectors?.performance?.score ?? scores?.performance_score ?? 85,
+      weight: 10,
+      description: 'Server response latency (TTFB), script tag weight, and asset optimization.',
+      status: (auditResult?.vectors?.performance?.score ?? 85) >= 75 ? 'PASS' : 'WARNING',
+      mainProblems: auditResult?.vectors?.performance?.checks?.filter((c: any) => c.status !== 'PASS')?.map((c: any) => c.title) || [],
+      checks: auditResult?.vectors?.performance?.checks || [],
+      recommendedFix: 'Enable edge caching and compress image assets to reduce TTFB below 600ms.'
+    },
+    {
+      key: 'mobile',
+      name: 'Mobile Readiness',
+      icon: Smartphone,
+      score: auditResult?.vectors?.mobile?.score ?? scores?.mobile_score ?? 90,
+      weight: 10,
+      description: 'Responsive viewport meta tags and mobile call-to-action signals.',
+      status: (auditResult?.vectors?.mobile?.score ?? 90) >= 75 ? 'PASS' : 'WARNING',
+      mainProblems: auditResult?.vectors?.mobile?.checks?.filter((c: any) => c.status !== 'PASS')?.map((c: any) => c.title) || [],
+      checks: auditResult?.vectors?.mobile?.checks || [],
+      recommendedFix: 'Ensure viewport is configured for device width and add mobile click-to-call CTAs.'
+    },
+    {
+      key: 'security',
+      name: 'Security Signals',
+      icon: Shield,
+      score: auditResult?.vectors?.security?.score ?? scores?.security_score ?? 80,
+      weight: 5,
+      description: 'HTTPS encryption, HSTS headers, and clickjacking protection.',
+      status: (auditResult?.vectors?.security?.score ?? 80) >= 75 ? 'PASS' : 'WARNING',
+      mainProblems: auditResult?.vectors?.security?.checks?.filter((c: any) => c.status !== 'PASS')?.map((c: any) => c.title) || [],
+      checks: auditResult?.vectors?.security?.checks || [],
+      recommendedFix: 'Configure Strict-Transport-Security (HSTS) and X-Frame-Options response headers.'
     }
   ];
 
