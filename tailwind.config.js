@@ -56,10 +56,10 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
-        serif: ['"EB Garamond"', '"Cormorant Garamond"', 'Copernicus', '"Tiempos Headline"', 'Garamond', 'serif'],
+        sans: ['"Plus Jakarta Sans"', 'Inter', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
+        serif: ['Lora', 'Copernicus', '"Tiempos Headline"', 'Georgia', 'serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
-        display: ['"EB Garamond"', '"Cormorant Garamond"', 'Copernicus', '"Tiempos Headline"', 'serif'],
+        display: ['Lora', 'Copernicus', '"Tiempos Headline"', 'Georgia', 'serif'],
       },
       letterSpacing: {
         'display-xl': '-1.5px',

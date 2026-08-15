@@ -152,16 +152,16 @@ export function Keywords() {
             size="sm"
             onClick={handleRefresh}
             disabled={refreshing || keywords.length === 0}
-            className="border-gray-200 bg-white text-primary hover:bg-gray-50 flex items-center gap-2 text-xs font-semibold h-9 shadow-xs"
+            className="border-[#e6dfd8] bg-[#faf9f5] text-[#141413] hover:bg-[#efe9de] flex items-center gap-2 text-xs font-semibold h-9 shadow-xs"
           >
-            <RefreshCw size={13} className={refreshing ? "animate-spin text-primary-accent" : "text-secondary"} />
+            <RefreshCw size={13} className={refreshing ? "animate-spin text-[#cc785c]" : "text-[#8e8b82]"} />
             {refreshing ? 'Refreshing SERP...' : 'Refresh Rankings'}
           </Button>
           <Button
             variant="primary"
             size="sm"
             onClick={() => setShowAddModal(true)}
-            className="bg-primary-accent hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1.5 h-9"
+            className="bg-[#141413] hover:bg-[#252320] text-[#faf9f5] font-semibold text-xs flex items-center gap-1.5 h-9"
           >
             <Plus size={14} />
             <span>Add Keyword</span>
@@ -171,26 +171,26 @@ export function Keywords() {
 
       {/* KPI Stats Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs font-semibold text-secondary">Tracked Keywords</span>
-          <div className="mt-2 text-2xl font-black text-primary">{keywords.length}</div>
+        <div className="bg-[#efe9de] p-4 rounded-2xl border border-[#e6dfd8] shadow-xs">
+          <span className="text-xs font-semibold text-[#6c6a64] font-sans">Tracked Keywords</span>
+          <div className="mt-2 text-2xl font-serif font-medium text-[#141413]">{keywords.length}</div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs font-semibold text-secondary">Top 3 Organic</span>
-          <div className="mt-2 text-2xl font-black text-emerald-600">{top3Count}</div>
+        <div className="bg-[#efe9de] p-4 rounded-2xl border border-[#e6dfd8] shadow-xs">
+          <span className="text-xs font-semibold text-[#6c6a64] font-sans">Top 3 Organic</span>
+          <div className="mt-2 text-2xl font-serif font-medium text-emerald-600">{top3Count}</div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs font-semibold text-secondary">Local 3-Pack Presence</span>
-          <div className="mt-2 text-2xl font-black text-primary-accent">{localPackCount}</div>
+        <div className="bg-[#efe9de] p-4 rounded-2xl border border-[#e6dfd8] shadow-xs">
+          <span className="text-xs font-semibold text-[#6c6a64] font-sans">Local 3-Pack Presence</span>
+          <div className="mt-2 text-2xl font-serif font-medium text-[#cc785c]">{localPackCount}</div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs font-semibold text-secondary">Top 10 (Page 1)</span>
-          <div className="mt-2 text-2xl font-black text-purple-600">{top10Count}</div>
+        <div className="bg-[#efe9de] p-4 rounded-2xl border border-[#e6dfd8] shadow-xs">
+          <span className="text-xs font-semibold text-[#6c6a64] font-sans">Top 10 (Page 1)</span>
+          <div className="mt-2 text-2xl font-serif font-medium text-purple-600">{top10Count}</div>
         </div>
       </div>
 
       {/* Search & Filter Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs mb-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="bg-[#efe9de] p-4 rounded-2xl border border-[#e6dfd8] shadow-xs mb-6 flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
           {[
             { id: 'all', label: `All (${keywords.length})` },
@@ -204,8 +204,8 @@ export function Keywords() {
               onClick={() => setActiveFilter(f.id as any)}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                 activeFilter === f.id
-                  ? 'bg-primary-accent text-white shadow-xs'
-                  : 'bg-gray-50 hover:bg-gray-100 text-secondary hover:text-primary border border-gray-200'
+                  ? 'bg-[#141413] text-[#faf9f5] shadow-xs'
+                  : 'bg-[#faf9f5] hover:bg-[#e8e0d2] text-[#6c6a64] hover:text-[#141413] border border-[#e6dfd8]'
               }`}
             >
               {f.label}

@@ -30,12 +30,14 @@
   body {
     background-color: #faf9f5;
     color: #141413;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   h1, h2, h3, .font-serif, .font-display {
-    font-family: 'EB Garamond', 'Cormorant Garamond', 'Copernicus', 'Tiempos Headline', Garamond, serif;
-    font-weight: 400;
+    font-family: 'Lora', 'Copernicus', 'Tiempos Headline', Georgia, serif;
+    letter-spacing: -0.02em;
   }
 
   code, pre, .font-mono {

@@ -181,9 +181,9 @@ export function Competitors() {
             size="sm"
             onClick={handleDiscover}
             disabled={discovering}
-            className="border-gray-200 bg-white text-primary hover:bg-gray-50 flex items-center gap-2 text-xs font-semibold h-9 shadow-xs"
+            className="border-[#e6dfd8] bg-[#faf9f5] text-[#141413] hover:bg-[#efe9de] flex items-center gap-2 text-xs font-semibold h-9 shadow-xs"
           >
-            <RefreshCw size={13} className={discovering ? "animate-spin text-primary-accent" : "text-secondary"} />
+            <RefreshCw size={13} className={discovering ? "animate-spin text-[#cc785c]" : "text-[#8e8b82]"} />
             {discovering ? 'Searching Google SERP...' : 'Scan Market Competitors'}
           </Button>
         </div>
@@ -197,25 +197,25 @@ export function Competitors() {
       )}
 
       {/* 1. TOP SECTION: YOUR BUSINESS VS TOP LOCAL COMPETITORS */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs mb-8">
+      <div className="bg-[#efe9de] p-6 rounded-2xl border border-[#e6dfd8] shadow-xs mb-8">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-base font-bold text-primary flex items-center gap-2">
-              <Users size={18} className="text-primary-accent" />
+            <h2 className="text-lg font-serif font-medium text-[#141413] flex items-center gap-2">
+              <Users size={18} className="text-[#cc785c]" />
               Your Business vs Top Local Competitors in {myBusiness?.city || 'Your Area'}
             </h2>
-            <p className="text-xs text-secondary mt-0.5">
+            <p className="text-xs text-[#6c6a64] mt-0.5 font-sans">
               Verified competitors discovered through localized Google organic search & Local 3-Pack results.
             </p>
           </div>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 uppercase border border-emerald-200">
+          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 uppercase border border-emerald-200">
             REAL SERP EVIDENCE
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Your Business Card */}
-          <div className="p-4 rounded-xl border-2 border-primary-accent bg-blue-50/40 shadow-xs flex flex-col justify-between">
+          <div className="p-4 rounded-xl border-2 border-[#cc785c] bg-[#faf9f5] shadow-xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-black px-2 py-0.5 rounded bg-primary-accent text-white uppercase">

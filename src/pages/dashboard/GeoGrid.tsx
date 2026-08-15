@@ -159,37 +159,37 @@ export function GeoGrid() {
 
       {/* KPI Stats Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs font-semibold text-secondary">Average Grid Rank (AGR)</span>
-          <div className="mt-2 text-2xl font-black text-primary">
+        <div className="bg-[#efe9de] p-4 rounded-2xl border border-[#e6dfd8] shadow-xs">
+          <span className="text-xs font-semibold text-[#6c6a64] font-sans">Average Grid Rank (AGR)</span>
+          <div className="mt-2 text-2xl font-serif font-medium text-[#141413]">
             {geoData?.averageGridRank ? `#${geoData.averageGridRank}` : '—'}
           </div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs font-semibold text-secondary">Local Visibility Index (LVI)</span>
-          <div className="mt-2 text-2xl font-black text-primary-accent">
+        <div className="bg-[#efe9de] p-4 rounded-2xl border border-[#e6dfd8] shadow-xs">
+          <span className="text-xs font-semibold text-[#6c6a64] font-sans">Local Visibility Index (LVI)</span>
+          <div className="mt-2 text-2xl font-serif font-medium text-[#cc785c]">
             {geoData?.localVisibilityIndex !== undefined ? `${geoData.localVisibilityIndex}%` : '—'}
           </div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs font-semibold text-secondary">Top 3 Local Pack Share</span>
-          <div className="mt-2 text-2xl font-black text-emerald-600">
+        <div className="bg-[#efe9de] p-4 rounded-2xl border border-[#e6dfd8] shadow-xs">
+          <span className="text-xs font-semibold text-[#6c6a64] font-sans">Top 3 Local Pack Share</span>
+          <div className="mt-2 text-2xl font-serif font-medium text-emerald-600">
             {geoData?.top3Percentage !== undefined ? `${geoData.top3Percentage}%` : '—'}
           </div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
-          <span className="text-xs font-semibold text-secondary">Grid Dimension & Radius</span>
-          <div className="mt-2 text-2xl font-black text-primary">
-            {geoData?.gridSize ? `${geoData.gridSize}x${geoData.gridSize}` : `${gridSize}x${gridSize}`} <span className="text-xs font-normal text-secondary font-sans">({geoData?.radiusMiles || radiusMiles} mi)</span>
+        <div className="bg-[#efe9de] p-4 rounded-2xl border border-[#e6dfd8] shadow-xs">
+          <span className="text-xs font-semibold text-[#6c6a64] font-sans">Grid Dimension & Radius</span>
+          <div className="mt-2 text-2xl font-serif font-medium text-[#141413]">
+            {geoData?.gridSize ? `${geoData.gridSize}x${geoData.gridSize}` : `${gridSize}x${gridSize}`} <span className="text-xs font-normal text-[#6c6a64] font-sans">({geoData?.radiusMiles || radiusMiles} mi)</span>
           </div>
         </div>
       </div>
 
       {/* Scan Parameter Form */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs mb-8">
+      <div className="bg-[#efe9de] p-5 rounded-2xl border border-[#e6dfd8] shadow-xs mb-8">
         <form onSubmit={handleRunScan} className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 items-end">
           <div className="sm:col-span-4">
-            <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-1">
+            <label className="block text-xs font-bold text-[#6c6a64] font-mono uppercase tracking-wider mb-1">
               Target Search Query *
             </label>
             <input
@@ -198,7 +198,7 @@ export function GeoGrid() {
               placeholder="e.g. emergency dentist, hvac repair"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              className="w-full px-3.5 py-2 text-xs rounded-xl border border-gray-200 bg-gray-50 focus:bg-white text-primary focus:outline-none focus:ring-1 focus:ring-primary-accent"
+              className="w-full px-3.5 py-2 text-xs rounded-xl border border-[#e6dfd8] bg-[#faf9f5] focus:bg-white text-[#141413] focus:outline-none focus:border-[#cc785c]"
             />
           </div>
 

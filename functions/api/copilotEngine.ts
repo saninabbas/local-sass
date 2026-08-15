@@ -109,7 +109,8 @@ STRICT OPERATIONAL RULES:
 1. Speak with authoritative, practical, and highly specific local business advice.
 2. Directly reference their specific numbers, city (${context.business.city}), domain (${context.business.websiteUrl}), and competitors.
 3. If asked for code or schema, provide clean, valid, copy-pasteable JSON-LD or HTML code blocks with their exact business details.
-4. Keep formatting clean with concise markdown headers and bold bullet points.`;
+4. Keep formatting clean with concise markdown headers and bold bullet points.
+5. ZERO-FABRICATION RULE: Never fabricate backlinks, referring domains, or authority metrics. If asked about backlinks and no verified backlink provider is connected or totalBacklinks is 0, state clearly: "I don't have verified backlink data for this domain yet." and guide the user to discover local authority opportunities in the Backlinks module.`;
 
   if (!apiKey) {
     return generateLocalContextReply(userMessage, context);
@@ -178,6 +179,9 @@ function determineActionButtons(userMessage: string, context: CopilotFullContext
   if (lower.includes('plan') || lower.includes('fix') || lower.includes('action') || lower.includes('first')) {
     actions.push({ type: 'view_module', label: 'Execute Action Plan', target: '/dashboard/actions' });
   }
+  if (lower.includes('backlink') || lower.includes('authority') || lower.includes('citation') || lower.includes('directory')) {
+    actions.push({ type: 'view_module', label: 'Open Backlinks & Authority', target: '/dashboard/backlinks' });
+  }
 
   if (actions.length === 0) {
     actions.push({ type: 'view_module', label: 'View Action Roadmap', target: '/dashboard/actions' });
@@ -199,54 +203,41 @@ function generateLocalContextReply(
 
   let reply = '';
 
-  // 1. SPECIFIC ACTION: SCHEMA / JSON-LD
-  if (lower.includes('json-ld') || lower.includes('schema markup') || lower.includes('localbusiness schema')) {
-    reply = `### Step-by-Step Implementation: JSON-LD LocalBusiness Schema for ${bizName}\n\n` +
-      `Deploying structured data directly satisfies Google's Local 3-Pack entity criteria. Paste the following JSON-LD script tag directly into the \`<head>\` section of your homepage (${domain}):\n\n` +
+  // 1. GENERATE FAQ SCHEMA
+  if (lower.includes('faq schema') || lower.includes('generate schema') || lower.includes('json-ld')) {
+    reply = `### Verified LocalBusiness JSON-LD Schema for ${bizName}\n\n` +
+      `Here is the production-ready schema generated directly from your verified business data in **${city}**:\n\n` +
       `\`\`\`html\n` +
       `<script type="application/ld+json">\n` +
       `{\n` +
       `  "@context": "https://schema.org",\n` +
       `  "@type": "LocalBusiness",\n` +
       `  "name": "${bizName}",\n` +
-      `  "image": "${domain}/logo.png",\n` +
-      `  "@id": "${domain}",\n` +
       `  "url": "${domain}",\n` +
-      `  "telephone": "+1-555-0199",\n` +
-      `  "priceRange": "$$",\n` +
       `  "address": {\n` +
       `    "@type": "PostalAddress",\n` +
-      `    "streetAddress": "Main Street",\n` +
       `    "addressLocality": "${city}",\n` +
       `    "addressCountry": "US"\n` +
       `  },\n` +
-      `  "geo": {\n` +
-      `    "@type": "GeoCoordinates",\n` +
-      `    "latitude": 30.2672,\n` +
-      `    "longitude": -97.7431\n` +
-      `  },\n` +
-      `  "openingHoursSpecification": [\n` +
-      `    {\n` +
-      `      "@type": "OpeningHoursSpecification",\n` +
-      `      "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],\n` +
-      `      "opens": "08:00",\n` +
-      `      "closes": "18:00"\n` +
-      `    }\n` +
-      `  ]\n` +
+      `  "priceRange": "$$",\n` +
+      `  "areaServed": {\n` +
+      `    "@type": "City",\n` +
+      `    "name": "${city}"\n` +
+      `  }\n` +
       `}\n` +
       `</script>\n` +
       `\`\`\`\n\n` +
-      `**Verification Step**:\n` +
-      `Once deployed, test your URL on the [Google Rich Results Test](https://search.google.com/test/rich-results) to verify 0 errors.`;
+      `**Action**: Paste this snippet into the \`<head>\` section of your homepage.`;
   }
-  // 2. SPECIFIC ACTION: META TITLE TAG
-  else if (lower.includes('meta title') || lower.includes('title tag') || lower.includes('optimize homepage')) {
+  // 2. IMPROVE TITLE TAG
+  else if (lower.includes('title') || lower.includes('meta') || lower.includes('tag')) {
     reply = `### Optimized Title & Meta Description for ${bizName}\n\n` +
-      `Replace your existing \`<title>\` and \`<meta name="description">\` tags in your homepage HTML with these high-converting, city-anchored tags:\n\n` +
+      `**Recommended Title Tag (56 characters)**:\n` +
       `\`\`\`html\n` +
-      `<!-- Recommended Title Tag (54 characters) -->\n` +
-      `<title>${category} in ${city} | ${bizName}</title>\n\n` +
-      `<!-- Recommended Meta Description (152 characters) -->\n` +
+      `<title>${category} in ${city} | Top Rated & Trusted — ${bizName}</title>\n` +
+      `\`\`\`\n\n` +
+      `**Recommended Meta Description (152 characters)**:\n` +
+      `\`\`\`html\n` +
       `<meta name="description" content="Top-rated ${category.toLowerCase()} in ${city}. Fast appointments, certified specialists, and 5-star service for ${city} residents. Call today for a consultation!" />\n` +
       `\`\`\`\n\n` +
       `**Why This Works**:\n` +
@@ -296,6 +287,20 @@ function generateLocalContextReply(
       `- Reply to all pending reviews using AI-assisted responses.\n\n` +
       `**Week 4: Authority & Citations**\n` +
       `- Submit your business profile to 3 verified local community directories.`;
+  }
+  // 7. BACKLINKS / AUTHORITY QUERY
+  else if (lower.includes('backlink') || lower.includes('backlinks') || lower.includes('referring domain') || lower.includes('authority')) {
+    const totalBl = context.authority?.totalBacklinks || 0;
+    if (totalBl === 0) {
+      reply = `### Backlink & Authority Status for ${bizName}\n\n` +
+        `I don't have verified backlink data for **${domain}** yet.\n\n` +
+        `We do not fabricate synthetic Domain Authority or fake backlink counts. To discover verified local directories, chamber of commerce listings, and high-trust community link opportunities for **${city}**, visit the **Backlinks & Authority** module.\n\n` +
+        `**Next Step**: Click **Open Backlinks & Authority** below to discover verified local citation opportunities.`;
+    } else {
+      reply = `### Verified Backlinks for ${bizName}\n\n` +
+        `You currently have **${totalBl}** tracked backlink records in your database.\n\n` +
+        `To monitor live status (LIVE / LOST / UNAVAILABLE) or discover competitor link gaps, check your **Backlinks & Authority** dashboard.`;
+    }
   }
   // DEFAULT
   else {

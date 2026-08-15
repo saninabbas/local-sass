@@ -54,7 +54,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   };
 
   return (
-    <div className="bg-[#faf9f5] border border-[#e6dfd8] rounded-2xl p-5 shadow-xs hover:border-[#cc785c]/40 transition-all flex flex-col justify-between">
+    <div className="bg-[#efe9de] border border-[#e6dfd8] rounded-2xl p-5 shadow-xs hover:border-[#cc785c]/40 transition-all flex flex-col justify-between">
       <div>
         {/* Header: Title, Icon, Status */}
         <div className="flex items-center justify-between gap-2 mb-3">

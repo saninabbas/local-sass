@@ -1192,7 +1192,7 @@ export const onRequest = async (context: any) => {
       }
 
       // --- COMPETITORS: DISCOVERED LIST ---
-      if (url.pathname === '/api/competitors/discovered' && request.method === 'GET') {
+      if ((url.pathname === '/api/competitors' || url.pathname === '/api/competitors/discovered') && request.method === 'GET') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
@@ -1200,7 +1200,22 @@ export const onRequest = async (context: any) => {
           "SELECT id FROM businesses WHERE user_id = ? LIMIT 1"
         ).bind(user.id as string).first();
 
-        if (!business) return errorResponse("Business not found", 404);
+        if (!business) return jsonResponse({ success: true, data: [] });
+
+        await env.DB.prepare(`CREATE TABLE IF NOT EXISTS discovered_competitors (
+          id TEXT PRIMARY KEY,
+          business_id TEXT NOT NULL,
+          domain TEXT NOT NULL,
+          name TEXT NOT NULL,
+          ranking_position INTEGER,
+          keyword TEXT,
+          url TEXT NOT NULL,
+          location TEXT,
+          organic_title TEXT,
+          organic_snippet TEXT,
+          health_score INTEGER DEFAULT 0,
+          discovered_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
 
         const { results } = await env.DB.prepare(
           "SELECT * FROM discovered_competitors WHERE business_id = ? ORDER BY ranking_position ASC"
@@ -1208,6 +1223,7 @@ export const onRequest = async (context: any) => {
 
         return jsonResponse({ success: true, data: results || [] });
       }
+
 
       // --- COMPETITORS: AUTO-DISCOVER VIA SERP ---
       if (url.pathname === '/api/competitors/discover' && request.method === 'POST') {
@@ -1288,7 +1304,7 @@ export const onRequest = async (context: any) => {
       }
 
       // --- GROWTH ROADMAP (Today, This Week, This Month, Next 90 Days) ---
-      if (url.pathname === '/api/growth/roadmap' && request.method === 'GET') {
+      if ((url.pathname === '/api/growth/roadmap' || url.pathname === '/api/actions/roadmap') && request.method === 'GET') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
@@ -1296,7 +1312,7 @@ export const onRequest = async (context: any) => {
           "SELECT id FROM businesses WHERE user_id = ? LIMIT 1"
         ).bind(user.id as string).first();
 
-        if (!business) return errorResponse("Business not found", 404);
+        if (!business) return jsonResponse({ success: true, data: { today: [], this_week: [], this_month: [], next_90_days: [] } });
 
         try {
           const { generateGrowthRoadmap } = await import('./competitorEngine');
@@ -1306,6 +1322,7 @@ export const onRequest = async (context: any) => {
           return errorResponse("Failed to generate growth roadmap: " + err.message, 500);
         }
       }
+
 
       // --- GROWTH COPILOT AI ASSISTANT ---
       // --- AI FIX GENERATOR (Fix With AI) ---
@@ -2185,15 +2202,39 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
+        await env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS leads (
+            id TEXT PRIMARY KEY,
+            business_id TEXT,
+            user_id TEXT,
+            name TEXT,
+            email TEXT NOT NULL,
+            website_url TEXT,
+            website TEXT,
+            phone TEXT,
+            source TEXT DEFAULT 'widget',
+            status TEXT DEFAULT 'new',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            captured_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `).run().catch(() => {});
+        await env.DB.prepare("ALTER TABLE leads ADD COLUMN website_url TEXT").run().catch(() => {});
+        await env.DB.prepare("ALTER TABLE leads ADD COLUMN business_id TEXT").run().catch(() => {});
+        await env.DB.prepare("ALTER TABLE leads ADD COLUMN phone TEXT").run().catch(() => {});
+        await env.DB.prepare("ALTER TABLE leads ADD COLUMN source TEXT DEFAULT 'widget'").run().catch(() => {});
+        await env.DB.prepare("ALTER TABLE leads ADD COLUMN status TEXT DEFAULT 'new'").run().catch(() => {});
+        await env.DB.prepare("ALTER TABLE leads ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP").run().catch(() => {});
+
         const business = await env.DB.prepare("SELECT id FROM businesses WHERE user_id = ?").bind(user.id as string).first();
-        if (!business) return jsonResponse({ success: true, data: [] });
+        const businessId = business?.id || user.id;
 
         const { results } = await env.DB.prepare(
-          "SELECT id, name, email, website_url, created_at FROM leads WHERE business_id = ? ORDER BY created_at DESC"
-        ).bind(business.id).all();
+          "SELECT id, name, email, COALESCE(website_url, website, '') as website_url, phone, source, status, COALESCE(created_at, captured_at, datetime('now')) as created_at FROM leads WHERE business_id = ? OR user_id = ? ORDER BY created_at DESC"
+        ).bind(businessId, user.id).all();
 
-        return jsonResponse({ success: true, data: results });
+        return jsonResponse({ success: true, data: results || [] });
       }
+
 
       // --- INTEGRATIONS (Google Search Console) ---
       if (url.pathname === '/api/integrations/google/auth' && request.method === 'GET') {
@@ -2276,28 +2317,35 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        // Normally we'd use an external API like DataForSEO or similar, here we mock high-quality legitimate opps
+        // Ensure columns exist
+        await env.DB.prepare("ALTER TABLE authority_opportunities ADD COLUMN is_verified INTEGER DEFAULT 0").run().catch(() => {});
+        await env.DB.prepare("ALTER TABLE authority_opportunities ADD COLUMN evidence TEXT").run().catch(() => {});
+        await env.DB.prepare("ALTER TABLE authority_opportunities ADD COLUMN status TEXT DEFAULT 'DISCOVERED'").run().catch(() => {});
+        await env.DB.prepare("ALTER TABLE authority_opportunities ADD COLUMN priority TEXT DEFAULT 'MEDIUM'").run().catch(() => {});
+        await env.DB.prepare("ALTER TABLE authority_opportunities ADD COLUMN verification_level TEXT DEFAULT 'VERIFIED'").run().catch(() => {});
+
         let opps = await env.DB.prepare("SELECT * FROM authority_opportunities WHERE user_id = ? ORDER BY created_at DESC").bind(user.id).all();
         
         if (!opps.results || opps.results.length === 0) {
-          // Seed some legitimate local opportunities based on business data
           const business = await env.DB.prepare("SELECT * FROM businesses WHERE user_id = ?").bind(user.id).first();
-          const city = business?.city || 'your city';
-          const type = business?.type || 'local business';
+          const city = business?.city || 'Local Area';
 
           const seeds = [
-            { id: crypto.randomUUID(), type: 'directory', name: `${city} Chamber of Commerce`, url: `https://chamberofcommerce.com/${city}`, difficulty: 'Medium', value: 'High', why_relevant: `Local businesses in ${city} gain significant trust signals from the Chamber.` },
-            { id: crypto.randomUUID(), type: 'sponsorship', name: 'Local Little League', url: '', difficulty: 'Easy', value: 'Medium', why_relevant: 'Sponsoring local community teams often results in high-authority local community links.' },
-            { id: crypto.randomUUID(), type: 'guest_post', name: `${type} Industry Blog`, url: '', difficulty: 'Hard', value: 'High', why_relevant: 'Demonstrating expertise in your field builds topical authority.' }
+            { id: crypto.randomUUID(), type: 'directory', name: 'Google Business Profile', url: 'https://business.google.com', difficulty: 'Easy', value: 'High', priority: 'HIGH', is_verified: 1, verification_level: 'VERIFIED', why_relevant: 'Essential for Google Local 3-Pack and Maps visibility.' },
+            { id: crypto.randomUUID(), type: 'directory', name: 'Apple Business Connect', url: 'https://businessconnect.apple.com', difficulty: 'Easy', value: 'High', priority: 'HIGH', is_verified: 1, verification_level: 'VERIFIED', why_relevant: 'Powers Siri, Apple Maps, and iOS local search ecosystem.' },
+            { id: crypto.randomUUID(), type: 'directory', name: 'Bing Places for Business', url: 'https://www.bingplaces.com', difficulty: 'Easy', value: 'High', priority: 'HIGH', is_verified: 1, verification_level: 'VERIFIED', why_relevant: 'Feeds Microsoft Copilot, Windows Search, and Bing local index.' },
+            { id: crypto.randomUUID(), type: 'directory', name: 'Better Business Bureau (BBB)', url: 'https://www.bbb.org', difficulty: 'Medium', value: 'High', priority: 'HIGH', is_verified: 1, verification_level: 'VERIFIED', why_relevant: 'High Domain Authority citation with verified business entity trust.' },
+            { id: crypto.randomUUID(), type: 'chamber', name: `${city} Chamber of Commerce / Business Alliance`, url: '', difficulty: 'Medium', value: 'High', priority: 'MEDIUM', is_verified: 0, verification_level: 'AI_PROSPECT', why_relevant: `Local business alliance in ${city} signals strong geographic authority to search engines.` }
           ];
 
           for (const s of seeds) {
             await env.DB.prepare(
-              "INSERT INTO authority_opportunities (id, user_id, name, url, type, difficulty, value, why_relevant) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-            ).bind(s.id, user.id, s.name, s.url, s.type, s.difficulty, s.value, s.why_relevant).run();
+              "INSERT INTO authority_opportunities (id, user_id, name, url, type, difficulty, value, priority, is_verified, verification_level, why_relevant, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DISCOVERED')"
+            ).bind(s.id, user.id, s.name, s.url, s.type, s.difficulty, s.value, s.priority, s.is_verified, s.verification_level, s.why_relevant).run();
           }
           opps = await env.DB.prepare("SELECT * FROM authority_opportunities WHERE user_id = ? ORDER BY created_at DESC").bind(user.id).all();
         }
+
 
         return jsonResponse({ success: true, data: opps.results });
       }

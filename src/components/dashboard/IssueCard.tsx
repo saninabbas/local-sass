@@ -54,7 +54,7 @@ export const IssueCard: React.FC<IssueCardProps> = ({
   const Icon = config.icon;
 
   return (
-    <div className={`bg-[#faf9f5] border ${config.border} rounded-2xl p-5 transition-all shadow-xs hover:border-[#cc785c]/40 flex flex-col justify-between gap-4`}>
+    <div className={`bg-[#efe9de] border ${config.border} rounded-2xl p-5 transition-all shadow-xs hover:border-[#cc785c]/40 flex flex-col justify-between gap-4`}>
       <div className="space-y-3">
         {/* Header: Severity Badge + Category */}
         <div className="flex items-center justify-between gap-2">

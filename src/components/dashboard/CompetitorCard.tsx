@@ -34,7 +34,7 @@ export const CompetitorCard: React.FC<CompetitorCardProps> = ({
   onFixGapWithAI,
 }) => {
   return (
-    <div className="bg-[#faf9f5] border border-[#e6dfd8] rounded-2xl p-5 shadow-xs hover:border-[#cc785c]/40 transition-all flex flex-col justify-between gap-4">
+    <div className="bg-[#efe9de] border border-[#e6dfd8] rounded-2xl p-5 shadow-xs hover:border-[#cc785c]/40 transition-all flex flex-col justify-between gap-4">
       <div className="space-y-3">
         {/* Header: Domain + Rank */}
         <div className="flex items-start justify-between gap-2">
