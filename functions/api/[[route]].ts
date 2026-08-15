@@ -130,6 +130,64 @@ export const onRequest = async (context: any) => {
       return user;
     };
 
+    const normalizeDomain = (urlOrDomain: string): string => {
+      if (!urlOrDomain) return '';
+      let clean = urlOrDomain.trim().toLowerCase();
+      clean = clean.replace(/^https?:\/\//, '');
+      clean = clean.replace(/^www\./, '');
+      clean = clean.split('/')[0];
+      clean = clean.split('?')[0];
+      clean = clean.split('#')[0];
+      clean = clean.split(':')[0];
+      return clean;
+    };
+
+    const PLAN_LIMITS: Record<string, number> = {
+      'free': 1,
+      'starter': 3,
+      'growth': 10,
+      'pro': 25,
+      'agency': 50,
+      'lifetime_pro': 100,
+      'admin': 999,
+      'enterprise': 999
+    };
+
+    const getUserPlanLimit = (subscriptionStatus?: string, role?: string): number => {
+      if (role === 'admin') return 999;
+      const plan = (subscriptionStatus || 'free').toLowerCase();
+      return PLAN_LIMITS[plan] ?? 1;
+    };
+
+    const resolveTargetBusiness = async (userId: string, explicitBizId?: string | null) => {
+      if (explicitBizId && explicitBizId.trim()) {
+        const targetId = explicitBizId.trim();
+        const biz = await env.DB.prepare(
+          "SELECT * FROM businesses WHERE id = ? AND user_id = ? AND (is_archived IS NULL OR is_archived = 0)"
+        ).bind(targetId, userId).first();
+        
+        if (biz) return biz;
+
+        // Strict tenant isolation: Check if business exists under another user
+        const otherUserBiz = await env.DB.prepare(
+          "SELECT id FROM businesses WHERE id = ?"
+        ).bind(targetId).first();
+
+        if (otherUserBiz) {
+          const err: any = new Error("Forbidden: Cross-tenant business access denied");
+          err.status = 403;
+          throw err;
+        }
+
+        return null;
+      }
+
+      // Default to active / default or latest updated business
+      return await env.DB.prepare(
+        "SELECT * FROM businesses WHERE user_id = ? AND (is_archived IS NULL OR is_archived = 0) ORDER BY is_default DESC, updated_at DESC, created_at DESC LIMIT 1"
+      ).bind(userId).first();
+    };
+
     const executeAudit = async (business: any) => {
       if (!business.website_url) throw new Error("Business has no website URL");
 
@@ -376,6 +434,12 @@ export const onRequest = async (context: any) => {
           await env.DB.prepare("ALTER TABLE businesses ADD COLUMN main_services TEXT").run().catch(() => {});
           await env.DB.prepare("ALTER TABLE businesses ADD COLUMN discovered_data TEXT").run().catch(() => {});
           await env.DB.prepare("ALTER TABLE businesses ADD COLUMN last_crawled_at DATETIME").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE businesses ADD COLUMN normalized_domain TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE businesses ADD COLUMN is_default INTEGER DEFAULT 0").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE businesses ADD COLUMN is_archived INTEGER DEFAULT 0").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE businesses ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP").run().catch(() => {});
+          await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_businesses_user_id ON businesses(user_id)").run().catch(() => {});
+          await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_businesses_norm_domain ON businesses(user_id, normalized_domain)").run().catch(() => {});
 
           await env.DB.prepare("CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at DATETIME NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))").run().catch(() => {});
           await env.DB.prepare("CREATE TABLE IF NOT EXISTS leads (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, name TEXT, email TEXT NOT NULL, website TEXT, captured_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))").run().catch(() => {});
