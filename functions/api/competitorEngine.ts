@@ -181,15 +181,18 @@ export async function analyzeCompetitorDeep(
   apiKey: string
 ) {
   // 1. Fetch and extract My Website and Competitor Website
-  let myRes, compRes;
+  let myFetchRes, compFetchRes;
   try {
-    [myRes, compRes] = await Promise.all([
+    [myFetchRes, compFetchRes] = await Promise.all([
       fetchWithTimeout(business.website_url, 7000),
       fetchWithTimeout(competitorUrl, 7000)
     ]);
   } catch (err: any) {
     throw new Error(`Failed to crawl target websites: ${err.message}`);
   }
+
+  const myRes = myFetchRes.response;
+  const compRes = compFetchRes.response;
 
   const myExtractor = new Extractor();
   myExtractor.httpStatus = myRes.status;

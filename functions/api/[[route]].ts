@@ -1624,21 +1624,24 @@ export const onRequest = async (context: any) => {
           const { fetchWithTimeout, Extractor, computeScores, compareWithNVIDIA } = await import('./auditEngine');
           
           // Fetch both concurrently
-          const [myRes, compRes] = await Promise.allSettled([
+          const [myFetchRes, compFetchRes] = await Promise.allSettled([
             fetchWithTimeout(business.website_url as string, 8000),
             fetchWithTimeout(payload.competitorUrl, 8000)
           ]);
 
-          if (myRes.status === 'rejected' || compRes.status === 'rejected') {
+          if (myFetchRes.status === 'rejected' || compFetchRes.status === 'rejected') {
             throw new Error("Failed to fetch one or both websites.");
           }
 
+          const myRes = (myFetchRes as any).value.response;
+          const compRes = (compFetchRes as any).value.response;
+
           const myExtractor = new Extractor();
-          myExtractor.httpStatus = myRes.value.status;
+          myExtractor.httpStatus = myRes.status;
           myExtractor.isHttps = (business.website_url as string).startsWith('https');
           
           const compExtractor = new Extractor();
-          compExtractor.httpStatus = compRes.value.status;
+          compExtractor.httpStatus = compRes.status;
           compExtractor.isHttps = payload.competitorUrl.startsWith('https');
 
           const myRewriter = new HTMLRewriter()
@@ -1670,8 +1673,8 @@ export const onRequest = async (context: any) => {
             .on('body', compExtractor.handlers.body);
 
           await Promise.all([
-            myRewriter.transform(myRes.value).text(),
-            compRewriter.transform(compRes.value).text()
+            myRewriter.transform(myRes).text(),
+            compRewriter.transform(compRes).text()
           ]);
 
           const myScores = computeScores(myExtractor, business.website_url as string, business);
@@ -2205,12 +2208,14 @@ export const onRequest = async (context: any) => {
         const { fetchWithTimeout, Extractor } = await import('./auditEngine');
         const siteUrl = business.website_url;
         
-        let websiteResponse: Response;
+        let websiteFetchRes;
         try {
-          websiteResponse = await fetchWithTimeout(siteUrl, 8000);
+          websiteFetchRes = await fetchWithTimeout(siteUrl, 8000);
         } catch {
           return errorResponse("Could not reach website URL: " + siteUrl, 502);
         }
+
+        const websiteResponse = websiteFetchRes.response;
 
         const extractor = new Extractor();
         extractor.httpStatus = websiteResponse.status;
