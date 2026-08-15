@@ -46,6 +46,8 @@ const Campaign = lazy(() => import('./pages/dashboard/Campaign').then(m => ({ de
 const KeywordDiscovery = lazy(() => import('./pages/dashboard/KeywordDiscovery').then(m => ({ default: m.KeywordDiscovery })));
 const InternalLinks = lazy(() => import('./pages/dashboard/InternalLinks').then(m => ({ default: m.InternalLinks })));
 const ChangeHistory = lazy(() => import('./pages/dashboard/ChangeHistory').then(m => ({ default: m.ChangeHistory })));
+const Billing = lazy(() => import('./pages/dashboard/Billing').then(m => ({ default: m.Billing })));
+const FreeAudit = lazy(() => import('./pages/FreeAudit').then(m => ({ default: m.FreeAudit })));
 
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -101,6 +103,7 @@ function App() {
             <Route path="/verify" element={<VerifyEmail />} />
             <Route path="/api/auth/verify" element={<VerifyEmail />} />
             <Route path="/report/:id" element={<PublicReport />} />
+            <Route path="/free-audit" element={<DashboardSuspense><FreeAudit /></DashboardSuspense>} />
             
             {/* Claude Computer Use & Design System Showcase */}
             <Route path="/claude" element={<ClaudeShowcasePage />} />
@@ -119,6 +122,7 @@ function App() {
               <Route path="/dashboard" element={<DashboardSuspense><Dashboard /></DashboardSuspense>} />
               <Route path="/dashboard/businesses" element={<DashboardSuspense><Businesses /></DashboardSuspense>} />
               <Route path="/dashboard/websites" element={<DashboardSuspense><Businesses /></DashboardSuspense>} />
+              <Route path="/dashboard/billing" element={<DashboardSuspense><Billing /></DashboardSuspense>} />
               <Route path="/dashboard/score" element={<DashboardSuspense><Score /></DashboardSuspense>} />
               <Route path="/dashboard/actions" element={<DashboardSuspense><ActionPlan /></DashboardSuspense>} />
               <Route path="/dashboard/website" element={<DashboardSuspense><Website /></DashboardSuspense>} />

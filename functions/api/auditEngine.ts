@@ -339,6 +339,67 @@ export class Extractor {
   }
 }
 
+// Helper to populate Extractor from HTML text fallback
+export function populateExtractorFromHtml(extractor: Extractor, html: string) {
+  if (!html) return;
+
+  // Title
+  if (!extractor.title) {
+    const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
+    if (titleMatch) {
+      extractor.title = titleMatch[1].trim();
+      extractor.titleCount = 1;
+    }
+  }
+
+  // Meta description
+  if (!extractor.metaDescription) {
+    const metaDescMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i) ||
+                          html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i);
+    if (metaDescMatch) {
+      extractor.metaDescription = metaDescMatch[1].trim();
+      extractor.metaDescCount = 1;
+    }
+  }
+
+  // H1
+  if (!extractor.h1) {
+    const h1Match = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
+    if (h1Match) {
+      extractor.h1 = h1Match[1].replace(/<[^>]+>/g, '').trim();
+      extractor.h1Count = 1;
+    }
+  }
+
+  // H2
+  const h2Matches = Array.from(html.matchAll(/<h2[^>]*>(.*?)<\/h2>/gi));
+  for (const m of h2Matches) {
+    extractor.h2Count++;
+    const txt = m[1].replace(/<[^>]+>/g, '').trim();
+    if (txt && extractor.h2List.length < 10) extractor.h2List.push(txt);
+  }
+
+  // H3
+  const h3Matches = Array.from(html.matchAll(/<h3[^>]*>(.*?)<\/h3>/gi));
+  for (const m of h3Matches) {
+    extractor.h3Count++;
+    const txt = m[1].replace(/<[^>]+>/g, '').trim();
+    if (txt && extractor.h3List.length < 10) extractor.h3List.push(txt);
+  }
+
+  // Body text
+  if (!extractor.bodyText) {
+    const bodyMatch = html.match(/<body[^>]*>(.*?)<\/body>/is);
+    const rawBody = bodyMatch ? bodyMatch[1] : html;
+    const cleanText = rawBody.replace(/<script[^>]*>.*?<\/script>/gis, '')
+                             .replace(/<style[^>]*>.*?<\/style>/gis, '')
+                             .replace(/<[^>]+>/g, ' ')
+                             .replace(/\s+/g, ' ')
+                             .trim();
+    extractor.bodyText = cleanText;
+  }
+}
+
 // -----------------------------------------------------------------------------
 // 4. BUSINESS DISCOVERY EXTRACTION
 // -----------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Menu, User as UserIcon, Settings, LogOut, ChevronDown, Globe, FolderKanban } from 'lucide-react';
+import { Bell, Menu, User as UserIcon, Settings, LogOut, ChevronDown, Globe, FolderKanban, Sparkles } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBusiness } from '../../context/BusinessContext';
 import { Link, useNavigate } from 'react-router-dom';
@@ -135,6 +135,25 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       </div>
 
       <div className="flex items-center gap-3">
+        {/* Commercial Status Badge */}
+        <Link
+          to="/dashboard/billing"
+          className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#efe9de] border border-[#e6dfd8] hover:border-[#cc785c]/60 transition-colors text-xs font-mono"
+        >
+          <span className="w-2 h-2 rounded-full bg-[#cc785c]" />
+          <span className="font-bold uppercase text-[#141413]">
+            {user?.subscription_tier === 'pro' ? 'PRO PLAN' : user?.subscription_tier === 'growth' ? 'GROWTH PLAN' : 'FREE TRIAL'}
+          </span>
+          <span className="text-[#8e8b82] text-[10px]">&bull; Manage</span>
+        </Link>
+
+        <Link to="/dashboard/billing" className="hidden sm:block">
+          <button className="px-3 py-1 rounded-xl bg-[#141413] hover:bg-[#252320] text-[#faf9f5] text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer">
+            <Sparkles size={12} className="text-[#cc785c]" />
+            <span>Upgrade</span>
+          </button>
+        </Link>
+
         <button
           className="p-2 rounded-lg text-[#6c6a64] hover:bg-[#efe9de] hover:text-[#141413] relative transition-colors cursor-pointer"
           aria-label="Notifications"

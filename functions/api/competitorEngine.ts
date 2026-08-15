@@ -1,4 +1,4 @@
-import { Extractor, fetchWithTimeout, computeScores } from './auditEngine';
+import { Extractor, fetchWithTimeout, computeScores, populateExtractorFromHtml } from './auditEngine';
 
 export interface DiscoveredCompetitor {
   domain: string;
@@ -230,10 +230,24 @@ export async function analyzeCompetitorDeep(
     .on('img', compExtractor.handlers.img)
     .on('body', compExtractor.handlers.body);
 
-  await Promise.all([
-    myRewriter.transform(myRes).text(),
-    compRewriter.transform(compRes).text()
-  ]);
+  const myText = await myRes.text().catch(() => '');
+  const compText = await compRes.text().catch(() => '');
+
+  try {
+    const freshMyRes = new Response(myText, { status: myRes.status, headers: myRes.headers });
+    const freshCompRes = new Response(compText, { status: compRes.status, headers: compRes.headers });
+
+    await Promise.all([
+      myRewriter.transform(freshMyRes).text().catch(() => {}),
+      compRewriter.transform(freshCompRes).text().catch(() => {})
+    ]);
+  } catch (e) {
+    // Fallback if HTMLRewriter fails
+  }
+
+  // Ensure extractors are populated via fallback parser if needed
+  populateExtractorFromHtml(myExtractor, myText);
+  populateExtractorFromHtml(compExtractor, compText);
 
   const myScores = computeScores(myExtractor, business.website_url, business);
   const compScores = computeScores(compExtractor, competitorUrl, business);

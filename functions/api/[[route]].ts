@@ -276,7 +276,16 @@ export const onRequest = async (context: any) => {
           .on('img', extractor.handlers.img)
           .on('body', extractor.handlers.body);
 
-        await rewriter.transform(websiteResponse).text(); // consumes the stream
+        const htmlText = await websiteResponse.text().catch(() => '');
+        try {
+          const freshRes = new Response(htmlText, { status: websiteResponse.status, headers: websiteResponse.headers });
+          await rewriter.transform(freshRes).text().catch(() => {});
+        } catch (e) {
+          // Fallback if HTMLRewriter fails
+        }
+
+        const { populateExtractorFromHtml } = await import('./auditEngine');
+        populateExtractorFromHtml(extractor, htmlText);
 
         // 1. Calculate Unified Deterministic 7-Vector Audit
         const auditResult = calculateDeterministicAudit(
@@ -444,13 +453,29 @@ export const onRequest = async (context: any) => {
       try {
         await db.prepare("ALTER TABLE users ADD COLUMN password_hash TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN polar_customer_id TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN polar_subscription_id TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN subscription_tier TEXT DEFAULT 'free'").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN subscription_status TEXT DEFAULT 'free'").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN trial_started_at DATETIME").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN trial_ends_at DATETIME").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN trial_status TEXT DEFAULT 'ACTIVE'").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN current_period_end DATETIME").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN verification_token TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN totp_secret TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN reset_token TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN reset_token_expires_at DATETIME").run().catch(() => {});
+
+        await db.prepare("ALTER TABLE leads ADD COLUMN phone TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE leads ADD COLUMN company TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE leads ADD COLUMN source TEXT DEFAULT 'widget'").run().catch(() => {});
+        await db.prepare("ALTER TABLE leads ADD COLUMN utm_source TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE leads ADD COLUMN utm_medium TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE leads ADD COLUMN utm_campaign TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE leads ADD COLUMN audit_score INTEGER").run().catch(() => {});
+        await db.prepare("ALTER TABLE leads ADD COLUMN top_issues TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE leads ADD COLUMN status TEXT DEFAULT 'NEW'").run().catch(() => {});
 
         await db.prepare("ALTER TABLE audits ADD COLUMN audit_data TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE audits ADD COLUMN error_message TEXT").run().catch(() => {});
@@ -1621,7 +1646,7 @@ export const onRequest = async (context: any) => {
         if (!business || !business.website_url) return errorResponse("You must have a website to compare against", 400);
 
         try {
-          const { fetchWithTimeout, Extractor, computeScores, compareWithNVIDIA } = await import('./auditEngine');
+          const { fetchWithTimeout, Extractor, computeScores, compareWithNVIDIA, populateExtractorFromHtml } = await import('./auditEngine');
           
           // Fetch both concurrently
           const [myFetchRes, compFetchRes] = await Promise.allSettled([
@@ -1635,6 +1660,9 @@ export const onRequest = async (context: any) => {
 
           const myRes = (myFetchRes as any).value.response;
           const compRes = (compFetchRes as any).value.response;
+
+          const myText = await myRes.text().catch(() => '');
+          const compText = await compRes.text().catch(() => '');
 
           const myExtractor = new Extractor();
           myExtractor.httpStatus = myRes.status;
@@ -1672,10 +1700,20 @@ export const onRequest = async (context: any) => {
             .on('img', compExtractor.handlers.img)
             .on('body', compExtractor.handlers.body);
 
-          await Promise.all([
-            myRewriter.transform(myRes).text(),
-            compRewriter.transform(compRes).text()
-          ]);
+          try {
+            const freshMyRes = new Response(myText, { status: myRes.status, headers: myRes.headers });
+            const freshCompRes = new Response(compText, { status: compRes.status, headers: compRes.headers });
+
+            await Promise.all([
+              myRewriter.transform(freshMyRes).text().catch(() => {}),
+              compRewriter.transform(freshCompRes).text().catch(() => {})
+            ]);
+          } catch (e) {
+            // HTMLRewriter fallback
+          }
+
+          populateExtractorFromHtml(myExtractor, myText);
+          populateExtractorFromHtml(compExtractor, compText);
 
           const myScores = computeScores(myExtractor, business.website_url as string, business);
           const compScores = computeScores(compExtractor, payload.competitorUrl, business);
@@ -2670,18 +2708,176 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true, data: { id, status } });
       }
 
+      // --- BILLING: STATUS & ENTITLEMENTS ---
+      if (url.pathname === '/api/billing/status' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const { getUserPlan, calculateTrialStatus, getUserUsageStats } = await import('./entitlements');
+        const plan = getUserPlan(user);
+        const trial = calculateTrialStatus(user);
+        const usage = await getUserUsageStats(env.DB, user.id);
+
+        return jsonResponse({
+          success: true,
+          data: {
+            plan,
+            trial,
+            usage,
+            polarConfigured: !!env.POLAR_ACCESS_TOKEN,
+            user: {
+              email: user.email,
+              subscription_status: user.subscription_status || 'free',
+              subscription_tier: user.subscription_tier || 'free',
+              current_period_end: user.current_period_end || null
+            }
+          }
+        });
+      }
+
+      // --- PUBLIC: FREE AUDIT & LEAD FUNNEL ---
+      if (url.pathname === '/api/free-audit' && request.method === 'POST') {
+        try {
+          const payload = await request.json() as any;
+          const rawUrl = (payload.websiteUrl || payload.url || '').trim();
+          const email = (payload.email || '').trim();
+          const name = (payload.name || '').trim();
+          const phone = (payload.phone || '').trim();
+          const company = (payload.company || '').trim();
+
+          if (!rawUrl) return errorResponse("Website URL is required", 400);
+
+          const { validateAndNormalizeUrl, fetchWithTimeout, Extractor, calculateDeterministicAudit } = await import('./auditEngine');
+          
+          let validatedUrl: URL;
+          try {
+            validatedUrl = validateAndNormalizeUrl(rawUrl);
+          } catch (err: any) {
+            return errorResponse(err.message || "Invalid or restricted website URL.", 400);
+          }
+
+          const siteUrl = validatedUrl.href;
+          const origin = validatedUrl.origin;
+
+          // Fetch homepage
+          let fetchRes;
+          try {
+            fetchRes = await fetchWithTimeout(siteUrl, 8000);
+          } catch {
+            return errorResponse("Could not reach website URL (CRAWL_FAILED). Ensure site is public.", 502);
+          }
+
+          const response = fetchRes.response;
+          if (!response.ok || !response.headers.get('content-type')?.includes('text/html')) {
+            return errorResponse(`Website returned HTTP ${response.status} or non-HTML content.`, 400);
+          }
+
+          // Concurrent robots / sitemap check
+          const [robotsInfo, sitemapInfo] = await Promise.all([
+            fetch(`${origin}/robots.txt`, { headers: { 'User-Agent': 'Rankora-PublicAudit/2.0' } })
+              .then(r => ({ exists: r.ok, status: r.status })).catch(() => ({ exists: false, status: 404 })),
+            fetch(`${origin}/sitemap.xml`, { headers: { 'User-Agent': 'Rankora-PublicAudit/2.0' } })
+              .then(r => ({ exists: r.ok, status: r.status, url: `${origin}/sitemap.xml` })).catch(() => ({ exists: false, status: 404 }))
+          ]);
+
+          const extractor = new Extractor(validatedUrl.hostname);
+          extractor.httpStatus = response.status;
+          extractor.isHttps = siteUrl.startsWith('https');
+          extractor.securityHeaders = {
+            'strict-transport-security': response.headers.get('strict-transport-security') || '',
+            'x-content-type-options': response.headers.get('x-content-type-options') || '',
+            'x-frame-options': response.headers.get('x-frame-options') || ''
+          };
+
+          const rewriter = new HTMLRewriter()
+            .on('html', extractor.handlers.html)
+            .on('title', extractor.handlers.title)
+            .on('meta', extractor.handlers.meta)
+            .on('link', extractor.handlers.link)
+            .on('h1', extractor.handlers.h1)
+            .on('h2', extractor.handlers.h2)
+            .on('h3', extractor.handlers.h3)
+            .on('script', extractor.handlers.script)
+            .on('a', extractor.handlers.a)
+            .on('img', extractor.handlers.img)
+            .on('body', extractor.handlers.body);
+
+          await rewriter.transform(response).text();
+
+          const tempBusiness = {
+            name: name || extractor.title.split(/[-|:]/)[0]?.trim() || validatedUrl.hostname,
+            city: 'Local Market',
+            type: 'Business',
+            website_url: siteUrl
+          };
+
+          const audit = calculateDeterministicAudit(extractor, siteUrl, tempBusiness, robotsInfo, sitemapInfo, fetchRes.durationMs);
+
+          // If email is provided, capture lead record in D1
+          if (email) {
+            const leadId = `lead_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+            const topIssuesJson = JSON.stringify(audit.issues.slice(0, 3));
+            
+            await env.DB.prepare(`
+              INSERT INTO leads (
+                id, user_id, name, email, website, phone, company, source,
+                utm_source, utm_medium, utm_campaign, audit_score, top_issues, status, captured_at
+              ) VALUES (?, 'system_public', ?, ?, ?, ?, ?, 'free_audit_page', ?, ?, ?, ?, ?, 'AUDIT_COMPLETED', CURRENT_TIMESTAMP)
+            `).bind(
+              leadId,
+              name || 'Visitor',
+              email,
+              siteUrl,
+              phone || '',
+              company || '',
+              payload.utm_source || '',
+              payload.utm_medium || '',
+              payload.utm_campaign || '',
+              audit.growthScore,
+              topIssuesJson
+            ).run().catch((e: any) => console.warn("Failed to persist public lead:", e.message));
+          }
+
+          // Return protected public summary (Overall Score + Top 3 Issues + Telemetry)
+          return jsonResponse({
+            success: true,
+            data: {
+              url: siteUrl,
+              growthScore: audit.growthScore,
+              vectorScores: {
+                local: audit.vectors.local.score,
+                technical: audit.vectors.technical.score,
+                onpage: audit.vectors.onpage.score,
+                content: audit.vectors.content.score,
+                performance: audit.vectors.performance.score,
+                mobile: audit.vectors.mobile.score,
+                security: audit.vectors.security.score
+              },
+              topOpportunities: audit.issues.slice(0, 3),
+              telemetry: {
+                httpStatus: audit.httpStatus,
+                responseTimeMs: audit.responseTimeMs,
+                isHttps: audit.isHttps,
+                robotsTxt: robotsInfo.exists,
+                sitemap: sitemapInfo.exists,
+                wordCount: audit.metadata.wordCount
+              }
+            }
+          });
+        } catch (err: any) {
+          return errorResponse("Free audit failed: " + err.message, 500);
+        }
+      }
+
       // --- BILLING: CHECKOUT ---
       if (url.pathname === '/api/billing/checkout' && request.method === 'POST') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const { productId } = await request.json() as any;
-        if (!productId) return errorResponse("Product ID is required", 400);
+        const { productId, planType } = await request.json() as any;
 
         if (!env.POLAR_ACCESS_TOKEN) {
-          // Fallback if no token is provided: redirect to a static Polar checkout link if possible
-          // But since we need dynamic sessions for user metadata, we fail if no token.
-          return errorResponse("Billing is not configured on the server.", 500);
+          return errorResponse("Polar billing is not configured. Please add POLAR_ACCESS_TOKEN in Cloudflare environment variables.", 500);
         }
 
         try {
@@ -2692,13 +2888,14 @@ export const onRequest = async (context: any) => {
               'Authorization': `Bearer ${env.POLAR_ACCESS_TOKEN}`
             },
             body: JSON.stringify({
-              product_id: productId,
+              product_id: productId || (planType === 'growth' ? '7594755d-5580-4b77-86ae-90baae0e20d8' : 'pro_package_id'),
               customer_email: user.email,
               customer_name: user.name,
               metadata: {
-                user_id: user.id
+                user_id: user.id,
+                plan: planType || 'growth'
               },
-              success_url: `${url.origin}/dashboard/settings?checkout=success`,
+              success_url: `${url.origin}/dashboard/billing?checkout=success`,
             })
           });
 
@@ -2720,27 +2917,42 @@ export const onRequest = async (context: any) => {
       if (url.pathname === '/api/webhooks/polar' && request.method === 'POST') {
         const payload = await request.json() as any;
 
-        // Polar sends a `type` for the event
-        if (payload.type === 'order.created' || payload.type === 'subscription.created') {
-          const { metadata, customer_id, product_id } = payload.data;
+        if (payload.type === 'order.created' || payload.type === 'subscription.created' || payload.type === 'subscription.active') {
+          const { metadata, customer_id, product_id, id: subId } = payload.data || {};
           
           if (metadata && metadata.user_id) {
-            let plan = 'pro';
-            // Growth Package Product ID
+            let plan = metadata.plan || 'growth';
             if (product_id === '7594755d-5580-4b77-86ae-90baae0e20d8') {
               plan = 'growth';
             }
 
             try {
-              // Update user's subscription in businesses table
+              // Update user record
+              await env.DB.prepare(`
+                UPDATE users 
+                SET subscription_tier = ?, subscription_status = 'active', polar_customer_id = ?, polar_subscription_id = ?, trial_status = 'CONVERTED'
+                WHERE id = ?
+              `).bind(plan, customer_id || '', subId || '', metadata.user_id).run();
+
+              // Update businesses records
               await env.DB.prepare(
                 "UPDATE businesses SET subscription_tier = ?, polar_customer_id = ? WHERE user_id = ?"
-              ).bind(plan, customer_id, metadata.user_id).run();
+              ).bind(plan, customer_id || '', metadata.user_id).run();
             } catch (e) {
-              console.error("Failed to update business billing status:", e);
+              console.error("Failed to update user billing status:", e);
             }
           }
+        } else if (payload.type === 'subscription.canceled' || payload.type === 'subscription.revoked') {
+          const { metadata } = payload.data || {};
+          if (metadata && metadata.user_id) {
+            await env.DB.prepare(
+              "UPDATE users SET subscription_status = 'canceled', subscription_tier = 'free' WHERE id = ?"
+            ).bind(metadata.user_id).run().catch(() => {});
+          }
         }
+
+        return jsonResponse({ success: true, received: true });
+      }
 
         return jsonResponse({ success: true, received: true });
       }

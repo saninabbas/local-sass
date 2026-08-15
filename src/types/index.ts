@@ -6,6 +6,10 @@ export interface User {
   email: string;
   role?: 'admin' | 'user' | string;
   subscription_status?: string;
+  subscription_tier?: string;
+  trial_status?: string;
+  trial_started_at?: string;
+  trial_ends_at?: string;
   email_verified?: number | boolean;
   created_at?: string;
 }
