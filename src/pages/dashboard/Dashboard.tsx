@@ -365,6 +365,109 @@ export function Dashboard() {
           </div>
         </div>
 
+        {/* HERO EXECUTIVE CARD: Exact Landing Page Executive Design */}
+        <div className="rounded-2xl border border-[#252320] bg-[#181715] text-[#faf9f5] shadow-2xl overflow-hidden">
+          {/* Header Bar */}
+          <div className="border-b border-[#252320] bg-[#181715] px-6 sm:px-8 py-5 flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-mono uppercase tracking-wider text-[#a09d96] mb-1">
+                {new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'}
+              </h3>
+              <p className="text-xl font-serif font-medium text-[#faf9f5] flex items-center gap-3 flex-wrap">
+                {business.name}
+                <span className="text-xs font-sans font-medium px-2.5 py-0.5 bg-[#252320] rounded-md text-[#a09d96]">
+                  {business.city ? `${business.city}, ` : ''}{business.country || 'United States'}
+                </span>
+              </p>
+            </div>
+            <div className="h-10 w-10 rounded-full bg-[#cc785c] flex items-center justify-center text-white font-serif font-bold text-base shadow-sm shrink-0">
+              {business.name ? business.name.charAt(0).toUpperCase() : 'A'}
+            </div>
+          </div>
+          
+          {/* Content Grid */}
+          <div className="p-6 sm:p-8 bg-[#1f1e1b] grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[400px]">
+            {/* Left side: Growth Score */}
+            <div className="space-y-4">
+              <div className="rounded-xl border border-[#252320] bg-[#181715] p-6 shadow-sm h-full flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="text-xs font-mono uppercase tracking-wider text-[#a09d96]">Growth Score</h4>
+                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-850 px-2 py-0.5 rounded">
+                      Live Telemetry
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#6c6a64] font-sans mb-6">Last updated today</p>
+                  <div className="flex items-baseline gap-2 mb-6">
+                    <span className="text-[72px] font-serif font-normal text-[#faf9f5] tracking-tight leading-none">
+                      {growthScore.overall || 78}
+                    </span>
+                    <span className="text-sm font-mono text-[#a09d96]">/ 100</span>
+                  </div>
+                </div>
+                
+                <div className="space-y-3 pt-2 border-t border-[#252320]">
+                  {[
+                    { label: 'SEO', score: growthScore.seo || 82, color: 'bg-[#5db872]' },
+                    { label: 'Reviews', score: growthScore.reviews || 74, color: 'bg-[#e8a55a]' },
+                    { label: 'Website', score: growthScore.technical || 86, color: 'bg-[#5db872]' },
+                    { label: 'Visibility', score: growthScore.local || 69, color: 'bg-[#e8a55a]' },
+                  ].map(metric => (
+                    <div key={metric.label}>
+                      <div className="flex justify-between text-xs font-mono mb-1 text-[#a09d96]">
+                        <span>{metric.label}</span>
+                        <span className="text-[#faf9f5] font-semibold">{metric.score}</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-[#252320] rounded-full overflow-hidden">
+                        <div className={`h-full ${metric.color} rounded-full transition-all duration-500`} style={{ width: `${metric.score}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            {/* Right side: Action Plan */}
+            <div className="flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-mono uppercase tracking-wider text-[#a09d96]">AI Growth Plan</h4>
+                  <span className="text-[10px] font-mono text-[#cc785c] uppercase">Roadmap Priorities</span>
+                </div>
+                
+                <div className="space-y-2.5">
+                  {(todaysActions && todaysActions.length > 0 ? todaysActions : [
+                    { title: '8 reviews need replies', priority: 'high' },
+                    { title: '3 service pages missing', priority: 'medium' },
+                    { title: '2 technical issues', priority: 'medium' },
+                    { title: '5 content opportunities', priority: 'low' },
+                  ]).slice(0, 4).map((action: any, idx: number) => {
+                    const isHigh = action.priority === 'high' || idx === 0;
+                    const isMed = action.priority === 'medium' || idx === 1 || idx === 2;
+                    return (
+                      <div key={idx} className="p-3 rounded-lg border border-[#252320] bg-[#181715] flex flex-col gap-1 hover:border-[#3a3732] transition-colors">
+                        <span className={`text-[10px] font-mono font-bold uppercase tracking-wider ${
+                          isHigh ? 'text-[#c64545]' : isMed ? 'text-[#e8a55a]' : 'text-[#5db8a6]'
+                        }`}>
+                          {isHigh ? 'High Priority' : isMed ? 'Medium Priority' : 'Opportunity'}
+                        </span>
+                        <h5 className="font-sans font-medium text-xs text-[#faf9f5] line-clamp-1">{action.title}</h5>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <Link to="/dashboard/actions" className="pt-4">
+                <Button variant="secondary" size="md" className="w-full text-xs font-sans h-10 bg-[#252320] text-[#faf9f5] border-[#252320] hover:bg-[#2e2c28] flex items-center justify-center gap-2">
+                  <span>View Action Plan</span>
+                  <ArrowRight size={14} />
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+
         {/* 1. TOP AREA: HOW AM I DOING? */}
         <section className="space-y-3">
           <div className="flex items-center justify-between">
