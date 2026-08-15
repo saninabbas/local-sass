@@ -160,18 +160,25 @@ export const onRequest = async (context: any) => {
     };
 
     const resolveTargetBusiness = async (userId: string, explicitBizId?: string | null) => {
+      // Defensive schema migration for legacy D1 databases
+      await env.DB.prepare("ALTER TABLE businesses ADD COLUMN is_archived INTEGER DEFAULT 0").run().catch(() => {});
+      await env.DB.prepare("ALTER TABLE businesses ADD COLUMN is_default INTEGER DEFAULT 0").run().catch(() => {});
+      await env.DB.prepare("ALTER TABLE businesses ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP").run().catch(() => {});
+
       if (explicitBizId && explicitBizId.trim()) {
         const targetId = explicitBizId.trim();
-        const biz = await env.DB.prepare(
+        let biz = await env.DB.prepare(
           "SELECT * FROM businesses WHERE id = ? AND user_id = ? AND (is_archived IS NULL OR is_archived = 0)"
-        ).bind(targetId, userId).first();
+        ).bind(targetId, userId).first().catch(async () => {
+          return await env.DB.prepare("SELECT * FROM businesses WHERE id = ? AND user_id = ?").bind(targetId, userId).first();
+        });
         
         if (biz) return biz;
 
         // Strict tenant isolation: Check if business exists under another user
         const otherUserBiz = await env.DB.prepare(
           "SELECT id FROM businesses WHERE id = ?"
-        ).bind(targetId).first();
+        ).bind(targetId).first().catch(() => null);
 
         if (otherUserBiz) {
           const err: any = new Error("Forbidden: Cross-tenant business access denied");
@@ -185,7 +192,11 @@ export const onRequest = async (context: any) => {
       // Default to active / default or latest updated business
       return await env.DB.prepare(
         "SELECT * FROM businesses WHERE user_id = ? AND (is_archived IS NULL OR is_archived = 0) ORDER BY is_default DESC, updated_at DESC, created_at DESC LIMIT 1"
-      ).bind(userId).first();
+      ).bind(userId).first().catch(async () => {
+        return await env.DB.prepare(
+          "SELECT * FROM businesses WHERE user_id = ? ORDER BY created_at DESC LIMIT 1"
+        ).bind(userId).first();
+      });
     };
 
     const executeAudit = async (business: any) => {
