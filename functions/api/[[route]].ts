@@ -4523,10 +4523,13 @@ export const onRequest = async (context: any) => {
           }
           return jsonResponse({ success: true, message: `Generated ${opps.length} authority opportunities!`, redirectUrl: "/dashboard/authority" });
         } else if (actionType === 'generate_content') {
-          return jsonResponse({ success: true, message: "Ready to generate content!", redirectUrl: "/dashboard/content" });
+          return jsonResponse({ success: true, message: "Redirecting to Content Studio...", redirectUrl: "/dashboard/content" });
         } else if (actionType === 'refresh_rankings') {
-          return jsonResponse({ success: true, message: "Keywords visibility refreshed!", redirectUrl: "/dashboard/score" });
+          return jsonResponse({ success: true, message: "Redirecting to Local Rankings...", redirectUrl: "/dashboard/keywords" });
         }
+
+        return errorResponse("Unknown action type", 400);
+      }
 
       // --- SEO CAMPAIGN ENGINE ENDPOINTS ---
       if (url.pathname === '/api/campaigns' && request.method === 'GET') {
