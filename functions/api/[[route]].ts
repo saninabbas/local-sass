@@ -2954,9 +2954,6 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true, received: true });
       }
 
-        return jsonResponse({ success: true, received: true });
-      }
-
       // --- WIDGET CAPTURE (PUBLIC) ---
       // Expected payload: { businessId: string, name: string, email: string, websiteUrl?: string }
       if (url.pathname === '/api/widget/capture' && request.method === 'POST') {
