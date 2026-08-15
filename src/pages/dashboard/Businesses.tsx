@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
 import { useBusiness, type WorkspaceBusiness } from '../../context/BusinessContext';
 import { 
   Globe, 
@@ -11,7 +12,6 @@ import {
   Sparkles, 
   AlertCircle,
   ArrowRight,
-  Shield,
   Activity,
   Layers
 } from 'lucide-react';
@@ -22,7 +22,6 @@ export const Businesses: React.FC = () => {
   const navigate = useNavigate();
   const { 
     businesses, 
-    activeBusiness, 
     activeBusinessId, 
     planLimit, 
     websitesUsed, 
@@ -97,336 +96,357 @@ export const Businesses: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      
-      {/* Header Strip */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#e6dfd8]">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 rounded-full bg-[#cc785c]/10 text-[#cc785c] text-[11px] font-bold tracking-wider uppercase">
-              Multi-Client Workspace
-            </span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-serif font-bold text-[#141413]">
-            Websites & Client Projects
-          </h1>
-          <p className="text-sm text-[#605f5b] mt-1">
-            Manage all your client websites, track independent audits, and switch workspaces seamlessly.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:flex flex-col items-end">
-            <span className="text-xs font-semibold text-[#141413]">
-              {websitesUsed} of {planLimit} Websites
-            </span>
-            <span className="text-[11px] text-[#605f5b] uppercase font-bold tracking-wider">
-              {subscriptionStatus} plan
-            </span>
-          </div>
-
-          <button
-            onClick={openAddWebsiteModal}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[#cc785c] text-white text-xs font-bold rounded-xl hover:bg-[#b8694f] transition-all shadow-xs"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Website Project</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Notification Toast */}
-      {feedback && (
-        <div className={`p-4 rounded-xl text-xs flex items-center gap-3 border transition-all ${
-          feedback.type === 'success' 
-            ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
-            : 'bg-red-50 border-red-200 text-red-800'
-        }`}>
-          {feedback.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> : <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />}
-          <span>{feedback.message}</span>
-        </div>
-      )}
-
-      {/* Plan Capacity Banner */}
-      <div className="p-5 rounded-2xl bg-[#efe9de] border border-[#e6dfd8] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-white flex items-center justify-center text-[#cc785c] shadow-xs shrink-0">
-            <Layers className="w-5 h-5" />
-          </div>
+    <DashboardLayout>
+      <div className="space-y-8 animate-in fade-in duration-300">
+        
+        {/* Header Strip */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#e6dfd8]">
           <div>
-            <h3 className="text-sm font-bold text-[#141413]">
-              Workspace Allocation: {websitesUsed} / {planLimit} Active Domains
-            </h3>
-            <p className="text-xs text-[#605f5b] mt-0.5">
-              Each domain maintains dedicated SEO scores, audits, keywords, competitor gap analysis, and GeoGrid matrices.
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2.5 py-0.5 rounded-full bg-[#cc785c]/10 text-[#cc785c] text-[11px] font-bold tracking-wider uppercase">
+                Multi-Client Workspace
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-serif font-bold text-[#141413]">
+              Websites & Client Projects
+            </h1>
+            <p className="text-xs text-[#6c6a64] font-sans mt-1">
+              Manage all your client websites, track independent audits, and switch workspaces seamlessly.
             </p>
           </div>
-        </div>
 
-        {isLimitReached && (
-          <Link
-            to="/pricing"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[#e6dfd8] text-[#141413] text-xs font-bold rounded-xl hover:bg-[#faf9f5] transition-all shadow-xs shrink-0"
-          >
-            <span>Upgrade Limit</span>
-            <ArrowRight className="w-3.5 h-3.5 text-[#cc785c]" />
-          </Link>
-        )}
-      </div>
-
-      {/* Websites Grid */}
-      {businesses.length === 0 ? (
-        <div className="text-center py-16 px-4 bg-[#faf9f5] rounded-2xl border border-[#e6dfd8]">
-          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-[#efe9de] flex items-center justify-center text-[#cc785c]">
-            <Globe className="w-7 h-7" />
+          <div className="flex items-center gap-3 self-start sm:self-auto">
+            <div className="text-right hidden sm:block">
+              <div className="text-[11px] font-mono font-bold text-[#6c6a64]">
+                {websitesUsed} of {planLimit} Websites
+              </div>
+              <div className="text-[10px] font-mono text-[#8e8b82] uppercase">
+                {subscriptionStatus} PLAN
+              </div>
+            </div>
+            <button
+              onClick={openAddWebsiteModal}
+              disabled={isLimitReached}
+              className="px-4 py-2.5 bg-[#cc785c] hover:bg-[#a9583e] disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+            >
+              <Plus size={15} />
+              <span>Add Website Project</span>
+            </button>
           </div>
-          <h3 className="text-lg font-serif font-bold text-[#141413] mb-2">No Websites Added Yet</h3>
-          <p className="text-xs text-[#605f5b] max-w-md mx-auto mb-6">
-            Get started by adding your primary business website or client domain to run deep technical audits and track rankings.
-          </p>
-          <button
-            onClick={openAddWebsiteModal}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#cc785c] text-white text-xs font-bold rounded-xl hover:bg-[#b8694f] transition-all shadow-xs"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Your First Website</span>
-          </button>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {businesses.map((biz) => {
-            const isActive = biz.id === activeBusinessId;
-            const score = biz.latest_score;
 
-            return (
-              <div 
-                key={biz.id}
-                className={`relative flex flex-col justify-between p-6 rounded-2xl border transition-all duration-200 ${
-                  isActive 
-                    ? 'bg-[#faf9f5] border-[#cc785c] ring-2 ring-[#cc785c]/10 shadow-md' 
-                    : 'bg-[#faf9f5] border-[#e6dfd8] hover:border-[#cc785c]/50 hover:shadow-xs'
-                }`}
-              >
-                {/* Active Pill */}
-                {isActive && (
-                  <div className="absolute top-4 right-4 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold uppercase tracking-wider">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Active Project
-                  </div>
-                )}
+        {/* Feedback Alert */}
+        {feedback && (
+          <div className={`p-4 rounded-xl text-xs font-sans font-medium flex items-center gap-2.5 ${
+            feedback.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+          }`}>
+            {feedback.type === 'success' ? <CheckCircle2 size={16} className="text-emerald-600 shrink-0" /> : <AlertCircle size={16} className="text-red-600 shrink-0" />}
+            <span>{feedback.message}</span>
+          </div>
+        )}
 
-                <div>
-                  {/* Top Meta */}
-                  <div className="flex items-start gap-3.5 mb-4">
-                    <div className="w-11 h-11 rounded-xl bg-[#efe9de] border border-[#e6dfd8] flex items-center justify-center text-[#cc785c] shrink-0 font-serif font-bold text-base">
-                      {biz.name ? biz.name.charAt(0).toUpperCase() : 'W'}
-                    </div>
-                    <div className="pr-20">
-                      <h3 className="font-serif font-bold text-base text-[#141413] line-clamp-1">
-                        {biz.name || 'Untitled Business'}
-                      </h3>
-                      <a 
-                        href={biz.website_url.startsWith('http') ? biz.website_url : `https://${biz.website_url}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-[#cc785c] hover:underline flex items-center gap-1 mt-0.5 line-clamp-1"
-                      >
-                        <span>{biz.website_url.replace(/^https?:\/\//, '')}</span>
-                        <ExternalLink className="w-3 h-3 shrink-0 opacity-70" />
-                      </a>
-                    </div>
-                  </div>
+        {/* Active Domains Counter / Warning */}
+        <div className="p-4 rounded-xl bg-[#efe9de]/60 border border-[#e6dfd8] flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-white border border-[#e6dfd8] text-[#cc785c]">
+              <Layers size={18} />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-[#141413]">
+                Workspace Allocation: {websitesUsed} / {planLimit} Active Domains
+              </div>
+              <div className="text-[11px] text-[#6c6a64] font-sans">
+                Each domain maintains dedicated SEO scores, audits, keywords, competitor gap analysis, and GeoGrid matrices.
+              </div>
+            </div>
+          </div>
+          {isLimitReached && (
+            <Link
+              to="/pricing"
+              className="px-3 py-1.5 bg-[#141413] hover:bg-[#252320] text-white text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1.5 shrink-0"
+            >
+              <Sparkles size={13} className="text-[#cc785c]" />
+              <span>Upgrade Plan for More Domains</span>
+            </Link>
+          )}
+        </div>
 
-                  {/* Attributes */}
-                  <div className="space-y-1.5 mb-6 text-xs text-[#605f5b]">
-                    {biz.type && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-[#605f5b]/70">Industry:</span>
-                        <span className="font-medium text-[#141413]">{biz.type}</span>
-                      </div>
-                    )}
-                    {biz.city && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-[#605f5b]/70">Target Market:</span>
-                        <span className="font-medium text-[#141413]">{biz.city}{biz.country ? `, ${biz.country}` : ''}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[#605f5b]/70">Last Audit:</span>
-                      <span className="font-medium text-[#141413]">
-                        {biz.last_audit_time ? new Date(biz.last_audit_time).toLocaleDateString() : 'Not audited yet'}
-                      </span>
-                    </div>
-                  </div>
+        {/* Website Cards Grid */}
+        {businesses.length === 0 ? (
+          <div className="text-center py-16 bg-[#efe9de]/30 rounded-2xl border border-[#e6dfd8] p-8">
+            <div className="w-12 h-12 rounded-full bg-[#efe9de] text-[#cc785c] flex items-center justify-center mx-auto mb-4">
+              <Globe size={24} />
+            </div>
+            <h3 className="text-base font-serif font-bold text-[#141413] mb-1">
+              No Websites Added Yet
+            </h3>
+            <p className="text-xs text-[#6c6a64] max-w-sm mx-auto mb-6">
+              Get started by adding your primary business website or client domain to run deep technical audits and track rankings.
+            </p>
+            <button
+              onClick={openAddWebsiteModal}
+              className="px-5 py-2.5 bg-[#cc785c] hover:bg-[#a9583e] text-white text-xs font-bold rounded-xl transition-all shadow-xs inline-flex items-center gap-2 cursor-pointer"
+            >
+              <Plus size={15} />
+              <span>Add Your First Website</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {businesses.map((biz) => {
+              const isActive = biz.id === activeBusinessId;
+              const isAuditing = isAuditingId === biz.id;
 
-                  {/* Score strip */}
-                  <div className="p-3.5 rounded-xl bg-[#efe9de]/70 border border-[#e6dfd8] flex items-center justify-between mb-6">
-                    <span className="text-xs font-semibold text-[#141413]">Growth Score</span>
-                    {score !== null && score !== undefined ? (
-                      <span className={`text-sm font-bold px-2.5 py-0.5 rounded-lg ${
-                        score >= 80 ? 'bg-emerald-100 text-emerald-800' :
-                        score >= 60 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+              return (
+                <div
+                  key={biz.id}
+                  className={`bg-[#faf9f5] border rounded-2xl p-6 transition-all duration-200 flex flex-col justify-between gap-6 relative shadow-xs hover:shadow-md ${
+                    isActive 
+                      ? 'border-[#cc785c] ring-1 ring-[#cc785c]/30 bg-white' 
+                      : 'border-[#e6dfd8] hover:border-[#cc785c]/50'
+                  }`}
+                >
+                  {/* Top Badge Strip */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-3 rounded-xl border ${
+                        isActive ? 'bg-[#cc785c]/10 border-[#cc785c]/30 text-[#cc785c]' : 'bg-[#efe9de] border-[#e6dfd8] text-[#6c6a64]'
                       }`}>
-                        {score} / 100
-                      </span>
-                    ) : (
-                      <span className="text-xs text-[#605f5b] italic">Audit required</span>
-                    )}
-                  </div>
-                </div>
+                        <Globe size={20} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-serif font-bold text-[#141413] line-clamp-1">
+                            {biz.name || biz.website_url || 'Untitled Project'}
+                          </h3>
+                          {isActive && (
+                            <span className="px-2 py-0.5 text-[10px] font-mono font-bold uppercase bg-emerald-100 text-emerald-800 rounded-md border border-emerald-200 shrink-0">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <a
+                          href={biz.website_url.startsWith('http') ? biz.website_url : `https://${biz.website_url}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-mono text-[#6c6a64] hover:text-[#cc785c] flex items-center gap-1 mt-0.5 line-clamp-1"
+                        >
+                          <span>{biz.website_url}</span>
+                          <ExternalLink size={11} />
+                        </a>
+                      </div>
+                    </div>
 
-                {/* Bottom Action Strip */}
-                <div className="pt-4 border-t border-[#e6dfd8] flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setEditingBiz(biz)}
-                      title="Edit website details"
-                      className="p-2 text-[#605f5b] hover:text-[#141413] hover:bg-black/5 rounded-lg transition-colors"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleRunAudit(biz)}
-                      disabled={isAuditingId === biz.id}
-                      title="Run fresh SEO audit"
-                      className="p-2 text-[#605f5b] hover:text-[#cc785c] hover:bg-black/5 rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      <RefreshCw className={`w-4 h-4 ${isAuditingId === biz.id ? 'animate-spin text-[#cc785c]' : ''}`} />
-                    </button>
-                    {businesses.length > 1 && (
+                    {/* Actions Menu */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setEditingBiz(biz)}
+                        title="Edit Website Details"
+                        className="p-2 text-[#6c6a64] hover:text-[#141413] hover:bg-[#efe9de] rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Edit3 size={15} />
+                      </button>
                       <button
                         onClick={() => setDeleteConfirmBiz(biz)}
-                        title="Remove website"
-                        className="p-2 text-[#605f5b] hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete Website"
+                        className="p-2 text-[#6c6a64] hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 size={15} />
                       </button>
-                    )}
+                    </div>
                   </div>
 
-                  {isActive ? (
-                    <Link
-                      to="/dashboard"
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#cc785c] text-white text-xs font-bold rounded-xl hover:bg-[#b8694f] transition-all shadow-xs"
-                    >
-                      <span>Open Workspace</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
-                  ) : (
+                  {/* Metadata Chips */}
+                  <div className="grid grid-cols-2 gap-3 p-3.5 bg-[#efe9de]/40 rounded-xl border border-[#e6dfd8]/80 text-xs">
+                    <div>
+                      <span className="text-[10px] font-mono uppercase text-[#8e8b82] block mb-0.5">Industry / Type</span>
+                      <span className="font-semibold text-[#141413] capitalize">{biz.type || 'Local Business'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-mono uppercase text-[#8e8b82] block mb-0.5">Location</span>
+                      <span className="font-semibold text-[#141413]">{biz.city || 'Not specified'}{biz.country ? `, ${biz.country}` : ''}</span>
+                    </div>
+                  </div>
+
+                  {/* Telemetry Preview */}
+                  <div className="flex items-center justify-between pt-2 border-t border-[#e6dfd8]/60 text-xs">
+                    <div className="flex items-center gap-2">
+                      <Activity size={14} className="text-[#cc785c]" />
+                      <span className="text-[11px] font-mono text-[#6c6a64]">
+                        {biz.score !== undefined && biz.score !== null ? (
+                          <>Score: <strong className="text-[#141413] font-bold">{biz.score}/100</strong></>
+                        ) : (
+                          'No audit score yet'
+                        )}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono text-[#8e8b82]">
+                      {biz.last_crawled_at ? `Audited ${new Date(biz.last_crawled_at).toLocaleDateString()}` : 'Never Audited'}
+                    </span>
+                  </div>
+
+                  {/* Card Bottom CTA Buttons */}
+                  <div className="grid grid-cols-2 gap-2 pt-2">
                     <button
                       onClick={() => handleSwitchAndNavigate(biz.id)}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-[#e6dfd8] text-[#141413] text-xs font-bold rounded-xl hover:bg-[#efe9de] transition-all shadow-xs"
+                      disabled={isActive}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        isActive
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
+                          : 'bg-[#141413] hover:bg-[#252320] text-white shadow-xs'
+                      }`}
                     >
-                      <span>Switch to Project</span>
+                      {isActive ? (
+                        <>
+                          <CheckCircle2 size={14} />
+                          <span>Active Workspace</span>
+                        </>
+                      ) : (
+                        <>
+                          <ArrowRight size={14} />
+                          <span>Switch to Workspace</span>
+                        </>
+                      )}
                     </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
-      {/* Edit Details Modal */}
-      {editingBiz && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-md bg-[#faf9f5] border border-[#e6dfd8] rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4">
-            <h3 className="text-lg font-serif font-bold text-[#141413]">Edit Website Project</h3>
-            <form onSubmit={handleSaveEdit} className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-[#141413] mb-1">Business Name</label>
-                <input
-                  type="text"
-                  required
-                  value={editingBiz.name || ''}
-                  onChange={(e) => setEditingBiz({ ...editingBiz, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-[#e6dfd8] rounded-xl text-sm text-[#141413]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-[#141413] mb-1">Website URL</label>
-                <input
-                  type="text"
-                  required
-                  value={editingBiz.website_url || ''}
-                  onChange={(e) => setEditingBiz({ ...editingBiz, website_url: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-[#e6dfd8] rounded-xl text-sm text-[#141413]"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#141413] mb-1">Industry</label>
-                  <input
-                    type="text"
-                    value={editingBiz.type || ''}
-                    onChange={(e) => setEditingBiz({ ...editingBiz, type: e.target.value })}
-                    className="w-full px-3 py-2 bg-white border border-[#e6dfd8] rounded-xl text-sm text-[#141413]"
-                  />
+                    <button
+                      onClick={() => handleRunAudit(biz)}
+                      disabled={isAuditing}
+                      className="py-2 px-3 bg-white hover:bg-gray-50 text-[#141413] border border-[#e6dfd8] rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      <RefreshCw size={13} className={isAuditing ? 'animate-spin text-[#cc785c]' : 'text-[#6c6a64]'} />
+                      <span>{isAuditing ? 'Auditing...' : 'Run New Audit'}</span>
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#141413] mb-1">City</label>
-                  <input
-                    type="text"
-                    value={editingBiz.city || ''}
-                    onChange={(e) => setEditingBiz({ ...editingBiz, city: e.target.value })}
-                    className="w-full px-3 py-2 bg-white border border-[#e6dfd8] rounded-xl text-sm text-[#141413]"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-end gap-3 pt-3">
+              );
+            })}
+          </div>
+        )}
+
+        {/* Edit Modal */}
+        {editingBiz && (
+          <div className="fixed inset-0 bg-[#181715]/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white border border-[#e6dfd8] rounded-2xl p-6 max-w-md w-full shadow-xl space-y-5 animate-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between pb-3 border-b border-[#e6dfd8]">
+                <h3 className="text-lg font-serif font-bold text-[#141413]">
+                  Edit Project Details
+                </h3>
                 <button
-                  type="button"
                   onClick={() => setEditingBiz(null)}
-                  className="px-4 py-2 text-xs font-medium text-[#605f5b]"
+                  className="text-[#6c6a64] hover:text-[#141413] p-1 text-xs cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEdit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#6c6a64] uppercase mb-1">
+                    Business / Project Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingBiz.name || ''}
+                    onChange={(e) => setEditingBiz({ ...editingBiz, name: e.target.value })}
+                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-[#e6dfd8] bg-[#faf9f5] focus:bg-white text-[#141413] focus:outline-none focus:ring-1 focus:ring-[#cc785c]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#6c6a64] uppercase mb-1">
+                    Website URL
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingBiz.website_url || ''}
+                    onChange={(e) => setEditingBiz({ ...editingBiz, website_url: e.target.value })}
+                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-[#e6dfd8] bg-[#faf9f5] focus:bg-white text-[#141413] focus:outline-none focus:ring-1 focus:ring-[#cc785c]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono font-bold text-[#6c6a64] uppercase mb-1">
+                      Business Type / Industry
+                    </label>
+                    <input
+                      type="text"
+                      value={editingBiz.type || ''}
+                      onChange={(e) => setEditingBiz({ ...editingBiz, type: e.target.value })}
+                      placeholder="e.g. Dental Clinic"
+                      className="w-full px-3.5 py-2 text-xs rounded-xl border border-[#e6dfd8] bg-[#faf9f5] focus:bg-white text-[#141413] focus:outline-none focus:ring-1 focus:ring-[#cc785c]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono font-bold text-[#6c6a64] uppercase mb-1">
+                      City
+                    </label>
+                    <input
+                      type="text"
+                      value={editingBiz.city || ''}
+                      onChange={(e) => setEditingBiz({ ...editingBiz, city: e.target.value })}
+                      placeholder="e.g. Austin"
+                      className="w-full px-3.5 py-2 text-xs rounded-xl border border-[#e6dfd8] bg-[#faf9f5] focus:bg-white text-[#141413] focus:outline-none focus:ring-1 focus:ring-[#cc785c]"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#e6dfd8]">
+                  <button
+                    type="button"
+                    onClick={() => setEditingBiz(null)}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-[#141413] text-xs font-medium rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="px-4 py-2 bg-[#cc785c] hover:bg-[#a9583e] text-white text-xs font-bold rounded-xl transition-colors shadow-xs cursor-pointer"
+                  >
+                    {isSaving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {deleteConfirmBiz && (
+          <div className="fixed inset-0 bg-[#181715]/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white border border-[#e6dfd8] rounded-2xl p-6 max-w-sm w-full shadow-xl space-y-4 animate-in zoom-in-95 duration-150 text-center">
+              <div className="w-12 h-12 rounded-full bg-red-100 border border-red-200 text-red-600 flex items-center justify-center mx-auto">
+                <Trash2 size={24} />
+              </div>
+              <h3 className="text-base font-serif font-bold text-[#141413]">
+                Remove Website Project?
+              </h3>
+              <p className="text-xs text-[#6c6a64]">
+                Are you sure you want to remove <strong>{deleteConfirmBiz.name || deleteConfirmBiz.website_url}</strong>? All associated audit scores, keyword tracking, and gap data will be deleted.
+              </p>
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  onClick={() => setDeleteConfirmBiz(null)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-[#141413] text-xs font-medium rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-5 py-2 bg-[#cc785c] text-white text-xs font-bold rounded-xl hover:bg-[#b8694f]"
+                  onClick={handleConfirmDelete}
+                  className="px-5 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-colors shadow-xs cursor-pointer"
                 >
-                  {isSaving ? 'Saving...' : 'Save Changes'}
+                  Remove
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteConfirmBiz && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-sm bg-[#faf9f5] border border-[#e6dfd8] rounded-2xl shadow-2xl p-6 space-y-4 text-center">
-            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
-              <Trash2 className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-base font-serif font-bold text-[#141413]">Remove Project?</h3>
-              <p className="text-xs text-[#605f5b] mt-1">
-                Are you sure you want to remove <strong>{deleteConfirmBiz.name || deleteConfirmBiz.website_url}</strong> from your workspace?
-              </p>
-            </div>
-            <div className="flex items-center justify-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setDeleteConfirmBiz(null)}
-                className="px-4 py-2 text-xs font-medium text-[#605f5b] hover:bg-black/5 rounded-xl transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                className="px-5 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-colors shadow-xs"
-              >
-                Remove
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-    </div>
+      </div>
+    </DashboardLayout>
   );
 };

@@ -20,7 +20,9 @@ export interface WorkspaceBusiness {
   normalized_domain?: string;
   is_default?: number;
   latest_score?: number | null;
+  score?: number | null;
   last_audit_time?: string | null;
+  last_crawled_at?: string | null;
   created_at?: string;
   updated_at?: string;
 }
