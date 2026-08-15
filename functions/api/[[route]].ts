@@ -818,11 +818,16 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare(
-          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
-        if (!business) return errorResponse("No business found", 404);
+        if (!business) return jsonResponse({ success: true, data: [] });
 
         const { results: audits } = await env.DB.prepare(`
           SELECT 
@@ -847,11 +852,16 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare(
-          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
-        if (!business) return errorResponse("No business found", 404);
+        if (!business) return jsonResponse({ success: true, data: null });
 
         const audit = await env.DB.prepare(
           "SELECT * FROM audits WHERE business_id = ? AND status = 'completed' ORDER BY created_at DESC LIMIT 1"
@@ -930,34 +940,211 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true, message: "Profile updated successfully" });
       }
 
-      // --- BUSINESS: GET CURRENT ---
+      // --- MULTI-WEBSITE / BUSINESSES: LIST & CREATE ---
+      if (url.pathname === '/api/businesses' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const { results } = await env.DB.prepare(`
+          SELECT b.*, 
+            (SELECT overall_score FROM growth_scores WHERE business_id = b.id ORDER BY created_at DESC LIMIT 1) as latest_score,
+            (SELECT completed_at FROM audits WHERE business_id = b.id AND status = 'completed' ORDER BY completed_at DESC LIMIT 1) as last_audit_time
+          FROM businesses b
+          WHERE b.user_id = ? AND (b.is_archived IS NULL OR b.is_archived = 0)
+          ORDER BY b.is_default DESC, b.created_at DESC
+        `).bind(user.id as string).all();
+
+        const planLimit = getUserPlanLimit(user.subscription_status, user.role);
+        const activeBiz = (results || []).find((b: any) => b.is_default === 1) || (results || [])[0] || null;
+
+        return jsonResponse({
+          success: true,
+          data: {
+            businesses: results || [],
+            total: (results || []).length,
+            planLimit,
+            activeBusinessId: activeBiz?.id || null,
+            subscriptionStatus: user.subscription_status || 'free'
+          }
+        });
+      }
+
+      if (url.pathname === '/api/businesses' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const { name, type, city, country, websiteUrl, setAsActive } = await request.json() as any;
+        if (!websiteUrl || !websiteUrl.trim()) return errorResponse("Website URL is required", 400);
+
+        const planLimit = getUserPlanLimit(user.subscription_status, user.role);
+        const countRow = await env.DB.prepare(
+          "SELECT COUNT(*) as count FROM businesses WHERE user_id = ? AND (is_archived IS NULL OR is_archived = 0)"
+        ).bind(user.id as string).first();
+        const currentCount = (countRow?.count as number) || 0;
+
+        if (currentCount >= planLimit) {
+          return jsonResponse({
+            success: false,
+            error: `You have reached your website limit (${currentCount}/${planLimit}). Please upgrade your plan to add another website.`,
+            limitReached: true,
+            currentCount,
+            planLimit
+          }, 403);
+        }
+
+        const normDomain = normalizeDomain(websiteUrl);
+        // Duplicate check for this user
+        const existing = await env.DB.prepare(
+          "SELECT id, name, website_url FROM businesses WHERE user_id = ? AND normalized_domain = ? AND (is_archived IS NULL OR is_archived = 0)"
+        ).bind(user.id as string, normDomain).first();
+
+        if (existing) {
+          return jsonResponse({
+            success: false,
+            error: "This website is already in your account.",
+            isDuplicate: true,
+            existingBusinessId: existing.id,
+            existingBusinessName: existing.name
+          }, 409);
+        }
+
+        const bizId = generateId('biz');
+        const bizName = name && name.trim() ? name.trim() : (normDomain.split('.')[0] || 'My Business');
+        const isDefault = setAsActive || currentCount === 0 ? 1 : 0;
+
+        if (isDefault) {
+          await env.DB.prepare("UPDATE businesses SET is_default = 0 WHERE user_id = ?").bind(user.id).run().catch(() => {});
+        }
+
+        await env.DB.prepare(`
+          INSERT INTO businesses (id, user_id, name, type, city, country, website_url, normalized_domain, is_default, is_archived, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `).bind(bizId, user.id, bizName, type || '', city || '', country || '', websiteUrl.trim(), normDomain, isDefault).run();
+
+        const createdBiz = await env.DB.prepare("SELECT * FROM businesses WHERE id = ?").bind(bizId).first();
+
+        return jsonResponse({
+          success: true,
+          data: createdBiz,
+          message: "Website added successfully to your workspace."
+        });
+      }
+
+      // --- BUSINESSES: SET ACTIVE ---
+      if (url.pathname.match(/^\/api\/businesses\/[^\/]+\/set-active$/) && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const bizId = url.pathname.split('/')[3];
+        const biz = await env.DB.prepare(
+          "SELECT id FROM businesses WHERE id = ? AND user_id = ? AND (is_archived IS NULL OR is_archived = 0)"
+        ).bind(bizId, user.id).first();
+
+        if (!biz) return errorResponse("Business not found or unauthorized", 404);
+
+        await env.DB.prepare("UPDATE businesses SET is_default = 0 WHERE user_id = ?").bind(user.id).run();
+        await env.DB.prepare("UPDATE businesses SET is_default = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?").bind(bizId, user.id).run();
+
+        return jsonResponse({ success: true, activeBusinessId: bizId, message: "Active website updated" });
+      }
+
+      // --- BUSINESSES: BY ID (GET, PUT, DELETE) ---
+      if (url.pathname.startsWith('/api/businesses/') && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const bizId = url.pathname.replace('/api/businesses/', '').split('/')[0];
+        try {
+          const business = await resolveTargetBusiness(user.id, bizId);
+          if (!business) return errorResponse("Business not found", 404);
+          return jsonResponse({ success: true, data: business });
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+      }
+
+      if (url.pathname.startsWith('/api/businesses/') && request.method === 'PUT') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const bizId = url.pathname.replace('/api/businesses/', '').split('/')[0];
+        const { name, type, city, country, websiteUrl } = await request.json() as any;
+
+        const biz = await env.DB.prepare(
+          "SELECT id FROM businesses WHERE id = ? AND user_id = ? AND (is_archived IS NULL OR is_archived = 0)"
+        ).bind(bizId, user.id).first();
+
+        if (!biz) return errorResponse("Business not found or unauthorized", 404);
+
+        const normDomain = websiteUrl ? normalizeDomain(websiteUrl) : null;
+        await env.DB.prepare(`
+          UPDATE businesses 
+          SET name = COALESCE(?, name), type = COALESCE(?, type), city = COALESCE(?, city), country = COALESCE(?, country), website_url = COALESCE(?, website_url), normalized_domain = COALESCE(?, normalized_domain), updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND user_id = ?
+        `).bind(name || null, type || null, city || null, country || null, websiteUrl || null, normDomain, bizId, user.id).run();
+
+        const updated = await env.DB.prepare("SELECT * FROM businesses WHERE id = ?").bind(bizId).first();
+        return jsonResponse({ success: true, data: updated, message: "Website updated successfully" });
+      }
+
+      if (url.pathname.startsWith('/api/businesses/') && request.method === 'DELETE') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const bizId = url.pathname.replace('/api/businesses/', '').split('/')[0];
+        const biz = await env.DB.prepare(
+          "SELECT id, is_default FROM businesses WHERE id = ? AND user_id = ?"
+        ).bind(bizId, user.id).first();
+
+        if (!biz) return errorResponse("Business not found or unauthorized", 404);
+
+        // Soft delete
+        await env.DB.prepare("UPDATE businesses SET is_archived = 1, is_default = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?").bind(bizId, user.id).run();
+
+        // If it was default, make another business default
+        if (biz.is_default) {
+          const nextBiz = await env.DB.prepare(
+            "SELECT id FROM businesses WHERE user_id = ? AND (is_archived IS NULL OR is_archived = 0) ORDER BY updated_at DESC LIMIT 1"
+          ).bind(user.id).first();
+          if (nextBiz) {
+            await env.DB.prepare("UPDATE businesses SET is_default = 1 WHERE id = ?").bind(nextBiz.id).run();
+          }
+        }
+
+        return jsonResponse({ success: true, message: "Website removed from workspace" });
+      }
+
+      // --- SINGLE BUSINESS (BACKWARD COMPATIBLE) ---
       if (url.pathname === '/api/business' && request.method === 'GET') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare(
-          "SELECT id, name, type, city, country, website_url FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
-
-        return jsonResponse({ success: true, data: business || null });
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        try {
+          const business = await resolveTargetBusiness(user.id, targetBizId);
+          return jsonResponse({ success: true, data: business || null });
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
       }
 
-      // --- BUSINESS: CREATE ---
       if (url.pathname === '/api/business' && request.method === 'POST') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
         const { name, type, city, country, websiteUrl } = await request.json() as any;
+        const normDomain = normalizeDomain(websiteUrl || '');
         const bizId = generateId('biz');
 
         await env.DB.prepare(
-          "INSERT INTO businesses (id, user_id, name, type, city, country, website_url) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        ).bind(bizId, user.id, name, type, city, country, websiteUrl).run();
+          "INSERT INTO businesses (id, user_id, name, type, city, country, website_url, normalized_domain, is_default, is_archived) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0)"
+        ).bind(bizId, user.id, name, type, city, country, websiteUrl, normDomain).run();
 
         return jsonResponse({ success: true, data: { id: bizId } });
       }
 
-      // --- BUSINESS: UPDATE ---
       if (url.pathname === '/api/business' && request.method === 'PUT') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
@@ -965,34 +1152,45 @@ export const onRequest = async (context: any) => {
         const { name, type, city, country, websiteUrl } = await request.json() as any;
         if (!name || !name.trim()) return errorResponse("Business name is required", 400);
 
-        const existing = await env.DB.prepare(
-          "SELECT id FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        const existing = await resolveTargetBusiness(user.id, targetBizId);
 
         if (existing) {
+          const normDomain = websiteUrl ? normalizeDomain(websiteUrl) : existing.normalized_domain;
           await env.DB.prepare(
-            "UPDATE businesses SET name = ?, type = ?, city = ?, country = ?, website_url = ? WHERE user_id = ?"
-          ).bind(name.trim(), type || '', city || '', country || '', websiteUrl || '', user.id).run();
+            "UPDATE businesses SET name = ?, type = ?, city = ?, country = ?, website_url = ?, normalized_domain = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?"
+          ).bind(name.trim(), type || '', city || '', country || '', websiteUrl || '', normDomain, existing.id, user.id).run();
         } else {
           const bizId = generateId('biz');
+          const normDomain = normalizeDomain(websiteUrl || '');
           await env.DB.prepare(
-            "INSERT INTO businesses (id, user_id, name, type, city, country, website_url) VALUES (?, ?, ?, ?, ?, ?, ?)"
-          ).bind(bizId, user.id, name.trim(), type || '', city || '', country || '', websiteUrl || '').run();
+            "INSERT INTO businesses (id, user_id, name, type, city, country, website_url, normalized_domain, is_default, is_archived) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0)"
+          ).bind(bizId, user.id, name.trim(), type || '', city || '', country || '', websiteUrl || '', normDomain).run();
         }
 
         return jsonResponse({ success: true, message: "Business details updated successfully" });
       }
 
       // --- AUDIT ---
-      if (url.pathname === '/api/audit' && request.method === 'POST') {
+      if ((url.pathname === '/api/audit' || url.pathname === '/api/audit/run') && request.method === 'POST') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare(
-          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        let explicitBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        try {
+          const bodyJson = await request.clone().json().catch(() => ({}));
+          if (bodyJson?.business_id) explicitBizId = bodyJson.business_id;
+        } catch {}
 
-        if (!business) return errorResponse("No business found", 404);
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, explicitBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("No business workspace found", 404);
         if (!business.website_url) return errorResponse("Business has no website URL", 400);
 
         // Check if an audit is already running
@@ -1060,11 +1258,16 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare(
-          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
-        if (!business) return errorResponse("No business found", 404);
+        if (!business) return errorResponse("No business workspace found", 404);
         if (!business.website_url) return errorResponse("Business has no website URL", 400);
 
         try {
@@ -1121,13 +1324,18 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        let payload;
+        let payload: any;
         try { payload = await request.json(); } catch { return errorResponse("Invalid JSON", 400); }
         const topic = payload.topic || "The importance of our services in the local community";
 
-        const business = await env.DB.prepare(
-          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
         if (!business) return errorResponse("Business not found", 404);
 
@@ -1154,13 +1362,18 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        let payload;
+        let payload: any;
         try { payload = await request.json(); } catch { return errorResponse("Invalid JSON", 400); }
         if (!payload.competitorUrl) return errorResponse("Competitor URL required", 400);
 
-        const business = await env.DB.prepare(
-          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
         if (!business || !business.website_url) return errorResponse("You must have a website to compare against", 400);
 
@@ -1260,9 +1473,14 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare(
-          "SELECT id FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
         if (!business) return jsonResponse({ success: true, data: [] });
 
@@ -1294,9 +1512,19 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare(
-          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        let targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        try {
+          const bodyJson = await request.clone().json().catch(() => ({}));
+          if (bodyJson?.business_id) targetBizId = bodyJson.business_id;
+        } catch {}
+
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
         if (!business) return errorResponse("Business not found", 404);
         if (!env.SERP_API_KEY) return errorResponse("SERP API is not configured on the server", 500);
@@ -1319,9 +1547,14 @@ export const onRequest = async (context: any) => {
         try { payload = await request.json(); } catch { return errorResponse("Invalid JSON", 400); }
         if (!payload.competitorUrl) return errorResponse("Competitor URL required", 400);
 
-        const business = await env.DB.prepare(
-          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
         if (!business || !business.website_url) return errorResponse("You must have a business website configured", 400);
         if (!env.NVIDIA_API_KEY) return errorResponse("AI is not configured on the server", 500);
@@ -1372,9 +1605,14 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare(
-          "SELECT id FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
         if (!business) return jsonResponse({ success: true, data: { today: [], this_week: [], this_month: [], next_90_days: [] } });
 
@@ -1398,9 +1636,14 @@ export const onRequest = async (context: any) => {
         try { body = await request.json(); } catch { return errorResponse("Invalid JSON", 400); }
         if (!body.type) return errorResponse("Fix type is required", 400);
 
-        const business = await env.DB.prepare(
-          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = body.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
         const context = {
           businessName: business?.name || body.context?.businessName || 'Your Business',
@@ -1435,12 +1678,17 @@ export const onRequest = async (context: any) => {
 
         let body: any;
         try { body = await request.json(); } catch { return errorResponse("Invalid JSON", 400); }
-        const { actionId, status } = body;
+        const { actionId, status, business_id } = body;
         if (!actionId || !status) return errorResponse("actionId and status required", 400);
 
-        const business = await env.DB.prepare(
-          "SELECT id FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
         if (!business) return errorResponse("Business not found", 404);
 
@@ -1462,9 +1710,14 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare(
-          "SELECT id FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
         if (!business) return jsonResponse({ success: true, data: { completed: 0, pending: 0, skipped: 0, total: 0, percentage: 0 } });
 
@@ -1490,9 +1743,14 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare(
-          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
         if (!business) return errorResponse("Business not found", 404);
 
@@ -1564,7 +1822,7 @@ export const onRequest = async (context: any) => {
       }
 
       // --- GROWTH COPILOT AI ASSISTANT (RANKORA AI) ---
-      if (url.pathname === '/api/copilot/chat' && request.method === 'POST') {
+      if ((url.pathname === '/api/copilot/chat' || url.pathname === '/api/copilot/message') && request.method === 'POST') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
@@ -1572,9 +1830,14 @@ export const onRequest = async (context: any) => {
         try { body = await request.json(); } catch { return errorResponse("Invalid JSON", 400); }
         const userMessage = body?.message || "What should I focus on to improve my local ranking?";
 
-        const business = await env.DB.prepare(
-          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = body?.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
         if (!business) {
           return jsonResponse({
@@ -1685,9 +1948,14 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare(
-          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
         if (!business || !business.website_url) return errorResponse("No business website found", 404);
 
@@ -1808,9 +2076,14 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const businessInfo = await env.DB.prepare(
-          "SELECT * FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let businessInfo;
+        try {
+          businessInfo = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
         // New User State: No business yet
         if (!businessInfo) {
@@ -2078,9 +2351,14 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare(
-          "SELECT id FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
         if (!business) return jsonResponse({ success: true, data: [] });
 
@@ -2117,15 +2395,19 @@ export const onRequest = async (context: any) => {
         const id = url.pathname.split('/').pop();
         if (!id) return errorResponse("Invalid ID", 400);
 
-        const { status } = await request.json() as any;
+        const { status, business_id } = await request.json() as any;
         if (!status || !['pending', 'in-progress', 'completed'].includes(status)) {
           return errorResponse("Invalid status", 400);
         }
 
-        // Ensure the recommendation belongs to the user's business
-        const business = await env.DB.prepare(
-          "SELECT id FROM businesses WHERE user_id = ? LIMIT 1"
-        ).bind(user.id as string).first();
+        const targetBizId = business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
 
         if (!business) return errorResponse("Unauthorized", 401);
 
@@ -2289,7 +2571,15 @@ export const onRequest = async (context: any) => {
         await env.DB.prepare("ALTER TABLE leads ADD COLUMN status TEXT DEFAULT 'new'").run().catch(() => {});
         await env.DB.prepare("ALTER TABLE leads ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP").run().catch(() => {});
 
-        const business = await env.DB.prepare("SELECT id FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
         const businessId = business?.id || user.id;
 
         const { results } = await env.DB.prepare(
@@ -2381,6 +2671,15 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
         // Ensure columns exist
         await env.DB.prepare("ALTER TABLE authority_opportunities ADD COLUMN is_verified INTEGER DEFAULT 0").run().catch(() => {});
         await env.DB.prepare("ALTER TABLE authority_opportunities ADD COLUMN evidence TEXT").run().catch(() => {});
@@ -2391,7 +2690,6 @@ export const onRequest = async (context: any) => {
         let opps = await env.DB.prepare("SELECT * FROM authority_opportunities WHERE user_id = ? ORDER BY created_at DESC").bind(user.id).all();
         
         if (!opps.results || opps.results.length === 0) {
-          const business = await env.DB.prepare("SELECT * FROM businesses WHERE user_id = ?").bind(user.id).first();
           const city = business?.city || 'Local Area';
 
           const seeds = [
@@ -2409,7 +2707,6 @@ export const onRequest = async (context: any) => {
           }
           opps = await env.DB.prepare("SELECT * FROM authority_opportunities WHERE user_id = ? ORDER BY created_at DESC").bind(user.id).all();
         }
-
 
         return jsonResponse({ success: true, data: opps.results });
       }
@@ -2579,7 +2876,15 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare("SELECT * FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
         if (!business) return jsonResponse({ success: true, data: [] });
 
         let { results } = await env.DB.prepare("SELECT * FROM keywords WHERE business_id = ? ORDER BY created_at DESC").bind(business.id).all();
@@ -2649,11 +2954,19 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare("SELECT id, city, website_url FROM businesses WHERE user_id = ?").bind(user.id as string).first();
-        if (!business) return errorResponse("Business not found", 404);
-
         const payload = await request.json() as any;
         if (!payload.keyword) return errorResponse("Keyword is required", 400);
+
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
 
         const id = crypto.randomUUID();
         const searchLocation = payload.city || payload.location || business.city || '';
@@ -2729,7 +3042,15 @@ export const onRequest = async (context: any) => {
         if (!user) return errorResponse("Unauthorized", 401);
 
         const kwId = url.pathname.replace('/api/keywords/', '');
-        const business = await env.DB.prepare("SELECT id FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
         if (!business) return errorResponse("Business not found", 404);
 
         await env.DB.prepare("DELETE FROM keywords WHERE id = ? AND business_id = ?").bind(kwId, business.id).run();
@@ -2740,7 +3061,18 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare("SELECT * FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        let bodyJson: any = {};
+        try { bodyJson = await request.clone().json(); } catch {}
+        const targetBizId = bodyJson?.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
         if (!business || !business.website_url) return errorResponse("Business or website not found", 404);
 
         const serpKey = env.SERP_API_KEY || env.SERPER_API_KEY;
@@ -2795,7 +3127,15 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare("SELECT id FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
         if (!business) return jsonResponse({ success: true, data: { score: 0, history: [] } });
 
         const { getRankingHistory, calculateLocalVisibilityScore } = await import('./rankingEngine');
@@ -2810,7 +3150,15 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare("SELECT id, name, city, website_url FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
         if (!business) return jsonResponse({ success: true, data: null });
 
         const latestScan = await env.DB.prepare(
@@ -2847,11 +3195,19 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare("SELECT * FROM businesses WHERE user_id = ?").bind(user.id as string).first();
-        if (!business || !business.website_url) return errorResponse("Business profile not found", 404);
-
         let body: any = {};
         try { body = await request.json(); } catch { body = {}; }
+
+        const targetBizId = body.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business || !business.website_url) return errorResponse("Business profile not found", 404);
 
         const keyword = body.keyword || `${business.type || 'Local Service'} in ${business.city || 'Area'}`;
         const city = body.city || business.city || 'Austin';
@@ -2910,7 +3266,15 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare("SELECT * FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
         if (!business) return jsonResponse({ success: true, data: null });
 
         // Growth Score History
@@ -3162,7 +3526,15 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare("SELECT id, name, city FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
         if (!business) return jsonResponse({ success: true, data: { userReputation: null, competitors: [], gapSummary: null } });
 
         const { results: userReviews } = await env.DB.prepare(
@@ -3177,7 +3549,6 @@ export const onRequest = async (context: any) => {
         ).bind(business.id as string).all();
 
         const compsReputation = (dbComps || []).map((comp: any, idx: number) => {
-          // Check if competitor had place signals stored in organic_snippet or fallback to realistic SERP benchmark
           return {
             name: comp.name || comp.domain,
             domain: comp.domain,
@@ -3220,7 +3591,18 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const business = await env.DB.prepare("SELECT * FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+        let bodyJson: any = {};
+        try { bodyJson = await request.clone().json(); } catch {}
+        const targetBizId = bodyJson?.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
         if (!business) return errorResponse("Business not found", 404);
 
         if (!env.NVIDIA_API_KEY) return errorResponse("AI is not configured", 500);
@@ -3261,10 +3643,18 @@ export const onRequest = async (context: any) => {
 
         if (!env.NVIDIA_API_KEY) return errorResponse("AI is not configured", 500);
 
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
         try {
-          const business = await env.DB.prepare("SELECT name FROM businesses WHERE user_id = ?").bind(user.id as string).first();
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        try {
           const { generateOutreachEmail } = await import('./authorityEngine');
-          const email = await generateOutreachEmail(env.NVIDIA_API_KEY, payload.opportunityId, payload.opportunityName, payload.whyRelevant, business?.name as string);
+          const email = await generateOutreachEmail(env.NVIDIA_API_KEY, payload.opportunityId, payload.opportunityName, payload.whyRelevant, business?.name as string || 'Our Company');
           
           return jsonResponse({ success: true, data: email });
         } catch (e: any) {
