@@ -20,6 +20,8 @@ export function FreeAudit() {
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [company, setCompany] = useState('');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [auditResult, setAuditResult] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export function FreeAudit() {
       const res = await fetchApi('/api/free-audit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ websiteUrl, email, name })
+        body: JSON.stringify({ websiteUrl, email, name, company, phone })
       });
 
       if (res.success && res.data) {
@@ -105,9 +107,10 @@ export function FreeAudit() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-mono uppercase font-bold text-[#8e8b82]">Your Name</label>
+                  <label className="text-[11px] font-mono uppercase font-bold text-[#8e8b82]">Your Name *</label>
                   <input
                     type="text"
+                    required
                     placeholder="Sarah Jenkins"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
@@ -115,12 +118,36 @@ export function FreeAudit() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-mono uppercase font-bold text-[#8e8b82]">Work Email</label>
+                  <label className="text-[11px] font-mono uppercase font-bold text-[#8e8b82]">Work Email *</label>
                   <input
                     type="email"
+                    required
                     placeholder="sarah@company.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#e6dfd8] text-[#141413] text-xs focus:outline-none focus:ring-1 focus:ring-[#cc785c]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-mono uppercase font-bold text-[#8e8b82]">Company Name</label>
+                  <input
+                    type="text"
+                    placeholder="Acme Local Services"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#e6dfd8] text-[#141413] text-xs focus:outline-none focus:ring-1 focus:ring-[#cc785c]"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-mono uppercase font-bold text-[#8e8b82]">Phone Number (Optional)</label>
+                  <input
+                    type="tel"
+                    placeholder="+1 (555) 019-2834"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#e6dfd8] text-[#141413] text-xs focus:outline-none focus:ring-1 focus:ring-[#cc785c]"
                   />
                 </div>

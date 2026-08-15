@@ -8,9 +8,10 @@ import {
   ArrowRight, 
   Bot,
   Layers,
-  Plus
+  Wrench
 } from 'lucide-react';
 import { sendCopilotMessage, runAudit } from '../../lib/api';
+import { useBusiness } from '../../context/BusinessContext';
 import type { CopilotMessage } from '../../types';
 
 interface GrowthCopilotProps {
@@ -23,81 +24,104 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
   const [loading, setLoading] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { activeBusiness, activeBusinessId } = useBusiness();
 
-  // Dynamic context-aware chips based on active route
+  const activeProjectName = activeBusiness?.name || activeBusiness?.website_url || businessName || 'My Project';
+
+  // Contextual screen-aware loading indicators (Requirement #11)
+  const getContextualLoadingText = () => {
+    const path = location.pathname;
+    if (path.includes('competitors')) return "Analyzing competitor search gaps...";
+    if (path.includes('keywords')) return "Checking SERP keyword ranks...";
+    if (path.includes('website') || path.includes('score')) return "Checking live DOM audit & schema...";
+    if (path.includes('campaign')) return "Reading campaign priority queue...";
+    if (path.includes('billing')) return "Verifying account entitlements & plan...";
+    if (path.includes('reviews')) return "Reading GMB review telemetry...";
+    return "Evaluating growth score & telemetry...";
+  };
+
+  // Screen-aware quick action presets (Requirement #6 & #10)
   const getContextualPresets = () => {
     const path = location.pathname;
     if (path.includes('competitors')) {
       return [
-        "Why is competitor beating me?",
-        "What are my biggest competitor gaps?",
-        "How can I overtake my top rival?",
-        "What pages do competitors have that I lack?"
-      ];
-    }
-    if (path.includes('reviews')) {
-      return [
-        "How can I get more 5-star reviews?",
-        "How to respond to negative feedback?",
-        "How do reviews affect local Map Pack ranking?"
-      ];
-    }
-    if (path.includes('website') || path.includes('score')) {
-      return [
-        "Why is my Growth Score low?",
-        "What is the most critical technical issue?",
-        "How do I fix missing JSON-LD schema?",
-        "Explain my on-page meta tag status"
+        "Why are they beating me?",
+        "Show biggest gap",
+        "Create competitor strategy"
       ];
     }
     if (path.includes('keywords')) {
       return [
-        "Which local keywords should I target?",
-        "How do I break into Google's Top 3?",
-        "Why am I unranked for commercial terms?"
+        "Which keyword should I target?",
+        "Show ranking drops",
+        "Discover keywords"
       ];
     }
-    if (path.includes('authority')) {
+    if (path.includes('website') || path.includes('score')) {
       return [
-        "How do I get high-authority local citations?",
-        "Draft outreach pitch for local directory",
-        "How many backlinks do I need to compete?"
+        "What is my biggest technical issue?",
+        "Fix my title",
+        "Check schema"
       ];
     }
-    if (path.includes('content')) {
+    if (path.includes('campaign')) {
       return [
-        "What service pages should I create?",
-        "Generate pricing comparison outline",
-        "How to format local FAQ schema?"
+        "What's today's priority?",
+        "Fix highest-impact issue",
+        "Show completed work"
+      ];
+    }
+    if (path.includes('changes')) {
+      return [
+        "What changes were verified?",
+        "Show failed changes",
+        "Re-verify live DOM"
+      ];
+    }
+    if (path.includes('billing')) {
+      return [
+        "What is my plan status?",
+        "Show usage limits",
+        "Upgrade to Growth"
+      ];
+    }
+    if (path.includes('reviews')) {
+      return [
+        "What is my review status?",
+        "Which reviews need responses?",
+        "Improve reputation"
       ];
     }
     return [
-      "Why am I not ranking?",
-      "Why is competitor beating me?",
+      "Why is my score low?",
       "What should I fix first?",
-      "Give me a 30-day growth plan.",
-      "What are my biggest SEO problems?"
+      "What changed?"
     ];
   };
 
   const currentPresets = getContextualPresets();
 
-  const [messages, setMessages] = useState<CopilotMessage[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: `Hello! I am **RANKORA AI**, your dedicated local growth strategist.\n\nI have direct access to your live website crawl, competitor benchmarks, keyword rankings, and review telemetry for **${businessName || 'your business'}**.\n\nAsk me anything or choose a context-aware question below.`,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      actions: [
-        { type: 'view_module', label: 'View Action Plan', target: '/dashboard/actions' },
-        { type: 'run_audit', label: 'Run Diagnostic Audit' }
-      ]
-    }
-  ]);
+  const [messages, setMessages] = useState<CopilotMessage[]>([]);
+
+  // Project switch awareness: reset conversation context when project changes (Requirement #10)
+  useEffect(() => {
+    setMessages([
+      {
+        id: `welcome-${activeBusinessId || 'default'}`,
+        role: 'assistant',
+        content: `### Finding\nRANKORA GROWTH OPERATOR active for **${activeProjectName}**.\n\n### Evidence\n- Telemetry: Synced with D1\n\n### Action\nSelect a quick action or enter a query.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        actions: [
+          { type: 'view_module', label: 'View Action Plan', target: '/dashboard/actions' },
+          { type: 'run_audit', label: 'Run Diagnostic Audit' }
+        ]
+      }
+    ]);
+  }, [activeBusinessId]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Listen for custom "open-copilot" events from anywhere in the app
+  // Listen for custom "open-copilot" events
   useEffect(() => {
     const handleOpenCopilot = (event: any) => {
       const prompt = event.detail?.prompt;
@@ -140,7 +164,7 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
       const assistantMsg: CopilotMessage = {
         id: 'copilot-' + Date.now(),
         role: 'assistant',
-        content: response?.reply || 'I analyzed your website and identified actionable opportunities in your Action Plan.',
+        content: response?.reply || '### Finding\nTelemetry loaded and roadmap updated.\n\n### Evidence\n- Status: Synced with D1\n\n### Action\nReview action roadmap.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         actions: response?.actions as any
       };
@@ -149,11 +173,11 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
       const errorMsg: CopilotMessage = {
         id: 'err-' + Date.now(),
         role: 'assistant',
-        content: 'I don’t have this data yet. Please execute a fresh diagnostic audit or connect your integrations.',
+        content: '### Finding\nRankora couldn\'t retrieve verified telemetry for this query.\n\n### Evidence\n- Status: **UNAVAILABLE**\n\n### Action\nRun diagnostic audit.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         actions: [
           { type: 'run_audit', label: 'Run Diagnostic Audit' },
-          { type: 'view_module', label: 'Add Keyword', target: '/dashboard/keywords' }
+          { type: 'view_module', label: 'Open Website Diagnostics', target: '/dashboard/website' }
         ]
       };
       setMessages(prev => [...prev, errorMsg]);
@@ -172,7 +196,7 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
           {
             id: 'audit-started-' + Date.now(),
             role: 'assistant',
-            content: '✓ **New Diagnostic Audit Initiated**: Crawling DOM structure and refreshing local search positions. Updating view...',
+            content: '✓ **Diagnostic Audit Initiated**: Re-crawling HTML DOM structure and refreshing local search positions.',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
         ]);
@@ -182,6 +206,9 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
       } finally {
         setLoading(false);
       }
+    } else if (action.type === 'fix_with_ai' || action.target === '/dashboard/actions?fix=ai') {
+      setIsOpen(false);
+      navigate('/dashboard/actions?fix=ai');
     } else if (action.target) {
       setIsOpen(false);
       navigate(action.target);
@@ -194,52 +221,50 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 px-4 py-3 bg-[#181715] text-[#faf9f5] hover:bg-[#252320] rounded-full shadow-xl border border-[#cc785c]/40 transition-all duration-300 transform hover:scale-105 group"
-          aria-label="Ask RANKORA AI"
+          title="Open RANKORA Growth Operator"
+          className="fixed bottom-6 right-6 z-40 flex items-center justify-center w-12 h-12 bg-[#181715] text-[#faf9f5] hover:bg-[#252320] rounded-full shadow-2xl border border-[#cc785c]/50 transition-all duration-300 transform hover:scale-110 cursor-pointer group"
+          aria-label="Open RANKORA Growth Operator"
         >
-          <div className="w-6 h-6 rounded-full bg-[#cc785c] text-white flex items-center justify-center shadow-xs">
-            <Sparkles size={13} className="animate-pulse" />
-          </div>
-          <span className="font-sans font-medium text-xs tracking-wide">RANKORA AI</span>
-          <span className="w-2 h-2 rounded-full bg-[#5db872] animate-ping" />
+          <Sparkles size={18} className="text-[#cc785c]" />
+          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[#5db872] border-2 border-[#181715]" />
         </button>
       )}
 
-      {/* Slide-out Copilot Panel */}
+      {/* Slide-out / Compact Drawer Panel (380-400px - Requirement #11) */}
       {isOpen && (
-        <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] bg-[#faf9f5] shadow-2xl border-l border-[#e6dfd8] flex flex-col animate-in slide-in-from-right-8 duration-300">
+        <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[390px] bg-[#faf9f5] shadow-2xl border-l border-[#e6dfd8] flex flex-col animate-in slide-in-from-right-8 duration-200">
           
           {/* Header */}
           <div className="p-4 bg-[#181715] text-[#faf9f5] border-b border-[#252320] flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-[#cc785c] text-white flex items-center justify-center shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-[#cc785c] text-white flex items-center justify-center shadow-xs shrink-0">
                 <Bot size={18} />
               </div>
-              <div>
+              <div className="overflow-hidden">
                 <div className="flex items-center gap-2">
-                  <h2 className="font-serif text-sm font-medium">RANKORA AI</h2>
-                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#252320] text-[#5db872] border border-[#5db872]/30 font-bold">
-                    CONNECTED
-                  </span>
+                  <h2 className="font-serif text-xs font-bold tracking-wider uppercase text-[#faf9f5]">RANKORA GROWTH OPERATOR</h2>
                 </div>
-                <p className="text-[10px] text-[#8e8b82] font-mono">Live Business & SERP Telemetry</p>
+                <p className="text-[10px] text-[#8e8b82] font-mono truncate">
+                  Active Domain: <span className="text-white font-bold">{activeProjectName}</span>
+                </p>
               </div>
             </div>
             <button
               onClick={() => setIsOpen(false)}
               className="p-1.5 rounded-lg text-[#8e8b82] hover:text-white hover:bg-[#252320] transition-colors cursor-pointer"
+              aria-label="Close Assistant"
             >
               <X size={18} />
             </button>
           </div>
 
-          {/* Contextual Quick Question Presets */}
-          <div className="p-3 bg-[#efe9de] border-b border-[#e6dfd8] overflow-x-auto no-scrollbar flex items-center gap-1.5">
+          {/* Screen-Aware Contextual Quick Actions (3-4 pills - Requirement #10) */}
+          <div className="p-3 bg-[#efe9de]/60 border-b border-[#e6dfd8] overflow-x-auto no-scrollbar flex items-center gap-1.5">
             {currentPresets.map((q, idx) => (
               <button
                 key={idx}
                 onClick={() => handleSendMessage(q)}
-                className="whitespace-nowrap px-2.5 py-1 rounded-full text-[11px] font-sans font-medium bg-[#faf9f5] text-[#141413] border border-[#e6dfd8] hover:border-[#cc785c] hover:text-[#cc785c] transition-colors shrink-0 cursor-pointer"
+                className="whitespace-nowrap px-3 py-1 rounded-full text-[11px] font-sans font-semibold bg-[#faf9f5] text-[#141413] border border-[#e6dfd8] hover:border-[#cc785c] hover:text-[#cc785c] transition-all shrink-0 cursor-pointer shadow-2xs"
               >
                 {q}
               </button>
@@ -254,13 +279,13 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
                 className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
               >
                 <div
-                  className={`max-w-[90%] p-3.5 rounded-xl leading-relaxed whitespace-pre-wrap ${
+                  className={`max-w-[92%] p-3.5 rounded-2xl leading-relaxed whitespace-pre-wrap ${
                     msg.role === 'user'
-                      ? 'bg-[#cc785c] text-white rounded-br-none shadow-xs font-medium'
-                      : 'bg-[#efe9de] text-[#141413] border border-[#e6dfd8] rounded-bl-none shadow-xs'
+                      ? 'bg-[#141413] text-[#faf9f5] rounded-br-none shadow-xs font-medium'
+                      : 'bg-[#efe9de]/70 text-[#141413] border border-[#e6dfd8] rounded-bl-none shadow-xs'
                   }`}
                 >
-                  <div className="prose prose-xs max-w-none prose-headings:font-serif prose-headings:text-[#141413] prose-p:my-1 prose-strong:text-[#141413]">
+                  <div className="prose prose-xs max-w-none prose-headings:font-serif prose-headings:text-[#141413] prose-headings:font-bold prose-headings:mt-2 prose-headings:mb-1 prose-p:my-1 prose-strong:text-[#141413]">
                     {msg.content}
                   </div>
 
@@ -271,9 +296,11 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
                         <button
                           key={i}
                           onClick={() => handleActionClick(act)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#faf9f5] hover:bg-[#e8e0d2] text-[#cc785c] font-sans font-semibold rounded-lg text-[11px] border border-[#e6dfd8] transition-colors shadow-xs cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#faf9f5] hover:bg-[#141413] text-[#141413] hover:text-white font-sans font-bold rounded-xl text-[11px] border border-[#e6dfd8] transition-all shadow-xs cursor-pointer"
                         >
-                          {act.type === 'run_audit' ? <RefreshCw size={11} /> : act.type === 'add_keyword' ? <Plus size={11} /> : <Layers size={11} />}
+                          {act.type === 'run_audit' ? <RefreshCw size={11} className="text-[#cc785c]" /> : 
+                           act.type === 'fix_with_ai' ? <Wrench size={11} className="text-[#cc785c]" /> : 
+                           <Layers size={11} className="text-[#cc785c]" />}
                           <span>{act.label}</span>
                           <ArrowRight size={11} />
                         </button>
@@ -286,9 +313,9 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
             ))}
 
             {loading && (
-              <div className="flex items-center gap-2 p-3 bg-[#efe9de] rounded-xl border border-[#e6dfd8] text-[#6c6a64] max-w-[75%]">
+              <div className="flex items-center gap-2 p-3 bg-[#efe9de] rounded-xl border border-[#e6dfd8] text-[#6c6a64] max-w-[85%]">
                 <RefreshCw size={14} className="animate-spin text-[#cc785c]" />
-                <span className="text-xs font-sans">Evaluating local ranking signals...</span>
+                <span className="text-xs font-mono">{getContextualLoadingText()}</span>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -307,15 +334,16 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask RANKORA AI about rankings, competitors, or fixes..."
-                className="flex-1 px-3.5 py-2 rounded-lg border border-[#e6dfd8] bg-[#faf9f5] focus:outline-none focus:ring-1 focus:ring-[#cc785c] text-xs text-[#141413] font-sans"
+                placeholder={`Ask Growth Operator...`}
+                className="flex-1 px-3.5 py-2.5 rounded-xl border border-[#e6dfd8] bg-[#faf9f5] focus:outline-none focus:ring-1 focus:ring-[#cc785c] text-xs text-[#141413] font-sans"
               />
               <button
                 type="submit"
                 disabled={!input.trim() || loading}
-                className="p-2 bg-[#cc785c] hover:bg-[#a9583e] text-white rounded-lg disabled:opacity-40 transition-colors shadow-xs cursor-pointer"
+                className="p-2.5 bg-[#141413] hover:bg-[#252320] text-white rounded-xl disabled:opacity-40 transition-colors shadow-xs cursor-pointer"
+                aria-label="Send message"
               >
-                <Send size={15} />
+                <Send size={14} className="text-[#cc785c]" />
               </button>
             </form>
           </div>

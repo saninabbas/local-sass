@@ -156,7 +156,9 @@ export const onRequest = async (context: any) => {
     const getUserPlanLimit = (subscriptionStatus?: string, role?: string): number => {
       if (role === 'admin') return 999;
       const plan = (subscriptionStatus || 'free').toLowerCase();
-      return PLAN_LIMITS[plan] ?? 1;
+      if (plan === 'growth') return 5;
+      if (plan === 'pro' || plan === 'agency') return 25;
+      return 1; // 14-Day Free Trial limit is 1 project
     };
 
     const resolveTargetBusiness = async (userId: string, explicitBizId?: string | null) => {
@@ -494,10 +496,14 @@ export const onRequest = async (context: any) => {
         await db.prepare("ALTER TABLE businesses ADD COLUMN last_crawled_at DATETIME").run().catch(() => {});
         await db.prepare("ALTER TABLE businesses ADD COLUMN normalized_domain TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE businesses ADD COLUMN is_default INTEGER DEFAULT 0").run().catch(() => {});
-        await db.prepare("ALTER TABLE businesses ADD COLUMN is_archived INTEGER DEFAULT 0").run().catch(() => {});
         await db.prepare("ALTER TABLE businesses ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP").run().catch(() => {});
         await db.prepare("CREATE INDEX IF NOT EXISTS idx_businesses_user_id ON businesses(user_id)").run().catch(() => {});
         await db.prepare("CREATE INDEX IF NOT EXISTS idx_businesses_norm_domain ON businesses(user_id, normalized_domain)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_growth_scores_biz_created ON growth_scores(business_id, created_at DESC)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_audits_biz_created ON audits(business_id, created_at DESC)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_keywords_biz ON keywords(business_id)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_discovered_comp_biz ON discovered_competitors(business_id)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_recommendations_biz_status ON recommendations(business_id, status)").run().catch(() => {});
 
         await db.prepare(`CREATE TABLE IF NOT EXISTS campaigns (
           id TEXT PRIMARY KEY,
@@ -2379,9 +2385,14 @@ export const onRequest = async (context: any) => {
           });
         }
 
-        const growthScore: any = await env.DB.prepare(
-          "SELECT * FROM growth_scores WHERE business_id = ? ORDER BY created_at DESC LIMIT 1"
-        ).bind(businessInfo.id as string).first();
+        // Parallelized fetch of all dashboard metrics from D1 for maximum performance
+        const [growthScore, recommendationsRes, histResult, dbCompsRes, dbKeywordsRes] = await Promise.all([
+          env.DB.prepare("SELECT * FROM growth_scores WHERE business_id = ? ORDER BY created_at DESC LIMIT 1").bind(businessInfo.id as string).first() as Promise<any>,
+          env.DB.prepare("SELECT * FROM recommendations WHERE business_id = ? AND status = 'pending' ORDER BY created_at DESC").bind(businessInfo.id as string).all().catch(() => ({ results: [] })),
+          env.DB.prepare("SELECT overall_score FROM growth_scores WHERE business_id = ? ORDER BY created_at ASC LIMIT 10").bind(businessInfo.id as string).all().catch(() => ({ results: [] })),
+          env.DB.prepare("SELECT * FROM discovered_competitors WHERE business_id = ? LIMIT 4").bind(businessInfo.id as string).all().catch(() => ({ results: [] })),
+          env.DB.prepare("SELECT current_position, previous_position FROM keywords WHERE business_id = ?").bind(businessInfo.id as string).all().catch(() => ({ results: [] }))
+        ]);
 
         // New User State: Business exists, but no audit/score yet
         if (!growthScore) {
@@ -2403,16 +2414,11 @@ export const onRequest = async (context: any) => {
           });
         }
 
-        const { results: recommendations } = await env.DB.prepare(
-          "SELECT * FROM recommendations WHERE business_id = ? AND status = 'pending' ORDER BY created_at DESC"
-        ).bind(businessInfo.id as string).all();
+        const recommendations = recommendationsRes?.results || [];
+        const dbComps = dbCompsRes?.results || [];
+        const dbKeywords = dbKeywordsRes?.results || [];
 
-        // REAL historical scores query from database
-        const histResult = await env.DB.prepare(
-          "SELECT overall_score FROM growth_scores WHERE business_id = ? ORDER BY created_at ASC LIMIT 10"
-        ).bind(businessInfo.id as string).all().catch(() => ({ results: [] }));
-
-        const progressHistory = histResult.results && histResult.results.length > 0
+        const progressHistory = histResult?.results && histResult.results.length > 0
           ? histResult.results.map((h: any) => h.overall_score)
           : [growthScore.overall_score];
 
@@ -2520,11 +2526,6 @@ export const onRequest = async (context: any) => {
           }
         ];
 
-        // REAL Discovered Competitor Snapshot
-        const { results: dbComps } = await env.DB.prepare(
-          "SELECT * FROM discovered_competitors WHERE business_id = ? LIMIT 4"
-        ).bind(businessInfo.id as string).all().catch(() => ({ results: [] }));
-
         const myDomain = businessInfo.website_url ? new URL(businessInfo.website_url).hostname.replace(/^www\./, '') : 'your-site.com';
         const competitorSnapshot = [
           {
@@ -2557,11 +2558,6 @@ export const onRequest = async (context: any) => {
             });
           });
         }
-
-        // REAL Keywords Summary from DB
-        const { results: dbKeywords } = await env.DB.prepare(
-          "SELECT current_position, previous_position FROM keywords WHERE business_id = ?"
-        ).bind(businessInfo.id as string).all().catch(() => ({ results: [] }));
 
         const totalTracked = (dbKeywords || []).length;
         const top3Count = (dbKeywords || []).filter((k: any) => k.current_position && k.current_position <= 3).length;
@@ -2802,7 +2798,15 @@ export const onRequest = async (context: any) => {
             .on('img', extractor.handlers.img)
             .on('body', extractor.handlers.body);
 
-          await rewriter.transform(response).text();
+          const htmlText = await response.text().catch(() => '');
+          try {
+            const freshRes = new Response(htmlText, { status: response.status, headers: response.headers });
+            await rewriter.transform(freshRes).text().catch(() => {});
+          } catch (e) {
+            // HTMLRewriter fallback
+          }
+
+          populateExtractorFromHtml(extractor, htmlText);
 
           const tempBusiness = {
             name: name || extractor.title.split(/[-|:]/)[0]?.trim() || validatedUrl.hostname,
@@ -2874,10 +2878,20 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const { productId, planType } = await request.json() as any;
+        const payload = await request.json() as any;
+        const productId = payload.productId || payload.product_id;
+        const planType = payload.planType || payload.plan || 'growth';
 
-        if (!env.POLAR_ACCESS_TOKEN) {
-          return errorResponse("Polar billing is not configured. Please add POLAR_ACCESS_TOKEN in Cloudflare environment variables.", 500);
+        const polarToken = env.POLAR_ACCESS_TOKEN || (env as any).POLAR_API_KEY || (env as any).POLAR_TOKEN;
+        const targetProductId = productId || (planType === 'growth' ? '7594755d-5580-4b77-86ae-90baae0e20d8' : 'pro_package_id');
+
+        if (!polarToken) {
+          const fallbackUrl = `https://polar.sh/checkout/${targetProductId}?customer_email=${encodeURIComponent(user.email)}`;
+          return jsonResponse({ 
+            success: true, 
+            checkoutUrl: fallbackUrl,
+            data: { url: fallbackUrl } 
+          });
         }
 
         try {
@@ -2885,15 +2899,15 @@ export const onRequest = async (context: any) => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${env.POLAR_ACCESS_TOKEN}`
+              'Authorization': `Bearer ${polarToken}`
             },
             body: JSON.stringify({
-              product_id: productId || (planType === 'growth' ? '7594755d-5580-4b77-86ae-90baae0e20d8' : 'pro_package_id'),
+              product_id: targetProductId,
               customer_email: user.email,
               customer_name: user.name,
               metadata: {
                 user_id: user.id,
-                plan: planType || 'growth'
+                plan: planType
               },
               success_url: `${url.origin}/dashboard/billing?checkout=success`,
             })
@@ -2902,11 +2916,21 @@ export const onRequest = async (context: any) => {
           if (!polarRes.ok) {
             const errorText = await polarRes.text();
             console.error("Polar API error:", errorText);
-            return errorResponse(`Failed to generate checkout session: ${errorText}`, 500);
+            const fallbackUrl = `https://polar.sh/checkout/${targetProductId}?customer_email=${encodeURIComponent(user.email)}`;
+            return jsonResponse({ 
+              success: true, 
+              checkoutUrl: fallbackUrl,
+              data: { url: fallbackUrl } 
+            });
           }
 
           const checkoutData = await polarRes.json() as any;
-          return jsonResponse({ success: true, data: { url: checkoutData.url } });
+          const checkoutUrl = checkoutData.url || checkoutData.checkout_url;
+          return jsonResponse({ 
+            success: true, 
+            checkoutUrl: checkoutUrl,
+            data: { url: checkoutUrl } 
+          });
         } catch (e: any) {
           console.error("Polar fetch error:", e);
           return errorResponse("Failed to communicate with billing provider", 500);

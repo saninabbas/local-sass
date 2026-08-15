@@ -1,5 +1,34 @@
+/**
+ * RANKORA — INTELLIGENT GROWTH OPERATOR ENGINE
+ * 
+ * Scoped Telemetry & Intent Routing System:
+ * - Scoped by user_id + project_id
+ * - Persona: Native Rankora SEO Growth Operator (confident, concise 1-3 sentences, zero AI fluff)
+ * - Zero Generic AI Language (Strictly Banned: "How can I help you today?", "I'd be happy to help", "As an AI...", "Based on my analysis...")
+ * - Strict Response Structure: Finding (1 short statement) -> Evidence (1 verified data point) -> Action (1 direct next step)
+ * - Zero Fabrication Rule (UNAVAILABLE / NOT_FOUND / NOT_CONNECTED)
+ */
+
+export type CopilotIntent =
+  | 'AUDIT'
+  | 'SCORE'
+  | 'KEYWORD'
+  | 'COMPETITOR'
+  | 'GEOGRID'
+  | 'REVIEWS'
+  | 'BACKLINKS'
+  | 'CONTENT'
+  | 'CAMPAIGN'
+  | 'TECHNICAL'
+  | 'LOCAL_SEO'
+  | 'CHANGE_HISTORY'
+  | 'REPORT'
+  | 'BILLING'
+  | 'GENERAL';
+
 export interface CopilotFullContext {
   business: {
+    id: string;
     name: string;
     websiteUrl: string;
     type?: string;
@@ -24,7 +53,6 @@ export interface CopilotFullContext {
     severity: string;
     evidence: string;
     recommendedFix: string;
-    whyItMatters?: string;
   }>;
   competitors: Array<{
     name: string;
@@ -45,80 +73,114 @@ export interface CopilotFullContext {
   };
   authority?: {
     totalBacklinks: number;
-    pendingOpportunities: number;
+    connected: boolean;
   };
-  contentGaps?: Array<{
-    topic: string;
-    intent: string;
-    reason: string;
-  }>;
   actionPlanStats?: {
     totalActions: number;
     completedActions: number;
     pendingActions: number;
-    completionPercentage: number;
   };
+}
+
+export function classifyCopilotIntent(message: string): CopilotIntent {
+  const m = message.toLowerCase();
+  if (m.includes('audit') || m.includes('crawl') || m.includes('health')) return 'AUDIT';
+  if (m.includes('score') || m.includes('vector')) return 'SCORE';
+  if (m.includes('keyword') || m.includes('rank') || m.includes('serp') || m.includes('position') || m.includes('drop')) return 'KEYWORD';
+  if (m.includes('competitor') || m.includes('rival') || m.includes('beating') || m.includes('gap')) return 'COMPETITOR';
+  if (m.includes('geogrid') || m.includes('map pack') || m.includes('geo')) return 'GEOGRID';
+  if (m.includes('review') || m.includes('rating') || m.includes('reputation') || m.includes('gbp')) return 'REVIEWS';
+  if (m.includes('backlink') || m.includes('authority') || m.includes('citation')) return 'BACKLINKS';
+  if (m.includes('content') || m.includes('page') || m.includes('article') || m.includes('blog') || m.includes('title')) return 'CONTENT';
+  if (m.includes('campaign') || m.includes('task') || m.includes('today') || m.includes('priority')) return 'CAMPAIGN';
+  if (m.includes('technical') || m.includes('schema') || m.includes('speed') || m.includes('https') || m.includes('json-ld')) return 'TECHNICAL';
+  if (m.includes('local') || m.includes('nap') || m.includes('city') || m.includes('address')) return 'LOCAL_SEO';
+  if (m.includes('change') || m.includes('history') || m.includes('verified') || m.includes('what changed')) return 'CHANGE_HISTORY';
+  if (m.includes('report') || m.includes('pdf')) return 'REPORT';
+  if (m.includes('plan') || m.includes('billing') || m.includes('subscription') || m.includes('limit') || m.includes('upgrade')) return 'BILLING';
+  return 'GENERAL';
 }
 
 export async function askGrowthCopilot(
   apiKey: string | undefined,
   userMessage: string,
   context: CopilotFullContext
-): Promise<{ reply: string; actions: Array<{ type: string; label: string; target?: string }> }> {
-  
-  // Guard clause for missing audit baseline
-  if (!context.growthScore) {
+): Promise<{ 
+  reply: string; 
+  intent: CopilotIntent;
+  provenance?: string;
+  actions: Array<{ type: string; label: string; target?: string }> 
+}> {
+  const intent = classifyCopilotIntent(userMessage);
+
+  // Guard clause for missing business or baseline audit
+  if (!context.growthScore && intent !== 'GENERAL' && intent !== 'BILLING') {
     return {
-      reply: `I don't have full audit telemetry yet. We have not executed a baseline diagnostic crawl on **${context.business.websiteUrl || context.business.name}** yet.\n\nClick **Run Diagnostic Audit** below so I can analyze your HTML DOM, local signals, and search positions in **${context.business.city}**.`,
+      intent: 'AUDIT',
+      provenance: 'D1 DATABASE',
+      reply: `### Finding\nNo diagnostic audit baseline exists for **${context.business.websiteUrl || context.business.name}** yet.\n\n### Evidence\n- Status: **UNAVAILABLE**\n- Baseline Crawl: Pending\n\n### Action\nRun diagnostic audit to initialize 7-vector telemetry.`,
       actions: [
         { type: 'run_audit', label: 'Run Diagnostic Audit' },
-        { type: 'view_module', label: 'Complete Onboarding', target: '/onboarding' }
+        { type: 'view_module', label: 'Open Website Diagnostics', target: '/dashboard/website' }
       ]
     };
   }
 
-  const systemPrompt = `You are "RANKORA AI", the elite, telemetry-aware Local SEO and Product Growth Strategist for local businesses.
-You have direct, real-time access to the user's verified Rankora SaaS database records:
+  const systemPrompt = `You are the "RANKORA GROWTH OPERATOR", a native, data-driven SEO operator inside Rankora.
 
-BUSINESS PROFILE:
-- Business: ${context.business.name}
-- Domain: ${context.business.websiteUrl}
-- Category: ${context.business.type || 'Local Business'}
-- Market Location: ${context.business.city}, ${context.business.country || 'US'}
+STRICT PERSONALITY & LANGUAGE RULES:
+1. You are NOT an AI chatbot, conversational demo, or ChatGPT clone.
+2. STRICTLY BANNED PHRASES — DO NOT USE ANY OF THESE:
+   - "How can I help you today?"
+   - "I'd be happy to help."
+   - "Sure, here's..."
+   - "As an AI..."
+   - "Based on my analysis..."
+   - "Here are some tips..."
+   - "I understand that..."
+   - "Let me explain..."
+3. Start IMMEDIATELY with the finding.
+4. Strictly follow this 3-section layout (2–4 lines total):
 
-LIVE AUDIT TELEMETRY:
-- Overall Growth Score: ${context.growthScore.overall}/100 (Prior: ${context.growthScore.previousScore ?? 'None'}, Delta: ${context.growthScore.change ?? 0})
-- Local SEO Signal: ${context.growthScore.local}/100
-- Technical SEO: ${context.growthScore.technical}/100
-- On-Page Metadata: ${context.growthScore.onpage}/100
-- Content Depth: ${context.growthScore.content}/100
-- Performance: ${context.growthScore.performance}/100
-- Mobile UX: ${context.growthScore.mobile}/100
-- Security: ${context.growthScore.security}/100
+### Finding
+(1 short direct statement)
 
-IDENTIFIED GROWTH PROBLEMS:
-${context.topProblems.map((p, i) => `${i + 1}. [${p.severity}] ${p.title} | Evidence: "${p.evidence}" | Fix: ${p.recommendedFix}`).join('\n') || 'No critical issues identified.'}
+### Evidence
+(1 verified data point from telemetry below. If data is missing/disconnected, state: "Verified data isn't available yet.")
 
-COMPETITOR BENCHMARK:
-${context.competitors.map(c => `- ${c.name} (${c.domain}): Score ${c.score}/100. Gap: ${c.gapSummary || 'Higher topical coverage'}`).join('\n') || 'No competitors analyzed yet.'}
+### Action
+(1 direct next step)
+
+PROJECT TELEMETRY:
+- Domain: ${context.business.websiteUrl} (${context.business.name})
+- Location: ${context.business.city}, ${context.business.country || 'US'}
+- Intent: ${intent}
+- Overall Growth Score: ${context.growthScore?.overall ?? 'UNAVAILABLE'}/100
+- Local SEO: ${context.growthScore?.local ?? 'UNAVAILABLE'}/100
+- Technical SEO: ${context.growthScore?.technical ?? 'UNAVAILABLE'}/100
+- On-Page SEO: ${context.growthScore?.onpage ?? 'UNAVAILABLE'}/100
+
+CRITICAL AUDIT ISSUES:
+${context.topProblems.map((p, i) => `${i + 1}. [${p.severity}] ${p.title} | Evidence: "${p.evidence}"`).join('\n') || 'None verified.'}
+
+COMPETITOR TELEMETRY:
+${context.competitors.map(c => `- ${c.name} (${c.domain}): Score ${c.score}/100`).join('\n') || 'No competitors analyzed yet.'}
 
 TRACKED KEYWORDS:
-${context.keywords.map(k => `- "${k.keyword}": Position ${k.rank ? '#' + k.rank : '50+ / Unranked'} (${k.change ? (k.change > 0 ? '+' + k.change : k.change) : '0'}) | Best Rival: ${k.bestCompetitor || 'Competitor'}`).join('\n') || 'No keywords tracked yet.'}
+${context.keywords.map(k => `- "${k.keyword}": Position ${k.rank ? '#' + k.rank : 'NOT_FOUND'}`).join('\n') || 'No keywords tracked.'}
 
-STRICT OPERATIONAL RULES:
-1. Speak with authoritative, practical, and highly specific local business advice.
-2. Directly reference their specific numbers, city (${context.business.city}), domain (${context.business.websiteUrl}), and competitors.
-3. If asked for code or schema, provide clean, valid, copy-pasteable JSON-LD or HTML code blocks with their exact business details.
-4. Keep formatting clean with concise markdown headers and bold bullet points.
-5. ZERO-FABRICATION RULE: Never fabricate backlinks, referring domains, or authority metrics. If asked about backlinks and no verified backlink provider is connected or totalBacklinks is 0, state clearly: "I don't have verified backlink data for this domain yet." and guide the user to discover local authority opportunities in the Backlinks module.`;
+REVIEWS: ${context.reviews?.connected ? `${context.reviews.avgRating} ★ (${context.reviews.totalReviews} reviews)` : 'NOT_CONNECTED'}
+BACKLINKS: ${context.authority?.connected ? `${context.authority.totalBacklinks} backlinks` : 'NOT_CONNECTED / UNAVAILABLE'}
+
+ZERO FABRICATION RULE: Never invent rankings, backlinks, domain authority, search volume, or health scores. Use UNAVAILABLE or NOT_CONNECTED if data is missing.`;
 
   if (!apiKey) {
-    return generateLocalContextReply(userMessage, context);
+    return generateDeterministicFallback(userMessage, intent, context);
   }
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6500); // 6.5s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 6500);
 
     const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
       method: 'POST',
@@ -132,8 +194,8 @@ STRICT OPERATIONAL RULES:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage }
         ],
-        temperature: 0.2,
-        max_tokens: 850
+        temperature: 0.1,
+        max_tokens: 350
       }),
       signal: controller.signal
     });
@@ -141,178 +203,127 @@ STRICT OPERATIONAL RULES:
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      return generateLocalContextReply(userMessage, context);
+      return generateDeterministicFallback(userMessage, intent, context);
     }
 
     const data = await response.json() as any;
-    const replyText = data.choices?.[0]?.message?.content || generateLocalContextReply(userMessage, context).reply;
-    const actions = determineActionButtons(userMessage, context);
+    const replyText = data.choices?.[0]?.message?.content || generateDeterministicFallback(userMessage, intent, context).reply;
+    const actions = determineActionButtons(userMessage, intent, context);
+    const provenance = getProvenanceForIntent(intent);
 
-    return { reply: replyText, actions };
+    return { reply: replyText, intent, provenance, actions };
   } catch (err) {
-    return generateLocalContextReply(userMessage, context);
+    return generateDeterministicFallback(userMessage, intent, context);
   }
 }
 
-function determineActionButtons(userMessage: string, context: CopilotFullContext) {
-  const lower = userMessage.toLowerCase();
+function getProvenanceForIntent(intent: CopilotIntent): string {
+  switch (intent) {
+    case 'AUDIT':
+    case 'TECHNICAL':
+    case 'SCORE':
+      return 'LIVE CRAWL';
+    case 'KEYWORD':
+    case 'COMPETITOR':
+      return 'SERP';
+    case 'GEOGRID':
+      return 'GEOGRID';
+    case 'REVIEWS':
+      return 'GOOGLE BUSINESS';
+    default:
+      return 'D1 DATABASE';
+  }
+}
+
+function determineActionButtons(
+  userMessage: string, 
+  intent: CopilotIntent, 
+  context: CopilotFullContext
+): Array<{ type: string; label: string; target?: string }> {
   const actions: Array<{ type: string; label: string; target?: string }> = [];
 
-  if (lower.includes('audit') || lower.includes('refresh') || !context.growthScore) {
-    actions.push({ type: 'run_audit', label: 'Run Fresh Audit' });
-  }
-  if (lower.includes('competitor') || lower.includes('beating') || lower.includes('rival')) {
-    actions.push({ type: 'view_module', label: 'Open Competitor Radar', target: '/dashboard/competitors' });
-  }
-  if (lower.includes('keyword') || lower.includes('rank') || lower.includes('serp')) {
-    actions.push({ type: 'view_module', label: 'View Keyword Radar', target: '/dashboard/keywords' });
-  }
-  if (lower.includes('page') || lower.includes('content') || lower.includes('blog') || lower.includes('article') || lower.includes('topic')) {
-    actions.push({ type: 'view_module', label: 'Open Content Studio', target: '/dashboard/content' });
-  }
-  if (lower.includes('review') || lower.includes('gbp') || lower.includes('google business') || lower.includes('rating')) {
-    actions.push({ type: 'view_module', label: 'Open Reviews Manager', target: '/dashboard/reviews' });
-  }
-  if (lower.includes('schema') || lower.includes('json-ld') || lower.includes('meta') || lower.includes('website') || lower.includes('title')) {
-    actions.push({ type: 'view_module', label: 'Open Website Diagnostics', target: '/dashboard/website' });
-  }
-  if (lower.includes('plan') || lower.includes('fix') || lower.includes('action') || lower.includes('first')) {
-    actions.push({ type: 'view_module', label: 'Execute Action Plan', target: '/dashboard/actions' });
-  }
-  if (lower.includes('backlink') || lower.includes('authority') || lower.includes('citation') || lower.includes('directory')) {
-    actions.push({ type: 'view_module', label: 'Open Backlinks & Authority', target: '/dashboard/backlinks' });
-  }
-
-  if (actions.length === 0) {
-    actions.push({ type: 'view_module', label: 'View Action Roadmap', target: '/dashboard/actions' });
+  switch (intent) {
+    case 'AUDIT':
+    case 'TECHNICAL':
+      actions.push({ type: 'run_audit', label: 'Run Diagnostic Audit' });
+      actions.push({ type: 'view_module', label: 'Open Website Diagnostics', target: '/dashboard/website' });
+      break;
+    case 'SCORE':
+      actions.push({ type: 'view_module', label: 'View Growth Score Breakdown', target: '/dashboard/score' });
+      actions.push({ type: 'view_module', label: 'Execute Action Plan', target: '/dashboard/actions' });
+      break;
+    case 'KEYWORD':
+      actions.push({ type: 'view_module', label: 'Open Keywords Radar', target: '/dashboard/keywords' });
+      actions.push({ type: 'view_module', label: 'Discover Candidate Keywords', target: '/dashboard/keywords/discover' });
+      break;
+    case 'COMPETITOR':
+      actions.push({ type: 'view_module', label: 'Open Competitor Radar', target: '/dashboard/competitors' });
+      break;
+    case 'GEOGRID':
+      actions.push({ type: 'view_module', label: 'Open Local Geo-Grid', target: '/dashboard/geogrid' });
+      break;
+    case 'REVIEWS':
+      actions.push({ type: 'view_module', label: 'Open Reviews Manager', target: '/dashboard/reviews' });
+      break;
+    case 'BACKLINKS':
+      actions.push({ type: 'view_module', label: 'Open Backlinks & Authority', target: '/dashboard/backlinks' });
+      break;
+    case 'CONTENT':
+      actions.push({ type: 'view_module', label: 'Open Content Studio', target: '/dashboard/content' });
+      actions.push({ type: 'view_module', label: 'Internal Links Scanner', target: '/dashboard/content/links' });
+      break;
+    case 'CAMPAIGN':
+      actions.push({ type: 'view_module', label: 'Open SEO Campaign Engine', target: '/dashboard/campaign' });
+      break;
+    case 'CHANGE_HISTORY':
+      actions.push({ type: 'view_module', label: 'View Change History', target: '/dashboard/changes' });
+      break;
+    case 'BILLING':
+      actions.push({ type: 'view_module', label: 'Manage Subscription & Limits', target: '/dashboard/billing' });
+      break;
+    default:
+      actions.push({ type: 'view_module', label: 'Execute Action Plan', target: '/dashboard/actions' });
+      actions.push({ type: 'view_module', label: 'Open Campaign Engine', target: '/dashboard/campaign' });
+      break;
   }
 
   return actions;
 }
 
-function generateLocalContextReply(
+function generateDeterministicFallback(
   userMessage: string,
+  intent: CopilotIntent,
   context: CopilotFullContext
-): { reply: string; actions: Array<{ type: string; label: string; target?: string }> } {
-  const lower = userMessage.toLowerCase();
+): { 
+  reply: string; 
+  intent: CopilotIntent;
+  provenance: string;
+  actions: Array<{ type: string; label: string; target?: string }> 
+} {
   const bizName = context.business.name || 'Your Business';
   const city = context.business.city || 'Your Area';
-  const domain = context.business.websiteUrl || 'https://yourbusiness.com';
-  const category = context.business.type || 'LocalBusiness';
   const score = context.growthScore?.overall ?? 68;
+  const actions = determineActionButtons(userMessage, intent, context);
+  const provenance = getProvenanceForIntent(intent);
 
   let reply = '';
 
-  // 1. GENERATE FAQ SCHEMA
-  if (lower.includes('faq schema') || lower.includes('generate schema') || lower.includes('json-ld')) {
-    reply = `### Verified LocalBusiness JSON-LD Schema for ${bizName}\n\n` +
-      `Here is the production-ready schema generated directly from your verified business data in **${city}**:\n\n` +
-      `\`\`\`html\n` +
-      `<script type="application/ld+json">\n` +
-      `{\n` +
-      `  "@context": "https://schema.org",\n` +
-      `  "@type": "LocalBusiness",\n` +
-      `  "name": "${bizName}",\n` +
-      `  "url": "${domain}",\n` +
-      `  "address": {\n` +
-      `    "@type": "PostalAddress",\n` +
-      `    "addressLocality": "${city}",\n` +
-      `    "addressCountry": "US"\n` +
-      `  },\n` +
-      `  "priceRange": "$$",\n` +
-      `  "areaServed": {\n` +
-      `    "@type": "City",\n` +
-      `    "name": "${city}"\n` +
-      `  }\n` +
-      `}\n` +
-      `</script>\n` +
-      `\`\`\`\n\n` +
-      `**Action**: Paste this snippet into the \`<head>\` section of your homepage.`;
-  }
-  // 2. IMPROVE TITLE TAG
-  else if (lower.includes('title') || lower.includes('meta') || lower.includes('tag')) {
-    reply = `### Optimized Title & Meta Description for ${bizName}\n\n` +
-      `**Recommended Title Tag (56 characters)**:\n` +
-      `\`\`\`html\n` +
-      `<title>${category} in ${city} | Top Rated & Trusted — ${bizName}</title>\n` +
-      `\`\`\`\n\n` +
-      `**Recommended Meta Description (152 characters)**:\n` +
-      `\`\`\`html\n` +
-      `<meta name="description" content="Top-rated ${category.toLowerCase()} in ${city}. Fast appointments, certified specialists, and 5-star service for ${city} residents. Call today for a consultation!" />\n` +
-      `\`\`\`\n\n` +
-      `**Why This Works**:\n` +
-      `- Puts your primary commercial keyword first for maximum Google weighting.\n` +
-      `- Anchors your target geographic market (${city}) in both title and snippet.\n` +
-      `- Includes a clear call-to-action to maximize search click-through rate (CTR).`;
-  }
-  // 3. WHY AM I NOT RANKING
-  else if (lower.includes('why am i not ranking') || lower.includes('not ranking')) {
-    reply = `### Why ${bizName} is Not Ranking in Top 3 in ${city}\n\n` +
-      `Based on your live audit telemetry (Growth Score: **${score}/100**), there are 3 clear ranking bottlenecks:\n\n` +
-      `1. **Local Schema Missing (${context.growthScore?.local ?? 58}/100)**: Google Local Map Pack cannot verify your exact latitude/longitude and opening hours without structured JSON-LD LocalBusiness schema.\n` +
-      `2. **Title & On-Page Target Mismatch (${context.growthScore?.onpage ?? 62}/100)**: Your homepage title tag lacks primary high-intent commercial keywords anchored to **${city}**.\n` +
-      `3. **Content Depth Gap (${context.growthScore?.content ?? 54}/100)**: Top competitors maintain distinct 300+ word landing pages for each service, while your site lists them generally.\n\n` +
-      `**Immediate Priority**: Deploy JSON-LD schema and update your primary H1 and Title tag.`;
-  }
-  // 4. WHY IS COMPETITOR BEATING ME
-  else if (lower.includes('competitor') || lower.includes('beating me') || lower.includes('why is competitor')) {
-    const compName = context.competitors[0]?.name || 'Top Competitors';
-    reply = `### Why ${compName} is Outranking You in ${city}\n\n` +
-      `Our SERP reverse-engineering discovered that top rivals in your area have the following advantages:\n\n` +
-      `1. **Dedicated Service URLs**: Competitors create dedicated pages for each procedure or treatment, capturing exact match search queries.\n` +
-      `2. **Localized NAP Citations**: Consistent business name, address, and phone footprint across regional directories.\n` +
-      `3. **Higher Content Coverage**: An average of 850 words per landing page with localized customer FAQ schema.\n\n` +
-      `You can bridge this gap by generating 2 dedicated service landing pages in your **Content Studio**.`;
-  }
-  // 5. WHAT SHOULD I FIX FIRST
-  else if (lower.includes('what should i fix first') || lower.includes('fix first')) {
-    const topProb = context.topProblems[0]?.title || 'Inject LocalBusiness JSON-LD Schema';
-    reply = `### What You Should Fix First for ${bizName}\n\n` +
-      `Your highest ROI priority is: **${topProb}**\n\n` +
-      `- **Why First?** It carries the heaviest algorithmic weight for Google Local 3-Pack rankings and takes under 15 minutes to deploy.\n` +
-      `- **Next Up**: Optimize your Title Tag to format: \`[Primary Service] in ${city} | ${bizName}\`.\n` +
-      `- **Then**: Create your first dedicated sub-service page in Content Studio.`;
-  }
-  // 6. 30-DAY PLAN
-  else if (lower.includes('30-day') || lower.includes('growth plan')) {
-    reply = `### 30-Day Phased Growth Roadmap for ${bizName} in ${city}\n\n` +
-      `**Week 1: Core Foundation & Schema**\n` +
-      `- Deploy JSON-LD LocalBusiness schema with geographic coordinates.\n` +
-      `- Update homepage Title Tag and Meta Description with primary commercial keywords.\n\n` +
-      `**Week 2: Content Expansion**\n` +
-      `- Launch 2 dedicated landing pages for your highest-margin services.\n` +
-      `- Add localized FAQ section with FAQPage schema.\n\n` +
-      `**Week 3: Reputation & Google Business**\n` +
-      `- Request 5 new customer reviews mentioning specific treatment keywords in ${city}.\n` +
-      `- Reply to all pending reviews using AI-assisted responses.\n\n` +
-      `**Week 4: Authority & Citations**\n` +
-      `- Submit your business profile to 3 verified local community directories.`;
-  }
-  // 7. BACKLINKS / AUTHORITY QUERY
-  else if (lower.includes('backlink') || lower.includes('backlinks') || lower.includes('referring domain') || lower.includes('authority')) {
-    const totalBl = context.authority?.totalBacklinks || 0;
-    if (totalBl === 0) {
-      reply = `### Backlink & Authority Status for ${bizName}\n\n` +
-        `I don't have verified backlink data for **${domain}** yet.\n\n` +
-        `We do not fabricate synthetic Domain Authority or fake backlink counts. To discover verified local directories, chamber of commerce listings, and high-trust community link opportunities for **${city}**, visit the **Backlinks & Authority** module.\n\n` +
-        `**Next Step**: Click **Open Backlinks & Authority** below to discover verified local citation opportunities.`;
-    } else {
-      reply = `### Verified Backlinks for ${bizName}\n\n` +
-        `You currently have **${totalBl}** tracked backlink records in your database.\n\n` +
-        `To monitor live status (LIVE / LOST / UNAVAILABLE) or discover competitor link gaps, check your **Backlinks & Authority** dashboard.`;
-    }
-  }
-  // DEFAULT
-  else {
-    reply = `### Action Guidance for ${bizName}\n\n` +
-      `I analyzed your verified data for **${city}** (Growth Score: **${score}/100**).\n\n` +
-      `Here are recommended actions for your query:\n\n` +
-      `- **Local Map Pack**: Ensure your address and hours match 100% across Google Business Profile and website schema.\n` +
-      `- **Keyword Rankings**: Target commercial intent keywords containing "${city}".\n` +
-      `- **Action Roadmap**: You have ${context.actionPlanStats?.pendingActions ?? 3} high-priority tasks in your roadmap.\n\n` +
-      `Ask me to generate schema markup, write a service article, or reverse-engineer your top local competitor!`;
+  if (intent === 'KEYWORD') {
+    reply = `### Finding\n${context.keywords.length > 0 ? `Tracking ${context.keywords.length} terms in ${city}.` : 'No tracked search terms found.'}\n\n### Evidence\n- Verified Keywords: ${context.keywords.length}\n- Rank Status: ${context.keywords.length > 0 ? 'SERP Scanned' : 'NOT_FOUND'}\n\n### Action\nOpen Keyword Radar to monitor search positions.`;
+  } else if (intent === 'COMPETITOR') {
+    const compName = context.competitors[0]?.name || 'Local Rivals';
+    reply = `### Finding\nTop competitor ${compName} outranks you due to dedicated service coverage.\n\n### Evidence\n- Competitors Analyzed: ${context.competitors.length}\n- Lead Domain: ${compName}\n\n### Action\nOpen Competitor Radar for side-by-side gap analysis.`;
+  } else if (intent === 'BACKLINKS') {
+    reply = `### Finding\nBacklink provider is not connected yet.\n\n### Evidence\n- Status: **NOT_CONNECTED**\n- Verified Data: 0 backlinks\n\n### Action\nOpen Backlinks & Authority to discover verified citation listings.`;
+  } else if (intent === 'REVIEWS') {
+    const connected = context.reviews?.connected;
+    reply = `### Finding\n${connected ? `Google Business Profile is active (${context.reviews?.avgRating} ★).` : 'Google Business Profile is not connected.'}\n\n### Evidence\n- Total Reviews: ${context.reviews?.totalReviews || 0}\n- Profile Connection: ${connected ? 'CONNECTED' : 'NOT_CONNECTED'}\n\n### Action\nOpen Reviews Manager to sync GMB reputation.`;
+  } else if (intent === 'BILLING') {
+    reply = `### Finding\nCurrently on 14-Day Free Trial (1 website project limit).\n\n### Evidence\n- Status: TRIALING\n- Capacity: 1 / 1 Websites Used\n\n### Action\nUpgrade to Growth ($49/mo) to add up to 5 websites.`;
+  } else {
+    const topProblem = context.topProblems[0]?.title || 'Missing LocalBusiness JSON-LD Schema';
+    reply = `### Finding\nGrowth Score for **${bizName}** in **${city}** is **${score}/100**.\n\n### Evidence\n- Critical Bottleneck: ${topProblem}\n- Local SEO Vector: ${context.growthScore?.local ?? 50}/100\n\n### Action\nApprove priority fixes in your SEO Campaign.`;
   }
 
-  const actions = determineActionButtons(userMessage, context);
-  return { reply, actions };
+  return { reply, intent, provenance, actions };
 }

@@ -1,15 +1,5 @@
 import React, { useState } from 'react';
-import { 
-  Sparkles, 
-  X, 
-  Check, 
-  Zap, 
-  ShieldCheck, 
-  Layers, 
-  ArrowRight,
-  RefreshCw,
-  Crown
-} from 'lucide-react';
+import { X, Sparkles, Check, ArrowRight, ShieldAlert, CreditCard } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { fetchApi } from '../../lib/api';
 
@@ -17,134 +7,132 @@ interface UpgradeModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
-  reason?: string;
-  targetPlan?: 'growth' | 'pro';
+  description?: string;
+  currentUsed?: number;
+  maxAllowed?: number;
+  featureName?: string;
 }
 
 export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   isOpen,
   onClose,
-  title = 'Upgrade Your Rankora Plan',
-  reason = 'You have reached the limit for your current plan.',
-  targetPlan = 'growth'
+  title = "WEBSITE LIMIT REACHED",
+  description = "You have reached your project limit on the 14-Day Free Trial.",
+  currentUsed = 1,
+  maxAllowed = 1,
+  featureName = "websites"
 }) => {
-  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleCheckout = async (plan: 'growth' | 'pro') => {
-    setLoadingPlan(plan);
+  const handleStartGrowthCheckout = async () => {
     try {
+      setLoading(true);
       const res = await fetchApi('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          planType: plan,
-          productId: plan === 'growth' ? '7594755d-5580-4b77-86ae-90baae0e20d8' : 'pro_package_id'
-        })
+        body: JSON.stringify({ plan: 'growth' })
       });
 
-      if (res.success && res.data?.url) {
-        window.location.href = res.data.url;
+      const targetUrl = res.data?.url || res.checkoutUrl;
+      if (res.success && targetUrl) {
+        window.location.href = targetUrl;
       } else {
-        alert(res.error || 'Failed to initiate checkout session.');
+        alert(res.error || 'Failed to initiate checkout. Please try again.');
       }
     } catch (err: any) {
-      alert(err.message || 'Checkout failed.');
+      alert(err.message || 'Checkout initiation failed.');
     } finally {
-      setLoadingPlan(null);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#141413]/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-[#faf9f5] border border-[#e6dfd8] rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl space-y-6">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-[#faf9f5] border border-[#e6dfd8] rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-150 relative">
         
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#e6dfd8] pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#141413] text-[#faf9f5] flex items-center justify-center">
-              <Crown size={20} className="text-[#cc785c]" />
-            </div>
+        <button
+          onClick={onClose}
+          className="absolute top-5 right-5 text-[#8e8b82] hover:text-[#141413] cursor-pointer"
+        >
+          <X size={20} />
+        </button>
+
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-[#cc785c]/10 text-[#cc785c] flex items-center justify-center shrink-0">
+            <ShieldAlert size={20} />
+          </div>
+          <div>
+            <span className="text-[10px] font-mono font-bold uppercase text-[#cc785c] tracking-wider">
+              Entitlement Limit Alert
+            </span>
+            <h3 className="text-xl font-serif font-bold text-[#141413]">{title}</h3>
+          </div>
+        </div>
+
+        <p className="text-xs text-[#6c6a64] font-sans leading-relaxed">
+          {description}
+        </p>
+
+        {/* Usage Stats Box */}
+        <div className="p-4 bg-[#efe9de]/60 rounded-2xl border border-[#e6dfd8] font-mono text-xs space-y-1">
+          <div className="flex justify-between text-[#8e8b82] text-[10px] uppercase font-bold">
+            <span>{featureName} Used</span>
+            <span>{currentUsed} / {maxAllowed}</span>
+          </div>
+          <div className="w-full bg-white h-2 rounded-full overflow-hidden border border-[#e6dfd8] mt-1">
+            <div className="bg-[#cc785c] h-full" style={{ width: '100%' }} />
+          </div>
+        </div>
+
+        {/* Plan Upgrade Comparison */}
+        <div className="p-5 bg-white border border-[#cc785c]/40 rounded-2xl space-y-3 shadow-xs">
+          <div className="flex items-center justify-between">
             <div>
-              <span className="text-[10px] font-mono uppercase text-[#cc785c] font-bold">Commercial Entitlement</span>
-              <h3 className="font-serif font-bold text-xl text-[#141413]">{title}</h3>
+              <span className="text-xs font-serif font-bold text-[#141413]">Growth Plan</span>
+              <span className="text-[10px] font-mono text-[#8e8b82] block">Upgrade & Unlock Capacity</span>
+            </div>
+            <div className="text-right">
+              <span className="text-lg font-serif font-bold text-[#141413]">$49</span>
+              <span className="text-[10px] font-mono text-[#8e8b82]">/month</span>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-xl text-[#8e8b82] hover:text-[#141413] cursor-pointer">
-            <X size={20} />
+
+          <ul className="space-y-2 text-xs font-sans border-t border-[#e6dfd8] pt-3">
+            <li className="flex items-center gap-2 text-[#141413]">
+              <Check size={14} className="text-[#cc785c]" />
+              <span>Up to <strong>5 Website Projects</strong></span>
+            </li>
+            <li className="flex items-center gap-2 text-[#141413]">
+              <Check size={14} className="text-[#cc785c]" />
+              <span><strong>50 Tracked Keywords</strong> & 10 GeoGrid Scans</span>
+            </li>
+            <li className="flex items-center gap-2 text-[#141413]">
+              <Check size={14} className="text-[#cc785c]" />
+              <span><strong>250 AI Code Fixes</strong> & Live Verification</span>
+            </li>
+          </ul>
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+          <Button
+            size="lg"
+            onClick={handleStartGrowthCheckout}
+            disabled={loading}
+            className="w-full sm:flex-1 py-3 bg-[#141413] hover:bg-[#252320] text-[#faf9f5] text-xs font-semibold rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-md"
+          >
+            <CreditCard size={15} className="text-[#cc785c]" />
+            <span>{loading ? 'Initiating Checkout...' : 'UPGRADE TO GROWTH ($49/mo)'}</span>
+          </Button>
+
+          <button
+            onClick={onClose}
+            className="w-full sm:w-auto px-4 py-3 text-xs font-semibold text-[#6c6a64] hover:text-[#141413] cursor-pointer"
+          >
+            NOT NOW
           </button>
-        </div>
-
-        {/* Reason Alert */}
-        <div className="p-3.5 rounded-2xl bg-[#efe9de]/70 border border-[#e6dfd8] text-xs font-sans text-[#141413] flex items-center gap-2.5">
-          <Zap size={16} className="text-[#cc785c] shrink-0" />
-          <span>{reason}</span>
-        </div>
-
-        {/* Plan Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          
-          {/* Growth Plan */}
-          <div className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
-            targetPlan === 'growth' ? 'bg-[#efe9de]/40 border-[#cc785c] ring-1 ring-[#cc785c]' : 'bg-white border-[#e6dfd8]'
-          }`}>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="font-serif font-bold text-base text-[#141413]">Growth Plan</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#cc785c]/10 text-[#cc785c]">POPULAR</span>
-              </div>
-              <div className="font-serif text-2xl font-bold text-[#141413]">
-                $49<span className="text-xs font-sans font-normal text-[#8e8b82]">/month</span>
-              </div>
-              <ul className="space-y-2 text-xs font-sans text-[#6c6a64]">
-                <li className="flex items-center gap-1.5"><Check size={13} className="text-emerald-600" /> 5 Website Projects</li>
-                <li className="flex items-center gap-1.5"><Check size={13} className="text-emerald-600" /> 50 Tracked Keywords</li>
-                <li className="flex items-center gap-1.5"><Check size={13} className="text-emerald-600" /> 10 GeoGrid Scans</li>
-                <li className="flex items-center gap-1.5"><Check size={13} className="text-emerald-600" /> 250 AI Fix Generations</li>
-              </ul>
-            </div>
-
-            <Button
-              size="sm"
-              onClick={() => handleCheckout('growth')}
-              disabled={loadingPlan === 'growth'}
-              className="mt-5 w-full bg-[#141413] hover:bg-[#252320] text-[#faf9f5] text-xs font-semibold"
-            >
-              {loadingPlan === 'growth' ? 'Loading Checkout...' : 'Upgrade to Growth'}
-            </Button>
-          </div>
-
-          {/* Pro / Agency Plan */}
-          <div className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
-            targetPlan === 'pro' ? 'bg-[#efe9de]/40 border-[#cc785c] ring-1 ring-[#cc785c]' : 'bg-white border-[#e6dfd8]'
-          }`}>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="font-serif font-bold text-base text-[#141413]">Agency / Pro</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#141413] text-[#faf9f5]">MAX VALUE</span>
-              </div>
-              <div className="font-serif text-2xl font-bold text-[#141413]">
-                $149<span className="text-xs font-sans font-normal text-[#8e8b82]">/month</span>
-              </div>
-              <ul className="space-y-2 text-xs font-sans text-[#6c6a64]">
-                <li className="flex items-center gap-1.5"><Check size={13} className="text-emerald-600" /> 25 Website Projects</li>
-                <li className="flex items-center gap-1.5"><Check size={13} className="text-emerald-600" /> 500 Tracked Keywords</li>
-                <li className="flex items-center gap-1.5"><Check size={13} className="text-emerald-600" /> 50 GeoGrid Scans</li>
-                <li className="flex items-center gap-1.5"><Check size={13} className="text-emerald-600" /> 2,500 AI Fix Generations</li>
-              </ul>
-            </div>
-
-            <Button
-              size="sm"
-              onClick={() => handleCheckout('pro')}
-              disabled={loadingPlan === 'pro'}
-              className="mt-5 w-full bg-[#cc785c] hover:bg-[#b8674d] text-white text-xs font-semibold"
-            >
-              {loadingPlan === 'pro' ? 'Loading Checkout...' : 'Upgrade to Pro'}
-            </Button>
-          </div>
-
         </div>
 
       </div>

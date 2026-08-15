@@ -21,7 +21,7 @@ export interface PlanLimits {
 
 export const PLAN_LIMITS: Record<string, PlanLimits> = {
   free: {
-    name: 'Free Trial / Starter',
+    name: '14-Day Free Trial',
     tier: 'free',
     project_limit: 1,
     keyword_limit: 5,
@@ -47,7 +47,7 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
     agency_features: false
   },
   pro: {
-    name: 'Agency / Pro',
+    name: 'Agency / Pro Plan',
     tier: 'pro',
     project_limit: 25,
     keyword_limit: 500,
@@ -106,17 +106,20 @@ export async function getUserUsageStats(db: any, userId: string): Promise<{
   projectsUsed: number;
   keywordsUsed: number;
   leadsUsed: number;
+  auditsUsed: number;
 }> {
-  const [bizCount, kwCount, leadCount] = await Promise.all([
+  const [bizCount, kwCount, leadCount, auditCount] = await Promise.all([
     db.prepare("SELECT COUNT(*) as count FROM businesses WHERE user_id = ? AND is_archived = 0").bind(userId).first(),
     db.prepare("SELECT COUNT(*) as count FROM keywords WHERE user_id = ?").bind(userId).first(),
-    db.prepare("SELECT COUNT(*) as count FROM leads WHERE user_id = ?").bind(userId).first()
+    db.prepare("SELECT COUNT(*) as count FROM leads WHERE user_id = ?").bind(userId).first(),
+    db.prepare("SELECT COUNT(*) as count FROM audits WHERE business_id IN (SELECT id FROM businesses WHERE user_id = ?)").bind(userId).first().catch(() => ({ count: 0 }))
   ]);
 
   return {
     projectsUsed: bizCount?.count || 0,
     keywordsUsed: kwCount?.count || 0,
-    leadsUsed: leadCount?.count || 0
+    leadsUsed: leadCount?.count || 0,
+    auditsUsed: auditCount?.count || 0
   };
 }
 
@@ -124,7 +127,7 @@ export async function enforceEntitlement(
   db: any,
   user: any,
   action: 'create_project' | 'add_keyword' | 'run_geogrid' | 'ai_fix' | 'export_report'
-): Promise<{ allowed: boolean; reason?: string; limits: PlanLimits }> {
+): Promise<{ allowed: boolean; reason?: string; limits: PlanLimits; currentUsed?: number }> {
   const plan = getUserPlan(user);
   const trial = calculateTrialStatus(user);
 
@@ -132,7 +135,7 @@ export async function enforceEntitlement(
   if (trial.isTrial && trial.trialStatus === 'EXPIRED') {
     return {
       allowed: false,
-      reason: "Your 14-day free trial has expired. Upgrade to Growth or Pro to continue.",
+      reason: "Your 14-day free trial has expired. Upgrade to Growth ($49/mo) or Agency ($149/mo) to continue.",
       limits: plan
     };
   }
@@ -142,18 +145,23 @@ export async function enforceEntitlement(
   if (action === 'create_project' && usage.projectsUsed >= plan.project_limit) {
     return {
       allowed: false,
-      reason: `You have reached your limit of ${plan.project_limit} website project(s) on the ${plan.name}. Upgrade to add more websites.`,
-      limits: plan
+      reason: `WEBSITE LIMIT REACHED: You are currently using ${usage.projectsUsed}/${plan.project_limit} website project(s) on the ${plan.name}. Upgrade to Growth to manage up to 5 websites.`,
+      limits: plan,
+      currentUsed: usage.projectsUsed
     };
   }
 
   if (action === 'add_keyword' && usage.keywordsUsed >= plan.keyword_limit) {
     return {
       allowed: false,
-      reason: `You have reached your limit of ${plan.keyword_limit} tracked keywords on the ${plan.name}.`,
-      limits: plan
+      reason: `KEYWORD LIMIT REACHED: You are currently tracking ${usage.keywordsUsed}/${plan.keyword_limit} keywords on the ${plan.name}. Upgrade to Growth for 50 tracked keywords.`,
+      limits: plan,
+      currentUsed: usage.keywordsUsed
     };
   }
 
-  return { allowed: true, limits: plan };
+  return {
+    allowed: true,
+    limits: plan
+  };
 }

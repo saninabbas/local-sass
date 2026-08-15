@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Navbar } from '../../components/layout/Navbar';
 import { Footer } from '../../components/layout/Footer';
 import { Link } from 'react-router-dom';
-import { Check, Sparkles } from 'lucide-react';
+import { Check, Sparkles, ArrowRight, ShieldCheck, Zap } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
 export function Pricing() {
@@ -10,63 +10,64 @@ export function Pricing() {
 
   const plans = [
     {
-      name: "Starter",
-      badge: "Free",
-      who: "For local businesses ready to understand why they're not ranking.",
-      description: "Get your full Growth Score and discover your top 3 blockers.",
+      name: "FREE TRIAL",
+      badge: "14 Days Free",
+      who: "Try Rankora risk-free for 14 days with zero credit card required.",
+      description: "Complete local SEO diagnostic baseline and 7-vector DOM crawl.",
       price: "$0",
-      period: "forever",
+      period: "14 Days",
       features: [
-        "Full website diagnostic audit",
-        "Growth Score (11 vectors)",
-        "Top 3 growth bottlenecks identified",
-        "Competitor discovery (up to 3)",
-        "1 AI action plan",
-        "Basic Growth Report"
+        "1 Website Project",
+        "5 Tracked Keywords",
+        "5 Diagnostic Audits",
+        "1 GeoGrid Local Scan",
+        "15 AI Fixes & Code Generations",
+        "Live Change Verification"
       ],
-      cta: "Start Free Audit",
+      cta: "START FREE TRIAL",
       ctaHref: "/signup",
       popular: false
     },
     {
-      name: "Growth",
+      name: "GROWTH",
       badge: "Most Popular",
-      who: "For businesses serious about dominating local search.",
-      description: "Track rankings weekly, monitor competitors, and execute an AI plan that keeps improving.",
-      price: billingCycle === 'monthly' ? "$15" : "$12",
+      who: "For businesses serious about dominating local Google search.",
+      description: "Scale local rankings, monitor top competitors, and execute automated AI fixes.",
+      price: billingCycle === 'monthly' ? "$49" : "$39",
       period: "/month",
       features: [
-        "Everything in Starter",
-        "Weekly rank tracking (25 keywords)",
-        "Geo-Grid local visibility map",
-        "Competitor monitoring (up to 5)",
-        "AI Copilot (unlimited questions)",
-        "Backlink & authority opportunities",
-        "Review monitoring & AI replies",
-        "Monthly progress reports"
+        "5 Website Projects",
+        "50 Tracked Keywords",
+        "50 Diagnostic Audits",
+        "10 GeoGrid Scans",
+        "250 AI Fixes & Code Generations",
+        "Competitor Radar Monitoring",
+        "Google Business Profile Sync",
+        "Internal Link Discovery"
       ],
-      cta: "Start 14-Day Free Trial",
+      cta: "START GROWTH",
       ctaHref: "/signup",
       popular: true
     },
     {
-      name: "Agency",
-      badge: "For Teams",
-      who: "For agencies and multi-location businesses.",
-      description: "White-label reports, advanced AI content, and full client workflow management.",
-      price: billingCycle === 'monthly' ? "$49" : "$39",
+      name: "AGENCY / PRO",
+      badge: "For Agencies & Teams",
+      who: "For agencies and multi-location business operations.",
+      description: "White-label reports, multi-client workspace management, and high volume limits.",
+      price: billingCycle === 'monthly' ? "$149" : "$119",
       period: "/month",
       features: [
-        "Everything in Growth",
-        "Up to 10 business locations",
-        "White-label report exports",
-        "AI Content Studio (unlimited)",
-        "Lead Gen Widget embed",
-        "Priority 24/7 support",
-        "API access"
+        "25 Website Projects",
+        "500 Tracked Keywords",
+        "500 Diagnostic Audits",
+        "50 GeoGrid Scans",
+        "2,500 AI Fixes",
+        "White-Label Executive Reports",
+        "Lead Generation Widget Embed",
+        "Priority 24/7 Support"
       ],
-      cta: "Contact for Agency Pricing",
-      ctaHref: "/contact",
+      cta: "START AGENCY",
+      ctaHref: "/signup",
       popular: false
     }
   ];
@@ -85,14 +86,14 @@ export function Pricing() {
               Invest in predictable <span className="italic text-[#cc785c]">local revenue growth</span>.
             </h1>
             <p className="text-base sm:text-lg text-[#6c6a64] max-w-2xl mx-auto leading-relaxed mb-8">
-              Choose the plan that fits your business stage. No lock-in contracts. Cancel anytime.
+              Start your 14-day free trial. No credit card required. Upgrade or cancel anytime.
             </p>
 
             {/* Toggle */}
             <div className="inline-flex items-center p-1 bg-[#efe9de] border border-[#e6dfd8] rounded-xl">
               <button
                 onClick={() => setBillingCycle('monthly')}
-                className={`px-4 py-2 rounded-lg text-xs font-sans font-medium transition-all ${
+                className={`px-4 py-2 rounded-lg text-xs font-sans font-medium transition-all cursor-pointer ${
                   billingCycle === 'monthly'
                     ? 'bg-[#faf9f5] text-[#141413] font-semibold shadow-xs'
                     : 'text-[#6c6a64] hover:text-[#141413]'
@@ -102,7 +103,7 @@ export function Pricing() {
               </button>
               <button
                 onClick={() => setBillingCycle('yearly')}
-                className={`px-4 py-2 rounded-lg text-xs font-sans font-medium transition-all ${
+                className={`px-4 py-2 rounded-lg text-xs font-sans font-medium transition-all cursor-pointer ${
                   billingCycle === 'yearly'
                     ? 'bg-[#faf9f5] text-[#141413] font-semibold shadow-xs'
                     : 'text-[#6c6a64] hover:text-[#141413]'
@@ -149,32 +150,33 @@ export function Pricing() {
                     <span className="text-xs font-mono text-[#8e8b82]">{plan.period}</span>
                   </div>
 
-                  <ul className="space-y-3 text-xs font-sans mb-8">
-                    {plan.features.map((feat, i) => (
-                      <li key={i} className="flex items-start gap-2.5 text-[#3d3d3a]">
-                        <Check size={15} className="text-[#5db872] shrink-0 mt-0.5" />
-                        <span>{feat}</span>
+                  <ul className="space-y-3 mb-8">
+                    {plan.features.map((feature, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-xs text-[#141413]">
+                        <Check size={14} className="text-[#cc785c] shrink-0 mt-0.5" />
+                        <span>{feature}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
 
-                <Link to={plan.ctaHref || '/signup'} className="w-full block">
+                <Link to={plan.ctaHref} className="w-full">
                   <Button
-                    className={`w-full py-2.5 text-xs font-medium rounded-xl shadow-xs ${
+                    size="lg"
+                    className={`w-full py-3 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 cursor-pointer ${
                       plan.popular
-                        ? 'bg-[#cc785c] hover:bg-[#a9583e] text-white'
-                        : 'bg-[#efe9de] hover:bg-[#e8e0d2] text-[#141413] border border-[#e6dfd8]'
+                        ? 'bg-[#141413] hover:bg-[#252320] text-[#faf9f5]'
+                        : 'bg-[#faf9f5] hover:bg-[#efe9de] text-[#141413] border border-[#e6dfd8]'
                     }`}
                   >
-                    {plan.cta}
+                    <span>{plan.cta}</span>
+                    <ArrowRight size={13} />
                   </Button>
                 </Link>
               </div>
             ))}
           </div>
         </section>
-
       </main>
 
       <Footer />
