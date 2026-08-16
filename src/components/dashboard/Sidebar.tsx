@@ -24,7 +24,8 @@ import {
   Plus,
   Check,
   Flag,
-  History
+  History,
+  GitBranch
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBusiness } from '../../context/BusinessContext';
@@ -87,6 +88,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         { name: 'Website Audit', href: '/dashboard/website', icon: Globe },
         { name: 'Content Studio', href: '/dashboard/content', icon: Sparkles },
         { name: 'Internal Links', href: '/dashboard/internal-links', icon: Link2 },
+        { name: 'Connections', href: '/dashboard/connections', icon: GitBranch },
         { name: 'Websites & Projects', href: '/dashboard/websites', icon: FolderKanban },
       ]
     },

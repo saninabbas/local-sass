@@ -318,3 +318,52 @@ export async function fetchProgressSummary(): Promise<any> {
   return fetchApi('/api/reports/progress-summary');
 }
 
+// -----------------------------------------------------------------------------
+// WEBSITE CONNECTIONS & GITHUB (PHASE 1)
+// -----------------------------------------------------------------------------
+export async function getConnections(): Promise<any[]> {
+  return fetchApi('/api/connections');
+}
+
+export async function saveGitHubConnection(data: {
+  repositoryName: string;
+  repositoryOwner: string;
+  repositoryId?: string;
+  defaultBranch?: string;
+  installationId?: string;
+  token?: string;
+}): Promise<any> {
+  return fetchApi('/api/connections/github', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+}
+
+export async function deleteConnection(connectionId: string): Promise<any> {
+  return fetchApi(`/api/connections/${connectionId}`, {
+    method: 'DELETE'
+  });
+}
+
+export async function getGitHubRepositories(token?: string): Promise<any[]> {
+  const query = token ? `?token=${encodeURIComponent(token)}` : '';
+  return fetchApi(`/api/github/repositories${query}`);
+}
+
+export async function getGitHubBranches(owner: string, repo: string, token?: string): Promise<any[]> {
+  const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
+  return fetchApi(`/api/github/branches?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}${tokenParam}`);
+}
+
+export async function getGitHubTree(owner: string, repo: string, branch: string, path?: string, token?: string): Promise<any[]> {
+  const pathParam = path ? `&path=${encodeURIComponent(path)}` : '';
+  const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
+  return fetchApi(`/api/github/tree?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&branch=${encodeURIComponent(branch)}${pathParam}${tokenParam}`);
+}
+
+export async function getGitHubFile(owner: string, repo: string, branch: string, path: string, token?: string): Promise<any> {
+  const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
+  return fetchApi(`/api/github/file?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&branch=${encodeURIComponent(branch)}&path=${encodeURIComponent(path)}${tokenParam}`);
+}
+
+

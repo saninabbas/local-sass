@@ -48,6 +48,7 @@ const InternalLinks = lazy(() => import('./pages/dashboard/InternalLinks').then(
 const ChangeHistory = lazy(() => import('./pages/dashboard/ChangeHistory').then(m => ({ default: m.ChangeHistory })));
 const Billing = lazy(() => import('./pages/dashboard/Billing').then(m => ({ default: m.Billing })));
 const FreeAudit = lazy(() => import('./pages/FreeAudit').then(m => ({ default: m.FreeAudit })));
+const Connections = lazy(() => import('./pages/dashboard/Connections').then(m => ({ default: m.Connections })));
 
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -142,6 +143,7 @@ function App() {
               <Route path="/dashboard/content/links" element={<DashboardSuspense><InternalLinks /></DashboardSuspense>} />
               <Route path="/dashboard/internal-links" element={<DashboardSuspense><InternalLinks /></DashboardSuspense>} />
               <Route path="/dashboard/changes" element={<DashboardSuspense><ChangeHistory /></DashboardSuspense>} />
+              <Route path="/dashboard/connections" element={<DashboardSuspense><Connections /></DashboardSuspense>} />
               <Route path="/dashboard/geogrid" element={<DashboardSuspense><GeoGrid /></DashboardSuspense>} />
               
               <Route path="/dashboard/*" element={<DashboardPlaceholder title="Page Not Found" />} />

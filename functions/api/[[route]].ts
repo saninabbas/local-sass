@@ -1,5 +1,12 @@
 import { sendVerificationEmail } from '../../src/lib/email';
 import { verifyTOTP } from '../../src/lib/totp';
+import { 
+  getProjectConnections, 
+  saveGitHubConnection, 
+  deleteConnection, 
+  getActiveGitHubConnection 
+} from './connectionsEngine';
+import { githubProvider } from './providers/githubProvider';
 
 export interface Env {
   DB: D1Database;
@@ -8,6 +15,8 @@ export interface Env {
   POLAR_WEBHOOK_SECRET?: string;
   SENDGRID_API_KEY?: string;
   BASE_URL?: string;
+  GITHUB_APP_TOKEN?: string;
+  GITHUB_TOKEN?: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -594,6 +603,23 @@ export const onRequest = async (context: any) => {
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           expires_at DATETIME
         )`).run().catch(() => {});
+
+        await db.prepare(`CREATE TABLE IF NOT EXISTS connections (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          project_id TEXT NOT NULL,
+          provider TEXT NOT NULL,
+          installation_id TEXT,
+          repository_id TEXT,
+          repository_name TEXT,
+          repository_owner TEXT,
+          default_branch TEXT DEFAULT 'main',
+          status TEXT DEFAULT 'CONNECTED',
+          auth_token TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_connections_user_proj ON connections(user_id, project_id)").run().catch(() => {});
 
         await db.prepare(`CREATE TABLE IF NOT EXISTS execution_events (
           id TEXT PRIMARY KEY,
@@ -4917,6 +4943,244 @@ export const onRequest = async (context: any) => {
 
         const auditData = await executeAudit(business);
         return jsonResponse({ success: true, data: auditData });
+      }
+
+      // =========================================================================
+      // GITHUB & WEBSITE CONNECTIONS ARCHITECTURE (PHASE 1)
+      // =========================================================================
+
+      // GET /api/connections — List all connections for active project
+      if (url.pathname === '/api/connections' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return jsonResponse({ success: true, data: [] });
+
+        const connections = await getProjectConnections(env.DB, user.id, business.id);
+        return jsonResponse({ success: true, data: connections });
+      }
+
+      // POST /api/connections/github — Save / Update GitHub repository connection
+      if (url.pathname === '/api/connections/github' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        if (!payload.repositoryOwner || !payload.repositoryName) {
+          return errorResponse("Missing required fields: repositoryOwner and repositoryName", 400);
+        }
+
+        const conn = await saveGitHubConnection(env.DB, user.id, business.id, {
+          repositoryName: payload.repositoryName,
+          repositoryOwner: payload.repositoryOwner,
+          repositoryId: payload.repositoryId,
+          defaultBranch: payload.defaultBranch || 'main',
+          installationId: payload.installationId,
+          token: payload.token
+        });
+
+        return jsonResponse({ success: true, message: "GitHub connection saved successfully", data: conn });
+      }
+
+      // DELETE /api/connections/:id — Disconnect repository
+      if (url.pathname.startsWith('/api/connections/') && request.method === 'DELETE') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const connectionId = url.pathname.replace('/api/connections/', '');
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const deleted = await deleteConnection(env.DB, user.id, business.id, connectionId);
+        if (!deleted) {
+          return errorResponse("Connection not found or unauthorized", 404);
+        }
+
+        return jsonResponse({ success: true, message: "Connection removed successfully" });
+      }
+
+      // GET /api/github/repositories — List accessible repos via Token / App
+      if (url.pathname === '/api/github/repositories' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const token = url.searchParams.get('token') || 
+                      request.headers.get('X-GitHub-Token') || 
+                      (await getActiveGitHubConnection(env.DB, user.id, business.id))?.auth_token || 
+                      env.GITHUB_APP_TOKEN || 
+                      env.GITHUB_TOKEN;
+
+        if (!token) {
+          return errorResponse("NOT_CONNECTED: No GitHub token or App connection found", 400);
+        }
+
+        try {
+          const repos = await githubProvider.getRepositories(token);
+          return jsonResponse({ success: true, data: repos });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to retrieve GitHub repositories", 400);
+        }
+      }
+
+      // GET /api/github/branches — List branches for repo
+      if (url.pathname === '/api/github/branches' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const owner = url.searchParams.get('owner');
+        const repo = url.searchParams.get('repo');
+        if (!owner || !repo) return errorResponse("Missing owner or repo parameter", 400);
+
+        const token = url.searchParams.get('token') || 
+                      request.headers.get('X-GitHub-Token') || 
+                      (await getActiveGitHubConnection(env.DB, user.id, business.id))?.auth_token || 
+                      env.GITHUB_APP_TOKEN || 
+                      env.GITHUB_TOKEN;
+
+        if (!token) {
+          return errorResponse("NOT_CONNECTED: No GitHub token or App connection found", 400);
+        }
+
+        try {
+          const branches = await githubProvider.getBranches(token, owner, repo);
+          return jsonResponse({ success: true, data: branches });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to retrieve branches", 400);
+        }
+      }
+
+      // GET /api/github/tree — List directory/repository files
+      if (url.pathname === '/api/github/tree' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const owner = url.searchParams.get('owner');
+        const repo = url.searchParams.get('repo');
+        const branch = url.searchParams.get('branch') || 'main';
+        const path = url.searchParams.get('path') || '';
+
+        if (!owner || !repo) return errorResponse("Missing owner or repo parameter", 400);
+
+        const token = url.searchParams.get('token') || 
+                      request.headers.get('X-GitHub-Token') || 
+                      (await getActiveGitHubConnection(env.DB, user.id, business.id))?.auth_token || 
+                      env.GITHUB_APP_TOKEN || 
+                      env.GITHUB_TOKEN;
+
+        if (!token) {
+          return errorResponse("NOT_CONNECTED: No GitHub token or App connection found", 400);
+        }
+
+        try {
+          const tree = await githubProvider.getTree(token, owner, repo, branch, path);
+          return jsonResponse({ success: true, data: tree });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to retrieve repository tree", 400);
+        }
+      }
+
+      // GET /api/github/file — Read file content (READ-ONLY)
+      if (url.pathname === '/api/github/file' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const owner = url.searchParams.get('owner');
+        const repo = url.searchParams.get('repo');
+        const branch = url.searchParams.get('branch') || 'main';
+        const path = url.searchParams.get('path');
+
+        if (!owner || !repo || !path) {
+          return errorResponse("Missing required parameters: owner, repo, and path", 400);
+        }
+
+        const token = url.searchParams.get('token') || 
+                      request.headers.get('X-GitHub-Token') || 
+                      (await getActiveGitHubConnection(env.DB, user.id, business.id))?.auth_token || 
+                      env.GITHUB_APP_TOKEN || 
+                      env.GITHUB_TOKEN;
+
+        if (!token) {
+          return errorResponse("NOT_CONNECTED: No GitHub token or App connection found", 400);
+        }
+
+        try {
+          const fileData = await githubProvider.getFile(token, owner, repo, branch, path);
+          return jsonResponse({ success: true, data: fileData });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to read file", 400);
+        }
       }
 
       // --- DEBUG ENV ---
