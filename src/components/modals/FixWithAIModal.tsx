@@ -14,9 +14,17 @@ import {
   FileCode,
   Zap,
   Clock,
-  ExternalLink
+  ExternalLink,
+  GitBranch,
+  GitPullRequest,
+  CheckCheck
 } from 'lucide-react';
-import { fetchApi } from '../../lib/api';
+import { 
+  fetchApi, 
+  getConnections, 
+  executeSeoFixViaGitHub, 
+  checkPullRequestStatus 
+} from '../../lib/api';
 import { ExecutionStatusBadge } from '../dashboard/ExecutionStatusBadge';
 import { Button } from '../ui/Button';
 
@@ -48,7 +56,7 @@ export function FixWithAIModal({
   context,
   onSuccess
 }: FixWithAIModalProps) {
-  const [step, setStep] = useState<'GENERATE' | 'PREVIEW' | 'APPLY_MANUAL' | 'VERIFYING' | 'RESULT'>('GENERATE');
+  const [step, setStep] = useState<'GENERATE' | 'PREVIEW' | 'GITHUB_EXECUTING' | 'PR_CREATED' | 'APPLY_MANUAL' | 'VERIFYING' | 'RESULT'>('GENERATE');
   const [loading, setLoading] = useState(false);
   const [changeRecord, setChangeRecord] = useState<any | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -56,6 +64,13 @@ export function FixWithAIModal({
   const [copied, setCopied] = useState(false);
   const [verificationResult, setVerificationResult] = useState<any | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // GitHub Connection & Phase 2 Execution state
+  const [activeGitHubConnection, setActiveGitHubConnection] = useState<any | null>(null);
+  const [targetFilePath, setTargetFilePath] = useState('index.html');
+  const [executionResult, setExecutionResult] = useState<any | null>(null);
+  const [prStatus, setPrStatus] = useState<any | null>(null);
+  const [deployMode, setDeployMode] = useState<'GITHUB_PR' | 'MANUAL'>('GITHUB_PR');
 
   // Normalize changeType
   const normalizedChangeType = fixType.toUpperCase().includes('TITLE') ? 'SEO_TITLE' :
@@ -69,6 +84,16 @@ export function FixWithAIModal({
     setLoading(true);
     setErrorMessage(null);
     try {
+      // Check connections first
+      const conns = await getConnections().catch(() => []);
+      const gh = Array.isArray(conns) ? conns.find((c: any) => c.provider === 'github' && c.status === 'CONNECTED') : null;
+      setActiveGitHubConnection(gh);
+      if (!gh) {
+        setDeployMode('MANUAL');
+      } else {
+        setDeployMode('GITHUB_PR');
+      }
+
       const res = await fetchApi('/api/seo/changes/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -101,6 +126,8 @@ export function FixWithAIModal({
       setStep('GENERATE');
       setChangeRecord(null);
       setVerificationResult(null);
+      setExecutionResult(null);
+      setPrStatus(null);
       setErrorMessage(null);
       setIsEditing(false);
       setCopied(false);
@@ -110,7 +137,59 @@ export function FixWithAIModal({
 
   if (!isOpen) return null;
 
-  const handleApprove = async () => {
+  // Phase 2: Execute GitHub Pull Request workflow
+  const handleApproveAndCreatePR = async () => {
+    if (!changeRecord) return;
+    setStep('GITHUB_EXECUTING');
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      // 1. Approve change record first with edited text
+      await fetchApi(`/api/seo/changes/${changeRecord.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ editedContent })
+      });
+
+      // 2. Execute GitHub branch creation, commit, and PR
+      const execRes = await executeSeoFixViaGitHub(changeRecord.id, {
+        targetFilePath: targetFilePath.trim() || 'index.html',
+        customCommitMessage: `Rankora SEO Fix: ${normalizedChangeType} for ${context.businessName || 'website'}`
+      });
+
+      if (execRes.success && execRes.data) {
+        setExecutionResult(execRes.data);
+        setStep('PR_CREATED');
+      } else {
+        throw new Error(execRes.error || 'Failed to create GitHub Pull Request');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'GitHub execution failed');
+      setStep('PREVIEW');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Check Pull Request status
+  const handleCheckPR = async () => {
+    if (!changeRecord) return;
+    try {
+      setLoading(true);
+      const res = await checkPullRequestStatus(changeRecord.id);
+      if (res.success && res.data) {
+        setPrStatus(res.data);
+      }
+    } catch (err: any) {
+      console.warn("Failed to check PR status:", err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Manual deployment mode handler
+  const handleApproveManual = async () => {
     if (!changeRecord) return;
     setLoading(true);
     setErrorMessage(null);
@@ -125,7 +204,6 @@ export function FixWithAIModal({
         throw new Error(approveRes.error || 'Approval failed');
       }
 
-      // Apply step
       const applyRes = await fetchApi(`/api/seo/changes/${changeRecord.id}/apply`, {
         method: 'POST'
       });
@@ -148,6 +226,7 @@ export function FixWithAIModal({
     }
   };
 
+  // Re-Crawl & Verify
   const handleVerify = async () => {
     if (!changeRecord) return;
     setStep('VERIFYING');
@@ -205,18 +284,18 @@ export function FixWithAIModal({
           </button>
         </div>
 
-        {/* Workflow Progression Stepper */}
+        {/* Stepper */}
         <div className="px-6 py-2.5 bg-[#f5f1ea] border-b border-[#e6dfd8] flex items-center justify-between text-[11px] font-mono text-[#8e8b82] overflow-x-auto">
           <span className={`flex items-center gap-1 ${step === 'GENERATE' ? 'text-[#cc785c] font-bold' : 'text-[#141413]'}`}>
             1. Generate
           </span>
           <ArrowRight size={12} />
-          <span className={`flex items-center gap-1 ${step === 'PREVIEW' ? 'text-[#cc785c] font-bold' : step === 'APPLY_MANUAL' || step === 'RESULT' ? 'text-[#141413]' : ''}`}>
+          <span className={`flex items-center gap-1 ${step === 'PREVIEW' ? 'text-[#cc785c] font-bold' : step !== 'GENERATE' ? 'text-[#141413]' : ''}`}>
             2. Preview & Diff
           </span>
           <ArrowRight size={12} />
-          <span className={`flex items-center gap-1 ${step === 'APPLY_MANUAL' ? 'text-[#cc785c] font-bold' : step === 'RESULT' ? 'text-[#141413]' : ''}`}>
-            3. Approve & Deploy
+          <span className={`flex items-center gap-1 ${step === 'GITHUB_EXECUTING' || step === 'PR_CREATED' || step === 'APPLY_MANUAL' ? 'text-[#cc785c] font-bold' : step === 'RESULT' ? 'text-[#141413]' : ''}`}>
+            3. {activeGitHubConnection ? 'GitHub PR' : 'Manual Deploy'}
           </span>
           <ArrowRight size={12} />
           <span className={`flex items-center gap-1 ${step === 'VERIFYING' || step === 'RESULT' ? 'text-[#cc785c] font-bold' : ''}`}>
@@ -224,7 +303,7 @@ export function FixWithAIModal({
           </span>
         </div>
 
-        {/* Content Body */}
+        {/* Modal Body */}
         <div className="p-6 overflow-y-auto flex-1 font-sans text-xs space-y-5">
           
           {loading && step === 'GENERATE' ? (
@@ -238,7 +317,7 @@ export function FixWithAIModal({
           ) : step === 'PREVIEW' && changeRecord ? (
             <div className="space-y-4">
               
-              {/* Context Information */}
+              {/* Target & Impact Header */}
               <div className="p-3 rounded-xl bg-[#efe9de]/50 border border-[#e6dfd8] flex items-center justify-between text-xs font-mono">
                 <span className="text-[#6c6a64]">Target URL: <strong className="text-[#141413]">{changeRecord.pageUrl}</strong></span>
                 <span className="text-[#cc785c] font-bold uppercase">{changeRecord.impact} Impact</span>
@@ -249,7 +328,7 @@ export function FixWithAIModal({
                 {changeRecord.beforeValue && (
                   <div>
                     <span className="text-[10px] font-mono uppercase text-[#8e8b82] block mb-1 font-bold">
-                      Current Live DOM Value (Before)
+                      Current Live Value (Before)
                     </span>
                     <div className="p-3 rounded-xl bg-red-50/50 border border-red-200/80 text-red-950 font-mono text-xs overflow-x-auto">
                       <code>{changeRecord.beforeValue}</code>
@@ -284,6 +363,32 @@ export function FixWithAIModal({
                   )}
                 </div>
 
+                {/* Target File Configuration (for GitHub Mode) */}
+                {activeGitHubConnection && (
+                  <div className="p-3.5 rounded-xl bg-[#faf9f5] border border-[#cc785c]/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-mono font-bold text-[#141413] flex items-center gap-1.5">
+                        <GitBranch size={13} className="text-[#cc785c]" />
+                        <span>Connected Repository: {activeGitHubConnection.repository_owner}/{activeGitHubConnection.repository_name}</span>
+                      </span>
+                      <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        Safe Branch Strategy Active
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <label className="text-[11px] text-[#6c6a64] whitespace-nowrap">Target File:</label>
+                      <input
+                        type="text"
+                        value={targetFilePath}
+                        onChange={(e) => setTargetFilePath(e.target.value)}
+                        placeholder="index.html, app/page.tsx, or header.php"
+                        className="flex-1 h-8 px-2.5 text-xs font-mono bg-white border border-[#e6dfd8] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#cc785c]"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {changeRecord.reason && (
                   <p className="text-xs text-[#6c6a64] font-sans pt-1">
                     <strong className="text-[#141413]">Why this matters: </strong>
@@ -293,6 +398,66 @@ export function FixWithAIModal({
               </div>
 
             </div>
+          ) : step === 'GITHUB_EXECUTING' ? (
+            <div className="py-12 space-y-4 max-w-md mx-auto font-mono text-xs">
+              <div className="text-center space-y-2 mb-6">
+                <RefreshCw className="animate-spin text-[#cc785c] mx-auto" size={32} />
+                <h4 className="font-serif text-base text-[#141413]">Creating Safe Pull Request on GitHub...</h4>
+              </div>
+
+              <div className="space-y-2.5 p-4 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
+                <div className="flex items-center gap-2 text-emerald-700">
+                  <Check size={14} className="shrink-0" />
+                  <span>1. Verified customer approval & file integrity</span>
+                </div>
+                <div className="flex items-center gap-2 text-emerald-700">
+                  <Check size={14} className="shrink-0" />
+                  <span>2. Created separate feature branch</span>
+                </div>
+                <div className="flex items-center gap-2 text-emerald-700">
+                  <Check size={14} className="shrink-0" />
+                  <span>3. Committed SEO changes</span>
+                </div>
+                <div className="flex items-center gap-2 text-[#cc785c] font-bold animate-pulse">
+                  <RefreshCw size={12} className="animate-spin shrink-0" />
+                  <span>4. Creating GitHub Pull Request...</span>
+                </div>
+              </div>
+            </div>
+          ) : step === 'PR_CREATED' && executionResult ? (
+            <div className="space-y-5">
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 space-y-2 text-center">
+                <CheckCheck size={36} className="text-emerald-600 mx-auto" />
+                <h4 className="font-serif font-bold text-base">Pull Request Created Successfully!</h4>
+                <p className="text-xs text-emerald-800 font-sans max-w-md mx-auto">
+                  Rankora created branch <strong className="font-mono">{executionResult.branch}</strong> and submitted Pull Request #{executionResult.pullRequestNumber}.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#181715] text-[#faf9f5] border border-[#252320] space-y-3 font-mono text-xs">
+                <div className="flex justify-between items-center pb-2 border-b border-[#252320]">
+                  <span className="text-[#a09d96]">Pull Request:</span>
+                  <span className="font-bold text-[#cc785c]">#{executionResult.pullRequestNumber}</span>
+                </div>
+                <div className="flex justify-between items-center pb-2 border-b border-[#252320]">
+                  <span className="text-[#a09d96]">Feature Branch:</span>
+                  <span className="text-white truncate max-w-[220px]">{executionResult.branch}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#a09d96]">Commit SHA:</span>
+                  <span className="text-emerald-400">{executionResult.commitSha.substring(0, 7)}</span>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#efe9de]/60 border border-[#e6dfd8] text-xs font-sans space-y-2">
+                <strong className="text-[#141413] block font-mono text-[11px] uppercase">Next Steps:</strong>
+                <ol className="list-decimal list-inside space-y-1 text-[#6c6a64]">
+                  <li>Review & Merge the Pull Request on GitHub.</li>
+                  <li>Wait for your CI/CD hosting pipeline (Vercel, Cloudflare, Netlify) to deploy.</li>
+                  <li>Click <strong className="text-[#141413]">"Re-Crawl & Verify Live Page"</strong> below to confirm live ranking signals.</li>
+                </ol>
+              </div>
+            </div>
           ) : step === 'APPLY_MANUAL' ? (
             <div className="space-y-4">
               <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 font-sans">
@@ -300,7 +465,7 @@ export function FixWithAIModal({
                 <div>
                   <strong className="block text-xs">Manual Deployment Package Ready</strong>
                   <span className="text-[11px] text-amber-800">
-                    No authorized CMS integration detected. Deploy the approved code below to your live website, then click "Verify Live Page".
+                    Deploy the approved code below to your live website, then click "Verify Live Page".
                   </span>
                 </div>
               </div>
@@ -373,7 +538,7 @@ export function FixWithAIModal({
           )}
         </div>
 
-        {/* Footer Actions */}
+        {/* Modal Footer Actions */}
         <div className="p-4 bg-[#efe9de] border-t border-[#e6dfd8] flex items-center justify-between">
           <Button
             variant="outline"
@@ -381,20 +546,66 @@ export function FixWithAIModal({
             onClick={onClose}
             className="border-[#e6dfd8] text-[#141413] hover:bg-[#e8e0d2] text-xs font-semibold"
           >
-            {step === 'RESULT' ? 'Close' : 'Cancel'}
+            {step === 'RESULT' || step === 'PR_CREATED' ? 'Close' : 'Cancel'}
           </Button>
 
           <div className="flex items-center gap-2">
-            {step === 'PREVIEW' && (
+            {step === 'PREVIEW' && activeGitHubConnection && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleApproveManual}
+                  disabled={loading}
+                  className="text-xs font-semibold"
+                >
+                  Manual Snippet
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleApproveAndCreatePR}
+                  disabled={loading}
+                  className="bg-[#141413] hover:bg-[#252320] text-[#faf9f5] flex items-center gap-1.5 text-xs font-semibold"
+                >
+                  <GitPullRequest size={13} className="text-[#cc785c]" />
+                  <span>Approve & Create Pull Request</span>
+                </Button>
+              </>
+            )}
+
+            {step === 'PREVIEW' && !activeGitHubConnection && (
               <Button
                 size="sm"
-                onClick={handleApprove}
+                onClick={handleApproveManual}
                 disabled={loading}
                 className="bg-[#141413] hover:bg-[#252320] text-[#faf9f5] flex items-center gap-1.5 text-xs font-semibold"
               >
                 <Check size={13} className="text-emerald-400" />
-                <span>Approve & Continue</span>
+                <span>Approve & Get Snippet</span>
               </Button>
+            )}
+
+            {step === 'PR_CREATED' && executionResult && (
+              <>
+                <a
+                  href={executionResult.pullRequestUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[#e6dfd8] bg-white hover:bg-[#efe9de] text-[#141413] text-xs font-semibold"
+                >
+                  <span>View PR on GitHub</span>
+                  <ExternalLink size={12} className="text-[#8e8b82]" />
+                </a>
+                <Button
+                  size="sm"
+                  onClick={handleVerify}
+                  disabled={loading}
+                  className="bg-[#141413] hover:bg-[#252320] text-[#faf9f5] flex items-center gap-1.5 text-xs font-semibold"
+                >
+                  <RefreshCw size={13} className={loading ? "animate-spin text-[#cc785c]" : "text-[#cc785c]"} />
+                  <span>Re-Crawl & Verify Live Page</span>
+                </Button>
+              </>
             )}
 
             {step === 'APPLY_MANUAL' && (

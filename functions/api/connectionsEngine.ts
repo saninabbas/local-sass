@@ -1,5 +1,5 @@
 import { githubProvider } from './providers/githubProvider';
-import type { RepositoryItem, BranchItem, TreeItem, FileContent } from './providers/types';
+import type { RepositoryItem, BranchItem, TreeItem, FileContent, PullRequestResult } from './providers/types';
 
 export interface ConnectionRecord {
   id: string;
@@ -125,4 +125,225 @@ export async function deleteConnection(db: any, userId: string, projectId: strin
   ).bind(connectionId, userId, projectId).run();
 
   return (res?.meta?.changes || 0) > 0;
+}
+
+// =========================================================================
+// PHASE 2: SAFE APPROVAL-BASED SEO CODE EXECUTION ENGINE
+// =========================================================================
+
+export async function executeGitHubSeoFix(
+  db: any,
+  userId: string,
+  projectId: string,
+  changeId: string,
+  options: {
+    targetFilePath?: string;
+    customCommitMessage?: string;
+  } = {}
+): Promise<{
+  success: boolean;
+  branch: string;
+  commitSha: string;
+  pullRequestNumber: number;
+  pullRequestUrl: string;
+  status: string;
+  message: string;
+}> {
+  // 1. Verify change ownership
+  const change: any = await db.prepare(
+    "SELECT * FROM seo_changes WHERE id = ? AND user_id = ? AND project_id = ?"
+  ).bind(changeId, userId, projectId).first();
+
+  if (!change) {
+    throw new Error("SEO Change record not found or access unauthorized");
+  }
+
+  // 2. Fetch project active GitHub connection
+  const conn = await getActiveGitHubConnection(db, userId, projectId);
+  if (!conn || !conn.auth_token) {
+    throw new Error("NOT_CONNECTED: No active GitHub connection found for this project");
+  }
+
+  const owner = conn.repository_owner;
+  const repo = conn.repository_name;
+  const baseBranch = conn.default_branch || 'main';
+  const token = conn.auth_token;
+
+  // Resolve target file path (default to index.html or targetFilePath or page.tsx)
+  const targetFilePath = options.targetFilePath || change.file_path || 'index.html';
+
+  // 3. Read current file to verify freshness (STALE_CHANGE guard)
+  const currentFile = await githubProvider.getFile(token, owner, repo, baseBranch, targetFilePath);
+  
+  // Stale check if initial_file_sha was stored
+  if (change.initial_file_sha && change.initial_file_sha !== currentFile.sha) {
+    await db.prepare("UPDATE seo_changes SET execution_status = 'STALE_CHANGE', updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(changeId).run();
+    throw new Error("STALE_CHANGE: The target file on GitHub was modified after this fix was generated. Please regenerate the fix.");
+  }
+
+  // 4. Create safe deterministic feature branch
+  const slug = (change.change_type || 'seo-fix').toLowerCase().replace(/[^a-z0-9]/g, '-');
+  const featureBranch = `rankora/seo-fix/${slug}-${changeId.substring(0, 8)}`;
+
+  await githubProvider.createBranch(token, owner, repo, baseBranch, featureBranch);
+
+  // 5. Apply fix in file content
+  let updatedContent = currentFile.content;
+  const beforeVal = (change.before_value || '').trim();
+  const afterVal = (change.after_value || '').trim();
+
+  if (beforeVal && updatedContent.includes(beforeVal)) {
+    updatedContent = updatedContent.replace(beforeVal, afterVal);
+  } else if (change.change_type === 'SEO_TITLE' && afterVal) {
+    if (/<title>.*?<\/title>/i.test(updatedContent)) {
+      updatedContent = updatedContent.replace(/<title>.*?<\/title>/i, `<title>${afterVal}</title>`);
+    } else {
+      updatedContent = updatedContent.replace(/<\/head>/i, `  <title>${afterVal}</title>\n</head>`);
+    }
+  } else if (change.change_type === 'META_DESCRIPTION' && afterVal) {
+    if (/<meta\s+name=["']description["'][^>]*>/i.test(updatedContent)) {
+      updatedContent = updatedContent.replace(/<meta\s+name=["']description["'][^>]*>/i, `<meta name="description" content="${afterVal}">`);
+    } else {
+      updatedContent = updatedContent.replace(/<\/head>/i, `  <meta name="description" content="${afterVal}">\n</head>`);
+    }
+  } else if (change.change_type === 'LOCALBUSINESS_SCHEMA' && afterVal) {
+    updatedContent = updatedContent.replace(/<\/body>/i, `  ${afterVal}\n</body>`);
+  } else {
+    updatedContent = updatedContent.includes(beforeVal) ? updatedContent.replace(beforeVal, afterVal) : updatedContent;
+  }
+
+  // 6. Commit the file update
+  const commitMsg = options.customCommitMessage || `Rankora SEO Fix: ${change.change_type} (${changeId.substring(0, 8)})`;
+  const commitResult = await githubProvider.updateFile(
+    token,
+    owner,
+    repo,
+    featureBranch,
+    targetFilePath,
+    updatedContent,
+    commitMsg,
+    currentFile.sha
+  );
+
+  // 7. Create Pull Request
+  const prTitle = `Rankora SEO Fix: ${change.change_type.replace(/_/g, ' ')}`;
+  const prBody = `## 🚀 Rankora SEO Fix
+
+**Project:** ${projectId}
+**Change Type:** ${change.change_type}
+**File:** \`${targetFilePath}\`
+
+### 📋 Before
+\`\`\`html
+${beforeVal || '(No existing value)'}
+\`\`\`
+
+### ✨ After (Proposed)
+\`\`\`html
+${afterVal}
+\`\`\`
+
+---
+*Generated automatically by Rankora SEO Operating System.*
+*Live DOM verification will be triggered automatically upon merging this Pull Request.*`;
+
+  const prResult = await githubProvider.createPullRequest(
+    token,
+    owner,
+    repo,
+    baseBranch,
+    featureBranch,
+    prTitle,
+    prBody
+  );
+
+  // 8. Update D1 seo_changes record
+  await db.prepare(`
+    UPDATE seo_changes 
+    SET repository_owner = ?, repository_name = ?, base_branch = ?, feature_branch = ?, file_path = ?, commit_sha = ?, pull_request_number = ?, pull_request_url = ?, approval_status = 'APPROVED', execution_status = 'PR_CREATED', provider = 'GITHUB', updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND user_id = ?
+  `).bind(
+    owner,
+    repo,
+    baseBranch,
+    featureBranch,
+    targetFilePath,
+    commitResult.commitSha,
+    prResult.number,
+    prResult.htmlUrl,
+    changeId,
+    userId
+  ).run();
+
+  // 9. Log execution event
+  await db.prepare(`
+    INSERT INTO execution_events (id, user_id, project_id, change_id, event_type, event_payload, created_at)
+    VALUES (?, ?, ?, ?, 'GITHUB_PR_CREATED', ?, CURRENT_TIMESTAMP)
+  `).bind(
+    `evt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    userId,
+    projectId,
+    changeId,
+    JSON.stringify({
+      prNumber: prResult.number,
+      prUrl: prResult.htmlUrl,
+      branch: featureBranch,
+      commitSha: commitResult.commitSha
+    })
+  ).run().catch(() => {});
+
+  return {
+    success: true,
+    branch: featureBranch,
+    commitSha: commitResult.commitSha,
+    pullRequestNumber: prResult.number,
+    pullRequestUrl: prResult.htmlUrl,
+    status: 'PR_CREATED',
+    message: `Pull Request #${prResult.number} created successfully on branch '${featureBranch}'.`
+  };
+}
+
+export async function checkGitHubPullRequestStatus(
+  db: any,
+  userId: string,
+  projectId: string,
+  changeId: string
+): Promise<{
+  merged: boolean;
+  state: string;
+  pullRequestUrl: string;
+  pullRequestNumber: number;
+}> {
+  const change: any = await db.prepare(
+    "SELECT * FROM seo_changes WHERE id = ? AND user_id = ? AND project_id = ?"
+  ).bind(changeId, userId, projectId).first();
+
+  if (!change || !change.pull_request_number) {
+    throw new Error("Change record has no associated Pull Request");
+  }
+
+  const conn = await getActiveGitHubConnection(db, userId, projectId);
+  if (!conn || !conn.auth_token) {
+    throw new Error("NOT_CONNECTED: No active GitHub connection");
+  }
+
+  const pr = await githubProvider.getPullRequest(
+    conn.auth_token,
+    change.repository_owner || conn.repository_owner,
+    change.repository_name || conn.repository_name,
+    change.pull_request_number
+  );
+
+  if (pr.merged && change.execution_status !== 'MERGED' && change.execution_status !== 'VERIFIED') {
+    await db.prepare(
+      "UPDATE seo_changes SET execution_status = 'MERGED', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+    ).bind(changeId).run();
+  }
+
+  return {
+    merged: pr.merged || false,
+    state: pr.state,
+    pullRequestUrl: pr.htmlUrl,
+    pullRequestNumber: pr.number
+  };
 }

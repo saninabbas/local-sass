@@ -366,4 +366,19 @@ export async function getGitHubFile(owner: string, repo: string, branch: string,
   return fetchApi(`/api/github/file?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&branch=${encodeURIComponent(branch)}&path=${encodeURIComponent(path)}${tokenParam}`);
 }
 
+// -----------------------------------------------------------------------------
+// PHASE 2: GITHUB APPROVED FIX & PULL REQUEST ENGINE
+// -----------------------------------------------------------------------------
+export async function executeSeoFixViaGitHub(changeId: string, options: { targetFilePath?: string; customCommitMessage?: string } = {}): Promise<any> {
+  return fetchApi(`/api/seo/changes/${changeId}/execute`, {
+    method: 'POST',
+    body: JSON.stringify(options)
+  });
+}
+
+export async function checkPullRequestStatus(changeId: string): Promise<any> {
+  return fetchApi(`/api/seo/changes/${changeId}/pr-status`);
+}
+
+
 

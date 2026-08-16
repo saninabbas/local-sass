@@ -4,7 +4,9 @@ import {
   getProjectConnections, 
   saveGitHubConnection, 
   deleteConnection, 
-  getActiveGitHubConnection 
+  getActiveGitHubConnection,
+  executeGitHubSeoFix,
+  checkGitHubPullRequestStatus
 } from './connectionsEngine';
 import { githubProvider } from './providers/githubProvider';
 
@@ -589,6 +591,15 @@ export const onRequest = async (context: any) => {
         await db.prepare("ALTER TABLE seo_changes ADD COLUMN applied_at DATETIME").run().catch(() => {});
         await db.prepare("ALTER TABLE seo_changes ADD COLUMN verification_evidence TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE seo_changes ADD COLUMN rollback_available INTEGER DEFAULT 0").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN repository_owner TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN repository_name TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN base_branch TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN feature_branch TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN file_path TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN commit_sha TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN pull_request_number INTEGER").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN pull_request_url TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE seo_changes ADD COLUMN initial_file_sha TEXT").run().catch(() => {});
 
         await db.prepare(`CREATE TABLE IF NOT EXISTS project_integrations (
           id TEXT PRIMARY KEY,
@@ -5180,6 +5191,173 @@ export const onRequest = async (context: any) => {
           return jsonResponse({ success: true, data: fileData });
         } catch (err: any) {
           return errorResponse(err.message || "Failed to read file", 400);
+        }
+      }
+
+      // =========================================================================
+      // PHASE 2: GITHUB APPROVED FIX & PULL REQUEST ENGINE
+      // =========================================================================
+
+      // POST /api/seo/changes/:id/execute — Execute approved fix $\to$ Branch $\to$ Commit $\to$ Pull Request
+      if (url.pathname.startsWith('/api/seo/changes/') && url.pathname.endsWith('/execute') && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const changeId = url.pathname.replace('/api/seo/changes/', '').replace('/execute', '');
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const payload = await request.json().catch(() => ({})) as any;
+
+        try {
+          const result = await executeGitHubSeoFix(env.DB, user.id, business.id, changeId, {
+            targetFilePath: payload.targetFilePath,
+            customCommitMessage: payload.customCommitMessage
+          });
+
+          return jsonResponse({ success: true, data: result });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to execute GitHub SEO fix", 400);
+        }
+      }
+
+      // GET /api/seo/changes/:id/pr-status — Check GitHub PR merge status
+      if (url.pathname.startsWith('/api/seo/changes/') && url.pathname.endsWith('/pr-status') && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const changeId = url.pathname.replace('/api/seo/changes/', '').replace('/pr-status', '');
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        try {
+          const prStatus = await checkGitHubPullRequestStatus(env.DB, user.id, business.id, changeId);
+          return jsonResponse({ success: true, data: prStatus });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to check PR status", 400);
+        }
+      }
+
+      // POST /api/github/branches — Create a new branch
+      if (url.pathname === '/api/github/branches' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const token = (await getActiveGitHubConnection(env.DB, user.id, business.id))?.auth_token || env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN;
+        if (!token) return errorResponse("NOT_CONNECTED: No active GitHub connection", 400);
+
+        try {
+          const branchRes = await githubProvider.createBranch(
+            token,
+            payload.owner,
+            payload.repo,
+            payload.baseBranch || 'main',
+            payload.newBranch
+          );
+          return jsonResponse({ success: true, data: branchRes });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to create branch", 400);
+        }
+      }
+
+      // POST /api/github/files/update — Update a file
+      if (url.pathname === '/api/github/files/update' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const token = (await getActiveGitHubConnection(env.DB, user.id, business.id))?.auth_token || env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN;
+        if (!token) return errorResponse("NOT_CONNECTED: No active GitHub connection", 400);
+
+        try {
+          const updateRes = await githubProvider.updateFile(
+            token,
+            payload.owner,
+            payload.repo,
+            payload.branch,
+            payload.path,
+            payload.content,
+            payload.commitMessage || 'Rankora SEO update',
+            payload.previousSha
+          );
+          return jsonResponse({ success: true, data: updateRes });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to update file", 400);
+        }
+      }
+
+      // POST /api/github/pull-requests — Create a Pull Request
+      if (url.pathname === '/api/github/pull-requests' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const token = (await getActiveGitHubConnection(env.DB, user.id, business.id))?.auth_token || env.GITHUB_APP_TOKEN || env.GITHUB_TOKEN;
+        if (!token) return errorResponse("NOT_CONNECTED: No active GitHub connection", 400);
+
+        try {
+          const prRes = await githubProvider.createPullRequest(
+            token,
+            payload.owner,
+            payload.repo,
+            payload.baseBranch || 'main',
+            payload.headBranch,
+            payload.title,
+            payload.body
+          );
+          return jsonResponse({ success: true, data: prRes });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to create Pull Request", 400);
         }
       }
 

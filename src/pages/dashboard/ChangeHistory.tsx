@@ -232,6 +232,34 @@ export const ChangeHistory: React.FC = () => {
               </span>
             </div>
 
+            {/* GitHub Pull Request Metadata (if GitHub provider) */}
+            {selectedChange.pull_request_url && (
+              <div className="p-4 rounded-2xl bg-[#faf9f5] border border-[#cc785c]/40 space-y-2.5 font-mono text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#8e8b82] uppercase text-[10px] font-bold">GitHub Code Execution:</span>
+                  <a
+                    href={selectedChange.pull_request_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[#cc785c] hover:underline font-bold inline-flex items-center gap-1"
+                  >
+                    <span>View PR #{selectedChange.pull_request_number}</span>
+                    <ExternalLink size={12} />
+                  </a>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                  <div>
+                    <span className="text-[#8e8b82] block">Feature Branch:</span>
+                    <span className="text-[#141413] font-bold truncate block">{selectedChange.feature_branch || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[#8e8b82] block">Target File:</span>
+                    <span className="text-[#141413] font-bold truncate block">{selectedChange.file_path || 'index.html'}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Before vs After Diff */}
             <div className="space-y-3">
               <h4 className="font-mono text-xs font-bold uppercase text-[#141413] flex items-center gap-1.5">

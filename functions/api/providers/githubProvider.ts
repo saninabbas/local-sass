@@ -1,4 +1,4 @@
-import type { WebsiteProvider, RepositoryItem, BranchItem, TreeItem, FileContent } from './types';
+import type { WebsiteProvider, RepositoryItem, BranchItem, TreeItem, FileContent, PullRequestResult } from './types';
 
 export class GitHubProvider implements WebsiteProvider {
   readonly providerName = 'github';
@@ -71,7 +71,6 @@ export class GitHubProvider implements WebsiteProvider {
   }
 
   async getTree(token: string, owner: string, repo: string, branch: string, path?: string): Promise<TreeItem[]> {
-    // If a subpath is provided, fetch via contents API, otherwise fetch git tree
     if (path && path.trim() !== '') {
       const cleanPath = path.replace(/^\//, '');
       const contents: any = await this.fetchGitHub(
@@ -90,7 +89,6 @@ export class GitHubProvider implements WebsiteProvider {
       return [];
     }
 
-    // Root git tree
     const treeData: any = await this.fetchGitHub(
       `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}`,
       token
@@ -136,6 +134,140 @@ export class GitHubProvider implements WebsiteProvider {
       encoding: 'utf-8',
       sha: data.sha,
       size: data.size || decodedContent.length
+    };
+  }
+
+  // =========================================================================
+  // PHASE 2 WRITE METHODS (SAFE SEPARATE FEATURE BRANCHES)
+  // =========================================================================
+
+  async createBranch(token: string, owner: string, repo: string, baseBranch: string, newBranch: string): Promise<{ ref: string; sha: string }> {
+    // 1. Get base branch commit SHA
+    const baseRefData: any = await this.fetchGitHub(
+      `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(baseBranch)}`,
+      token
+    );
+
+    const baseSha = baseRefData.object?.sha;
+    if (!baseSha) {
+      throw new Error(`Failed to resolve base commit SHA for branch '${baseBranch}'`);
+    }
+
+    // Clean branch name
+    const safeBranchName = newBranch.replace(/^refs\/heads\//, '');
+
+    // 2. Create new branch reference
+    const createRefRes: any = await this.fetchGitHub(
+      `https://api.github.com/repos/${owner}/${repo}/git/refs`,
+      token,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ref: `refs/heads/${safeBranchName}`,
+          sha: baseSha
+        })
+      }
+    );
+
+    return {
+      ref: createRefRes.ref,
+      sha: createRefRes.object?.sha || baseSha
+    };
+  }
+
+  async updateFile(
+    token: string,
+    owner: string,
+    repo: string,
+    branch: string,
+    path: string,
+    content: string,
+    commitMessage: string,
+    previousSha?: string
+  ): Promise<{ commitSha: string; contentSha: string }> {
+    const cleanPath = path.replace(/^\//, '');
+
+    let fileSha = previousSha;
+    if (!fileSha) {
+      const currentFile = await this.getFile(token, owner, repo, branch, cleanPath);
+      fileSha = currentFile.sha;
+    }
+
+    // Convert UTF-8 content to base64
+    const utf8Bytes = new TextEncoder().encode(content);
+    let binaryStr = '';
+    for (let i = 0; i < utf8Bytes.length; i++) {
+      binaryStr += String.fromCharCode(utf8Bytes[i]);
+    }
+    const base64Content = btoa(binaryStr);
+
+    const res: any = await this.fetchGitHub(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${cleanPath}`,
+      token,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: commitMessage,
+          content: base64Content,
+          branch: branch,
+          sha: fileSha
+        })
+      }
+    );
+
+    return {
+      commitSha: res.commit?.sha || '',
+      contentSha: res.content?.sha || ''
+    };
+  }
+
+  async createPullRequest(
+    token: string,
+    owner: string,
+    repo: string,
+    baseBranch: string,
+    headBranch: string,
+    title: string,
+    body: string
+  ): Promise<PullRequestResult> {
+    const res: any = await this.fetchGitHub(
+      `https://api.github.com/repos/${owner}/${repo}/pulls`,
+      token,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          head: headBranch,
+          base: baseBranch,
+          body
+        })
+      }
+    );
+
+    return {
+      number: res.number,
+      htmlUrl: res.html_url,
+      id: res.id,
+      state: res.state,
+      merged: false
+    };
+  }
+
+  async getPullRequest(token: string, owner: string, repo: string, pullNumber: number): Promise<PullRequestResult> {
+    const res: any = await this.fetchGitHub(
+      `https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}`,
+      token
+    );
+
+    return {
+      number: res.number,
+      htmlUrl: res.html_url,
+      id: res.id,
+      state: res.state,
+      merged: Boolean(res.merged)
     };
   }
 }
