@@ -47,14 +47,16 @@ export const Billing: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           planType: plan,
-          productId: plan === 'growth' ? '7594755d-5580-4b77-86ae-90baae0e20d8' : 'pro_package_id'
+          productId: '7594755d-5580-4b77-86ae-90baae0e20d8'
         })
       });
 
-      if (res.success && res.data?.url) {
-        window.location.href = res.data.url;
+      const checkoutUrl = typeof res === 'string' ? res : (res?.url || res?.checkoutUrl || res?.data?.url);
+
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
       } else {
-        alert(res.error || 'Failed to initiate checkout session.');
+        alert(res?.error || 'Failed to initiate checkout session.');
       }
     } catch (err: any) {
       alert(err.message || 'Checkout failed.');

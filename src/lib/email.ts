@@ -4,8 +4,8 @@
 export async function sendVerificationEmail(email: string, token: string, env: any) {
   const apiKey = env.SENDGRID_API_KEY;
   if (!apiKey) {
-    console.warn('SENDGRID_API_KEY not set – skipping email send');
-    return;
+    console.warn('EMAIL_PROVIDER_NOT_CONFIGURED: SENDGRID_API_KEY is not set in environment variables');
+    return { success: false, status: 'EMAIL_PROVIDER_NOT_CONFIGURED' };
   }
 
   const baseUrl = env.BASE_URL || 'https://local-sass.pages.dev';

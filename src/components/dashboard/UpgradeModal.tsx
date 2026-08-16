@@ -35,11 +35,11 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
         body: JSON.stringify({ plan: 'growth' })
       });
 
-      const targetUrl = res.data?.url || res.checkoutUrl;
-      if (res.success && targetUrl) {
+      const targetUrl = typeof res === 'string' ? res : (res?.url || res?.checkoutUrl || res?.data?.url);
+      if (targetUrl) {
         window.location.href = targetUrl;
       } else {
-        alert(res.error || 'Failed to initiate checkout. Please try again.');
+        alert(res?.error || 'Failed to initiate checkout. Please try again.');
       }
     } catch (err: any) {
       alert(err.message || 'Checkout initiation failed.');

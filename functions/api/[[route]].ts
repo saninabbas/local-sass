@@ -2879,20 +2879,19 @@ export const onRequest = async (context: any) => {
         if (!user) return errorResponse("Unauthorized", 401);
 
         const payload = await request.json() as any;
-        const productId = payload.productId || payload.product_id;
         const planType = payload.planType || payload.plan || 'growth';
 
         const polarToken = env.POLAR_ACCESS_TOKEN || (env as any).POLAR_API_KEY || (env as any).POLAR_TOKEN;
-        const targetProductId = productId || (planType === 'growth' ? '7594755d-5580-4b77-86ae-90baae0e20d8' : 'pro_package_id');
 
         if (!polarToken) {
-          const fallbackUrl = `https://polar.sh/checkout/${targetProductId}?customer_email=${encodeURIComponent(user.email)}`;
-          return jsonResponse({ 
-            success: true, 
-            checkoutUrl: fallbackUrl,
-            data: { url: fallbackUrl } 
-          });
+          return jsonResponse({
+            success: false,
+            error: "POLAR_ACCESS_TOKEN is missing in Cloudflare environment variables."
+          }, 400);
         }
+
+        const envProductId = (env as any).POLAR_PRODUCT_ID || (env as any).POLAR_GROWTH_PRODUCT_ID;
+        const targetProductId = payload.productId || payload.product_id || envProductId || '7594755d-5580-4b77-86ae-90baae0e20d8';
 
         try {
           const polarRes = await fetch('https://api.polar.sh/v1/checkouts/', {
@@ -2915,25 +2914,25 @@ export const onRequest = async (context: any) => {
 
           if (!polarRes.ok) {
             const errorText = await polarRes.text();
-            console.error("Polar API error:", errorText);
-            const fallbackUrl = `https://polar.sh/checkout/${targetProductId}?customer_email=${encodeURIComponent(user.email)}`;
-            return jsonResponse({ 
-              success: true, 
-              checkoutUrl: fallbackUrl,
-              data: { url: fallbackUrl } 
-            });
+            console.error("Polar API Error:", polarRes.status, errorText);
+            return jsonResponse({
+              success: false,
+              error: `Polar API Error (${polarRes.status}): ${errorText}`
+            }, 400);
           }
 
           const checkoutData = await polarRes.json() as any;
           const checkoutUrl = checkoutData.url || checkoutData.checkout_url;
           return jsonResponse({ 
             success: true, 
-            checkoutUrl: checkoutUrl,
             data: { url: checkoutUrl } 
           });
         } catch (e: any) {
-          console.error("Polar fetch error:", e);
-          return errorResponse("Failed to communicate with billing provider", 500);
+          console.error("Polar API call error:", e);
+          return jsonResponse({
+            success: false,
+            error: "Failed to connect to Polar API: " + e.message
+          }, 500);
         }
       }
 
