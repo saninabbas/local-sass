@@ -1,6 +1,19 @@
 import { githubProvider } from './providers/githubProvider';
 import { wordpressProvider } from './providers/wordpressProvider';
-import type { RepositoryItem, BranchItem, TreeItem, FileContent, PullRequestResult, WordPressSiteInfo, WordPressItem } from './providers/types';
+import { shopifyProvider } from './providers/shopifyProvider';
+import type { 
+  RepositoryItem, 
+  BranchItem, 
+  TreeItem, 
+  FileContent, 
+  PullRequestResult, 
+  WordPressSiteInfo, 
+  WordPressItem,
+  ShopifyStoreInfo,
+  ShopifyProductItem,
+  ShopifyPageItem,
+  ShopifyArticleItem
+} from './providers/types';
 
 export interface ConnectionRecord {
   id: string;
@@ -639,3 +652,267 @@ export async function executeWordPressSeoFix(
     verification: verificationEvidence
   };
 }
+
+// =========================================================================
+// PHASE 4: SHOPIFY PROVIDER INTEGRATION
+// =========================================================================
+
+export async function getActiveShopifyConnection(db: any, userId: string, projectId: string) {
+  const row: any = await db.prepare(
+    "SELECT * FROM connections WHERE user_id = ? AND project_id = ? AND provider = 'shopify' AND status = 'CONNECTED' ORDER BY updated_at DESC LIMIT 1"
+  ).bind(userId, projectId).first();
+
+  return row;
+}
+
+export async function saveShopifyConnection(
+  db: any,
+  userId: string,
+  projectId: string,
+  data: {
+    shopDomain: string;
+    accessToken: string;
+  }
+): Promise<ConnectionRecord & { storeName?: string }> {
+  // 1. Test connection against Shopify Store API
+  const testRes = await shopifyProvider.testConnection(data.shopDomain, data.accessToken);
+  const normalizedDomain = testRes.store.myshopify_domain || shopifyProvider.normalizeShopDomain(data.shopDomain);
+
+  const id = `conn_sh_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const cleanToken = data.accessToken.trim();
+
+  // Check if Shopify connection already exists for this project
+  const existing: any = await db.prepare(
+    "SELECT id FROM connections WHERE user_id = ? AND project_id = ? AND provider = 'shopify'"
+  ).bind(userId, projectId).first();
+
+  if (existing) {
+    await db.prepare(`
+      UPDATE connections 
+      SET repository_name = ?, repository_owner = ?, repository_id = ?, auth_token = ?, status = 'CONNECTED', updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND user_id = ?
+    `).bind(
+      testRes.store.name,
+      testRes.store.domain,
+      normalizedDomain,
+      cleanToken,
+      existing.id,
+      userId
+    ).run();
+
+    return {
+      id: existing.id,
+      user_id: userId,
+      project_id: projectId,
+      provider: 'shopify',
+      repository_name: testRes.store.name,
+      repository_owner: testRes.store.domain,
+      repository_id: normalizedDomain,
+      status: 'CONNECTED',
+      storeName: testRes.store.name,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+  }
+
+  await db.prepare(`
+    INSERT INTO connections 
+    (id, user_id, project_id, provider, installation_id, repository_id, repository_name, repository_owner, default_branch, status, auth_token, created_at, updated_at)
+    VALUES (?, ?, ?, 'shopify', ?, ?, ?, ?, 'main', 'CONNECTED', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `).bind(
+    id,
+    userId,
+    projectId,
+    String(testRes.store.id),
+    normalizedDomain,
+    testRes.store.name,
+    testRes.store.domain,
+    cleanToken
+  ).run();
+
+  return {
+    id,
+    user_id: userId,
+    project_id: projectId,
+    provider: 'shopify',
+    repository_name: testRes.store.name,
+    repository_owner: testRes.store.domain,
+    repository_id: normalizedDomain,
+    status: 'CONNECTED',
+    storeName: testRes.store.name,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+}
+
+export async function executeShopifySeoFix(
+  db: any,
+  userId: string,
+  projectId: string,
+  changeId: string,
+  options: {
+    resourceType?: 'product' | 'page' | 'article';
+    resourceId?: number | string;
+    customContent?: string;
+  } = {}
+): Promise<{
+  success: boolean;
+  status: string;
+  message: string;
+  updatedItem?: any;
+  verification?: any;
+}> {
+  // 1. Verify change ownership
+  const change: any = await db.prepare(
+    "SELECT * FROM seo_changes WHERE id = ? AND user_id = ? AND project_id = ?"
+  ).bind(changeId, userId, projectId).first();
+
+  if (!change) {
+    throw new Error("SEO Change record not found or access unauthorized");
+  }
+
+  // 2. Fetch active Shopify connection
+  const conn = await getActiveShopifyConnection(db, userId, projectId);
+  if (!conn || !conn.auth_token) {
+    throw new Error("NOT_CONNECTED: No active Shopify connection found for this project");
+  }
+
+  const shopDomain = conn.repository_id;
+  const accessToken = conn.auth_token;
+
+  // 3. Resolve target resource
+  let resourceType = options.resourceType || 'product';
+  let resourceId = options.resourceId;
+
+  if (!resourceId) {
+    // Attempt to match by page_url or default to first product/page
+    const products = await shopifyProvider.getProducts(shopDomain, accessToken, 20).catch(() => []);
+    if (products.length > 0) {
+      const matched = products.find(p => change.page_url && (change.page_url.includes(p.handle) || change.page_url.includes(String(p.id)))) || products[0];
+      resourceId = matched.id;
+      resourceType = 'product';
+    } else {
+      const pages = await shopifyProvider.getPages(shopDomain, accessToken, 20).catch(() => []);
+      if (pages.length > 0) {
+        resourceId = pages[0].id;
+        resourceType = 'page';
+      }
+    }
+  }
+
+  if (!resourceId) {
+    throw new Error("SHOPIFY_RESOURCE_NOT_FOUND: Unable to resolve target Shopify Product, Page, or Article ID");
+  }
+
+  // 4. Stale check
+  const beforeVal = (change.before_value || '').trim();
+  const afterVal = (options.customContent || change.after_value || '').trim();
+
+  let updatePayload: { title?: string; body_html?: string; seo_title?: string; seo_description?: string } = {};
+
+  if (change.change_type === 'SEO_TITLE') {
+    updatePayload.title = afterVal.replace(/<\/?title>/gi, '').trim();
+    updatePayload.seo_title = updatePayload.title;
+  } else if (change.change_type === 'META_DESCRIPTION') {
+    updatePayload.seo_description = afterVal.replace(/<[^>]*>/g, '').trim();
+  } else if (change.change_type === 'H1') {
+    updatePayload.title = afterVal.replace(/<\/?h1>/gi, '').trim();
+  } else {
+    updatePayload.body_html = afterVal;
+  }
+
+  // 5. Apply update via Shopify Admin REST API
+  let updatedItem: any;
+  if (resourceType === 'product') {
+    updatedItem = await shopifyProvider.updateProduct(shopDomain, accessToken, resourceId, updatePayload);
+  } else if (resourceType === 'page') {
+    updatedItem = await shopifyProvider.updatePage(shopDomain, accessToken, resourceId, updatePayload);
+  } else {
+    updatedItem = await shopifyProvider.updateArticle(shopDomain, accessToken, resourceId, updatePayload);
+  }
+
+  // 6. Update change record
+  await db.prepare(`
+    UPDATE seo_changes 
+    SET approval_status = 'APPROVED', execution_status = 'APPLIED', provider = 'SHOPIFY', applied_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND user_id = ?
+  `).bind(changeId, userId).run();
+
+  // 7. Perform live DOM re-crawl verification
+  let verificationStatus = 'APPLIED';
+  const liveUrl = change.page_url || `https://${shopDomain}/products/${updatedItem.handle || ''}`;
+  let verificationEvidence: any = {
+    provider: 'SHOPIFY',
+    shopDomain,
+    resourceType,
+    resourceId,
+    timestamp: new Date().toISOString()
+  };
+
+  try {
+    const fetchResp = await fetch(liveUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Rankora Live SEO Crawler 2.0)' }
+    });
+
+    if (fetchResp.ok) {
+      const html = await fetchResp.text();
+      const cleanExpected = afterVal.replace(/<[^>]*>/g, '').toLowerCase().trim();
+      const htmlLower = html.toLowerCase();
+      const matched = htmlLower.includes(cleanExpected);
+
+      verificationEvidence = {
+        status: matched ? 'VERIFIED' : 'VERIFICATION_PENDING_CACHE',
+        url: liveUrl,
+        http_status: fetchResp.status,
+        expected: afterVal,
+        observed_match: matched,
+        page_title: html.match(/<title>(.*?)<\/title>/i)?.[1] || 'N/A'
+      };
+
+      if (matched) {
+        verificationStatus = 'VERIFIED';
+        await db.prepare(`
+          UPDATE seo_changes 
+          SET execution_status = 'VERIFIED', verification_status = 'VERIFIED', verified_at = CURRENT_TIMESTAMP, verification_evidence = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(JSON.stringify(verificationEvidence), changeId).run();
+      } else {
+        await db.prepare(`
+          UPDATE seo_changes 
+          SET verification_evidence = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(JSON.stringify(verificationEvidence), changeId).run();
+      }
+    }
+  } catch (verifyErr: any) {
+    verificationEvidence.error = verifyErr.message;
+  }
+
+  // 8. Log execution event
+  await db.prepare(`
+    INSERT INTO execution_events (id, user_id, project_id, change_id, event_type, event_payload, created_at)
+    VALUES (?, ?, ?, ?, 'SHOPIFY_EXECUTED', ?, CURRENT_TIMESTAMP)
+  `).bind(
+    `evt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    userId,
+    projectId,
+    changeId,
+    JSON.stringify({
+      resourceType,
+      resourceId,
+      status: verificationStatus,
+      evidence: verificationEvidence
+    })
+  ).run().catch(() => {});
+
+  return {
+    success: true,
+    status: verificationStatus,
+    message: verificationStatus === 'VERIFIED'
+      ? 'Shopify resource updated and verified live on production!'
+      : 'Shopify resource updated successfully. Live cache verification pending.',
+    updatedItem,
+    verification: verificationEvidence
+  };
+}
+

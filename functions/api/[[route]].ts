@@ -9,10 +9,15 @@ import {
   checkGitHubPullRequestStatus,
   saveWordPressConnection,
   getActiveWordPressConnection,
-  executeWordPressSeoFix
+  executeWordPressSeoFix,
+  saveShopifyConnection,
+  getActiveShopifyConnection,
+  executeShopifySeoFix
 } from './connectionsEngine';
 import { githubProvider } from './providers/githubProvider';
 import { wordpressProvider } from './providers/wordpressProvider';
+import { shopifyProvider } from './providers/shopifyProvider';
+import { routeApprovedSeoFix } from './providers/providerRouter';
 
 export interface Env {
   DB: D1Database;
@@ -5667,6 +5672,362 @@ export const onRequest = async (context: any) => {
           return jsonResponse({ success: true, data: result });
         } catch (err: any) {
           return errorResponse(err.message || "Failed to execute WordPress SEO fix", 400);
+        }
+      }
+
+      // =========================================================================
+      // PHASE 4: SHOPIFY REST API & UNIVERSAL SEO EXECUTION ENGINE
+      // =========================================================================
+
+      // POST /api/connections/shopify — Connect Shopify Store
+      if (url.pathname === '/api/connections/shopify' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        if (!payload.shopDomain || !payload.accessToken) {
+          return errorResponse("Missing required fields: shopDomain and accessToken", 400);
+        }
+
+        try {
+          const conn = await saveShopifyConnection(env.DB, user.id, business.id, {
+            shopDomain: payload.shopDomain,
+            accessToken: payload.accessToken
+          });
+
+          return jsonResponse({ success: true, message: "Shopify connected successfully", data: conn });
+        } catch (err: any) {
+          return errorResponse(err.message || "Shopify connection test failed", 400);
+        }
+      }
+
+      // POST /api/shopify/test — Dry-run connectivity test
+      if (url.pathname === '/api/shopify/test' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        if (!payload.shopDomain || !payload.accessToken) {
+          return errorResponse("Missing required fields: shopDomain and accessToken", 400);
+        }
+
+        try {
+          const testRes = await shopifyProvider.testConnection(payload.shopDomain, payload.accessToken);
+          return jsonResponse({ success: true, data: testRes });
+        } catch (err: any) {
+          return errorResponse(err.message || "Shopify connection test failed", 400);
+        }
+      }
+
+      // GET /api/shopify/store — Retrieve Shopify Store details
+      if (url.pathname === '/api/shopify/store' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const conn = await getActiveShopifyConnection(env.DB, user.id, business.id);
+        if (!conn || !conn.auth_token) {
+          return errorResponse("NOT_CONNECTED: No active Shopify connection found for this project", 400);
+        }
+
+        try {
+          const storeInfo = await shopifyProvider.getStoreInfo(conn.repository_id, conn.auth_token);
+          return jsonResponse({ success: true, data: storeInfo });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to retrieve Shopify store info", 400);
+        }
+      }
+
+      // GET /api/shopify/products — Retrieve Shopify Products
+      if (url.pathname === '/api/shopify/products' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const conn = await getActiveShopifyConnection(env.DB, user.id, business.id);
+        if (!conn || !conn.auth_token) return errorResponse("NOT_CONNECTED: No active Shopify connection found", 400);
+
+        try {
+          const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+          const products = await shopifyProvider.getProducts(conn.repository_id, conn.auth_token, limit);
+          return jsonResponse({ success: true, data: products });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to retrieve Shopify products", 400);
+        }
+      }
+
+      // GET /api/shopify/products/:id — Retrieve single Product
+      if (url.pathname.startsWith('/api/shopify/products/') && !url.pathname.endsWith('/update') && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const productId = url.pathname.replace('/api/shopify/products/', '');
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const conn = await getActiveShopifyConnection(env.DB, user.id, business.id);
+        if (!conn || !conn.auth_token) return errorResponse("NOT_CONNECTED: No active Shopify connection", 400);
+
+        try {
+          const product = await shopifyProvider.getProduct(conn.repository_id, conn.auth_token, productId);
+          return jsonResponse({ success: true, data: product });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to retrieve Shopify product", 400);
+        }
+      }
+
+      // GET /api/shopify/pages — Retrieve Shopify Pages
+      if (url.pathname === '/api/shopify/pages' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const conn = await getActiveShopifyConnection(env.DB, user.id, business.id);
+        if (!conn || !conn.auth_token) return errorResponse("NOT_CONNECTED: No active Shopify connection", 400);
+
+        try {
+          const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+          const pages = await shopifyProvider.getPages(conn.repository_id, conn.auth_token, limit);
+          return jsonResponse({ success: true, data: pages });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to retrieve Shopify pages", 400);
+        }
+      }
+
+      // GET /api/shopify/pages/:id — Retrieve single Page
+      if (url.pathname.startsWith('/api/shopify/pages/') && !url.pathname.endsWith('/update') && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const pageId = url.pathname.replace('/api/shopify/pages/', '');
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const conn = await getActiveShopifyConnection(env.DB, user.id, business.id);
+        if (!conn || !conn.auth_token) return errorResponse("NOT_CONNECTED: No active Shopify connection", 400);
+
+        try {
+          const page = await shopifyProvider.getPage(conn.repository_id, conn.auth_token, pageId);
+          return jsonResponse({ success: true, data: page });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to retrieve Shopify page", 400);
+        }
+      }
+
+      // GET /api/shopify/articles — Retrieve Shopify Articles
+      if (url.pathname === '/api/shopify/articles' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const conn = await getActiveShopifyConnection(env.DB, user.id, business.id);
+        if (!conn || !conn.auth_token) return errorResponse("NOT_CONNECTED: No active Shopify connection", 400);
+
+        try {
+          const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+          const articles = await shopifyProvider.getArticles(conn.repository_id, conn.auth_token, limit);
+          return jsonResponse({ success: true, data: articles });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to retrieve Shopify articles", 400);
+        }
+      }
+
+      // POST /api/shopify/products/:id/update — Update Product
+      if (url.pathname.startsWith('/api/shopify/products/') && url.pathname.endsWith('/update') && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const productId = url.pathname.replace('/api/shopify/products/', '').replace('/update', '');
+        const payload = await request.json() as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const conn = await getActiveShopifyConnection(env.DB, user.id, business.id);
+        if (!conn || !conn.auth_token) return errorResponse("NOT_CONNECTED: No active Shopify connection", 400);
+
+        try {
+          const updated = await shopifyProvider.updateProduct(conn.repository_id, conn.auth_token, productId, {
+            title: payload.title,
+            body_html: payload.body_html,
+            seo_title: payload.seo_title,
+            seo_description: payload.seo_description
+          });
+          return jsonResponse({ success: true, data: updated });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to update Shopify product", 400);
+        }
+      }
+
+      // POST /api/shopify/pages/:id/update — Update Page
+      if (url.pathname.startsWith('/api/shopify/pages/') && url.pathname.endsWith('/update') && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const pageId = url.pathname.replace('/api/shopify/pages/', '').replace('/update', '');
+        const payload = await request.json() as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const conn = await getActiveShopifyConnection(env.DB, user.id, business.id);
+        if (!conn || !conn.auth_token) return errorResponse("NOT_CONNECTED: No active Shopify connection", 400);
+
+        try {
+          const updated = await shopifyProvider.updatePage(conn.repository_id, conn.auth_token, pageId, {
+            title: payload.title,
+            body_html: payload.body_html,
+            seo_title: payload.seo_title,
+            seo_description: payload.seo_description
+          });
+          return jsonResponse({ success: true, data: updated });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to update Shopify page", 400);
+        }
+      }
+
+      // POST /api/seo/changes/:id/execute-shopify — Execute Shopify Fix & live verify
+      if (url.pathname.startsWith('/api/seo/changes/') && url.pathname.endsWith('/execute-shopify') && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const changeId = url.pathname.replace('/api/seo/changes/', '').replace('/execute-shopify', '');
+        const payload = await request.json().catch(() => ({})) as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        try {
+          const result = await executeShopifySeoFix(env.DB, user.id, business.id, changeId, {
+            resourceType: payload.resourceType,
+            resourceId: payload.resourceId,
+            customContent: payload.customContent
+          });
+
+          return jsonResponse({ success: true, data: result });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to execute Shopify SEO fix", 400);
+        }
+      }
+
+      // POST /api/seo/changes/:id/execute-universal — Universal SEO Execution Router
+      if (url.pathname.startsWith('/api/seo/changes/') && url.pathname.endsWith('/execute-universal') && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const changeId = url.pathname.replace('/api/seo/changes/', '').replace('/execute-universal', '');
+        const payload = await request.json().catch(() => ({})) as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        try {
+          const result = await routeApprovedSeoFix(env.DB, user.id, business.id, changeId, {
+            targetFilePath: payload.targetFilePath,
+            resourceType: payload.resourceType,
+            resourceId: payload.resourceId,
+            customContent: payload.customContent,
+            customCommitMessage: payload.customCommitMessage
+          });
+
+          return jsonResponse({ success: true, data: result });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to execute SEO fix via router", 400);
         }
       }
 

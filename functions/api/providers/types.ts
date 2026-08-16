@@ -76,6 +76,75 @@ export interface WordPressItem {
   meta?: Record<string, any>;
 }
 
+// -----------------------------------------------------------------------------
+// SHOPIFY TYPES (PHASE 4)
+// -----------------------------------------------------------------------------
+export interface ShopifyStoreInfo {
+  id: number;
+  name: string;
+  email: string;
+  domain: string;
+  myshopify_domain: string;
+  currency: string;
+  timezone: string;
+  shop_owner?: string;
+  plan_name?: string;
+}
+
+export interface ShopifyProductItem {
+  id: number;
+  title: string;
+  handle: string;
+  body_html: string;
+  vendor?: string;
+  product_type?: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  seo_title?: string;
+  seo_description?: string;
+}
+
+export interface ShopifyPageItem {
+  id: number;
+  title: string;
+  handle: string;
+  body_html: string;
+  author?: string;
+  created_at: string;
+  updated_at: string;
+  seo_title?: string;
+  seo_description?: string;
+}
+
+export interface ShopifyArticleItem {
+  id: number;
+  title: string;
+  handle: string;
+  body_html: string;
+  author?: string;
+  created_at: string;
+  updated_at: string;
+  published_at?: string;
+  seo_title?: string;
+  seo_description?: string;
+}
+
+export interface UniversalExecutionResult {
+  provider: 'github' | 'wordpress' | 'shopify' | 'manual';
+  status: 'PROPOSED' | 'APPROVED' | 'BRANCH_CREATED' | 'COMMITTED' | 'PR_CREATED' | 'APPLIED' | 'VERIFYING' | 'VERIFIED' | 'VERIFICATION_FAILED' | 'STALE_CHANGE' | 'FAILED';
+  verification?: {
+    status: string;
+    url?: string;
+    http_status?: number;
+    expected?: string;
+    observed_match?: boolean;
+    evidence?: any;
+  };
+  details?: any;
+  message: string;
+}
+
 export interface WebsiteProvider {
   readonly providerName: string;
   getRepositories(token: string): Promise<RepositoryItem[]>;

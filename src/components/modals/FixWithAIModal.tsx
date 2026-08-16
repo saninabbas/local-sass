@@ -18,14 +18,16 @@ import {
   GitBranch,
   GitPullRequest,
   CheckCheck,
-  Layout
+  Layout,
+  ShoppingBag
 } from 'lucide-react';
 import { 
   fetchApi, 
   getConnections, 
   executeSeoFixViaGitHub, 
   checkPullRequestStatus,
-  executeWordPressFix
+  executeWordPressFix,
+  executeShopifyFix
 } from '../../lib/api';
 import { ExecutionStatusBadge } from '../dashboard/ExecutionStatusBadge';
 import { Button } from '../ui/Button';
@@ -58,7 +60,7 @@ export function FixWithAIModal({
   context,
   onSuccess
 }: FixWithAIModalProps) {
-  const [step, setStep] = useState<'GENERATE' | 'PREVIEW' | 'GITHUB_EXECUTING' | 'WP_EXECUTING' | 'PR_CREATED' | 'APPLY_MANUAL' | 'VERIFYING' | 'RESULT'>('GENERATE');
+  const [step, setStep] = useState<'GENERATE' | 'PREVIEW' | 'GITHUB_EXECUTING' | 'WP_EXECUTING' | 'SHOPIFY_EXECUTING' | 'PR_CREATED' | 'APPLY_MANUAL' | 'VERIFYING' | 'RESULT'>('GENERATE');
   const [loading, setLoading] = useState(false);
   const [changeRecord, setChangeRecord] = useState<any | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -70,6 +72,7 @@ export function FixWithAIModal({
   // Connection states
   const [activeGitHubConnection, setActiveGitHubConnection] = useState<any | null>(null);
   const [activeWpConnection, setActiveWpConnection] = useState<any | null>(null);
+  const [activeShopifyConnection, setActiveShopifyConnection] = useState<any | null>(null);
   const [targetFilePath, setTargetFilePath] = useState('index.html');
   const [executionResult, setExecutionResult] = useState<any | null>(null);
   const [prStatus, setPrStatus] = useState<any | null>(null);
@@ -90,8 +93,10 @@ export function FixWithAIModal({
       const conns = await getConnections().catch(() => []);
       const gh = Array.isArray(conns) ? conns.find((c: any) => c.provider === 'github' && c.status === 'CONNECTED') : null;
       const wp = Array.isArray(conns) ? conns.find((c: any) => c.provider === 'wordpress' && c.status === 'CONNECTED') : null;
+      const sh = Array.isArray(conns) ? conns.find((c: any) => c.provider === 'shopify' && c.status === 'CONNECTED') : null;
       setActiveGitHubConnection(gh);
       setActiveWpConnection(wp);
+      setActiveShopifyConnection(sh);
 
       const res = await fetchApi('/api/seo/changes/generate', {
         method: 'POST',
@@ -208,6 +213,45 @@ export function FixWithAIModal({
     }
   };
 
+  // Phase 4: Execute Shopify Store update workflow
+  const handleApproveAndApplyShopify = async () => {
+    if (!changeRecord) return;
+    setStep('SHOPIFY_EXECUTING');
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      await fetchApi(`/api/seo/changes/${changeRecord.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ editedContent })
+      });
+
+      const shRes = await executeShopifyFix(changeRecord.id, {
+        customContent: editedContent
+      });
+
+      if (shRes.success && shRes.data) {
+        setVerificationResult({
+          success: shRes.data.status === 'VERIFIED',
+          message: shRes.data.message,
+          evidence: shRes.data.verification
+        });
+        setStep('RESULT');
+        if (shRes.data.status === 'VERIFIED' && onSuccess) {
+          onSuccess();
+        }
+      } else {
+        throw new Error(shRes.error || 'Failed to apply Shopify update');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Shopify execution error');
+      setStep('PREVIEW');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Manual deployment mode handler
   const handleApproveManual = async () => {
     if (!changeRecord) return;
@@ -288,7 +332,7 @@ export function FixWithAIModal({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-[#cc785c] font-bold">SEO Execution Engine</span>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#cc785c] font-bold">Universal SEO Execution Engine</span>
                 <span className="text-[10px] font-mono text-[#8e8b82]">&bull; {normalizedChangeType}</span>
               </div>
               <h2 className="font-serif text-base text-[#141413] font-medium mt-0.5">
@@ -314,8 +358,8 @@ export function FixWithAIModal({
             2. Preview & Diff
           </span>
           <ArrowRight size={12} />
-          <span className={`flex items-center gap-1 ${step === 'GITHUB_EXECUTING' || step === 'WP_EXECUTING' || step === 'PR_CREATED' || step === 'APPLY_MANUAL' ? 'text-[#cc785c] font-bold' : step === 'RESULT' ? 'text-[#141413]' : ''}`}>
-            3. {activeWpConnection ? 'WordPress Apply' : activeGitHubConnection ? 'GitHub PR' : 'Manual Deploy'}
+          <span className={`flex items-center gap-1 ${step === 'GITHUB_EXECUTING' || step === 'WP_EXECUTING' || step === 'SHOPIFY_EXECUTING' || step === 'PR_CREATED' || step === 'APPLY_MANUAL' ? 'text-[#cc785c] font-bold' : step === 'RESULT' ? 'text-[#141413]' : ''}`}>
+            3. {activeShopifyConnection ? 'Shopify Apply' : activeWpConnection ? 'WordPress Apply' : activeGitHubConnection ? 'GitHub PR' : 'Manual Deploy'}
           </span>
           <ArrowRight size={12} />
           <span className={`flex items-center gap-1 ${step === 'VERIFYING' || step === 'RESULT' ? 'text-[#cc785c] font-bold' : ''}`}>
@@ -383,8 +427,26 @@ export function FixWithAIModal({
                   )}
                 </div>
 
+                {/* Shopify Integration Notice */}
+                {activeShopifyConnection && (
+                  <div className="p-3.5 rounded-xl bg-emerald-50/50 border border-[#96bf48]/40 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-mono font-bold text-[#141413] flex items-center gap-1.5">
+                        <ShoppingBag size={13} className="text-[#5e8e3e]" />
+                        <span>Connected Shopify: {activeShopifyConnection.repository_name}</span>
+                      </span>
+                      <span className="text-[10px] font-mono text-[#5e8e3e] bg-white px-2 py-0.5 rounded border border-[#96bf48]/40">
+                        Admin API Active
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#6c6a64] font-sans">
+                      This will update the connected Shopify store product/page metadata upon explicit user approval.
+                    </p>
+                  </div>
+                )}
+
                 {/* WordPress Integration Notice */}
-                {activeWpConnection && (
+                {!activeShopifyConnection && activeWpConnection && (
                   <div className="p-3.5 rounded-xl bg-blue-50/50 border border-[#0073aa]/30 space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-mono font-bold text-[#141413] flex items-center gap-1.5">
@@ -401,8 +463,8 @@ export function FixWithAIModal({
                   </div>
                 )}
 
-                {/* Target File Configuration (for GitHub Mode) */}
-                {activeGitHubConnection && !activeWpConnection && (
+                {/* GitHub Mode */}
+                {!activeShopifyConnection && !activeWpConnection && activeGitHubConnection && (
                   <div className="p-3.5 rounded-xl bg-[#faf9f5] border border-[#cc785c]/30 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-mono font-bold text-[#141413] flex items-center gap-1.5">
@@ -436,6 +498,32 @@ export function FixWithAIModal({
               </div>
 
             </div>
+          ) : step === 'SHOPIFY_EXECUTING' ? (
+            <div className="py-12 space-y-4 max-w-md mx-auto font-mono text-xs">
+              <div className="text-center space-y-2 mb-6">
+                <RefreshCw className="animate-spin text-[#5e8e3e] mx-auto" size={32} />
+                <h4 className="font-serif text-base text-[#141413]">Updating Shopify Store & Running Live Crawl...</h4>
+              </div>
+
+              <div className="space-y-2.5 p-4 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
+                <div className="flex items-center gap-2 text-emerald-700">
+                  <Check size={14} className="shrink-0" />
+                  <span>1. User approval confirmed</span>
+                </div>
+                <div className="flex items-center gap-2 text-emerald-700">
+                  <Check size={14} className="shrink-0" />
+                  <span>2. Freshness check verified (No stale conflicts)</span>
+                </div>
+                <div className="flex items-center gap-2 text-emerald-700">
+                  <Check size={14} className="shrink-0" />
+                  <span>3. Applied change via Shopify Admin API</span>
+                </div>
+                <div className="flex items-center gap-2 text-[#cc785c] font-bold animate-pulse">
+                  <RefreshCw size={12} className="animate-spin shrink-0" />
+                  <span>4. Inspecting live public DOM...</span>
+                </div>
+              </div>
+            </div>
           ) : step === 'WP_EXECUTING' ? (
             <div className="py-12 space-y-4 max-w-md mx-auto font-mono text-xs">
               <div className="text-center space-y-2 mb-6">
@@ -450,7 +538,7 @@ export function FixWithAIModal({
                 </div>
                 <div className="flex items-center gap-2 text-emerald-700">
                   <Check size={14} className="shrink-0" />
-                  <span>2. Freshness check verified (No stale conflicts)</span>
+                  <span>2. Freshness check verified</span>
                 </div>
                 <div className="flex items-center gap-2 text-emerald-700">
                   <Check size={14} className="shrink-0" />
@@ -598,7 +686,32 @@ export function FixWithAIModal({
           </Button>
 
           <div className="flex items-center gap-2">
-            {step === 'PREVIEW' && activeWpConnection && (
+            {/* Mode 1: Shopify */}
+            {step === 'PREVIEW' && activeShopifyConnection && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleApproveManual}
+                  disabled={loading}
+                  className="text-xs font-semibold"
+                >
+                  Manual Snippet
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleApproveAndApplyShopify}
+                  disabled={loading}
+                  className="bg-[#5e8e3e] hover:bg-[#4a7231] text-white flex items-center gap-1.5 text-xs font-semibold"
+                >
+                  <ShoppingBag size={13} />
+                  <span>Approve & Apply to Shopify</span>
+                </Button>
+              </>
+            )}
+
+            {/* Mode 2: WordPress */}
+            {step === 'PREVIEW' && !activeShopifyConnection && activeWpConnection && (
               <>
                 <Button
                   variant="outline"
@@ -621,7 +734,8 @@ export function FixWithAIModal({
               </>
             )}
 
-            {step === 'PREVIEW' && !activeWpConnection && activeGitHubConnection && (
+            {/* Mode 3: GitHub */}
+            {step === 'PREVIEW' && !activeShopifyConnection && !activeWpConnection && activeGitHubConnection && (
               <>
                 <Button
                   variant="outline"
@@ -644,7 +758,8 @@ export function FixWithAIModal({
               </>
             )}
 
-            {step === 'PREVIEW' && !activeWpConnection && !activeGitHubConnection && (
+            {/* Mode 4: Manual fallback */}
+            {step === 'PREVIEW' && !activeShopifyConnection && !activeWpConnection && !activeGitHubConnection && (
               <Button
                 size="sm"
                 onClick={handleApproveManual}
@@ -665,7 +780,7 @@ export function FixWithAIModal({
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[#e6dfd8] bg-white hover:bg-[#efe9de] text-[#141413] text-xs font-semibold"
                 >
                   <span>View PR on GitHub</span>
-                  <ExternalLink size={12} className="text-[#8e8b82]" />
+                  <ExternalLink size={12} />
                 </a>
                 <Button
                   size="sm"

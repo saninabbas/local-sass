@@ -424,6 +424,66 @@ export async function executeWordPressFix(changeId: string, options: { targetTyp
   });
 }
 
+// -----------------------------------------------------------------------------
+// PHASE 4: SHOPIFY PROVIDER & UNIVERSAL SEO ROUTER
+// -----------------------------------------------------------------------------
+export async function saveShopifyConnection(data: {
+  shopDomain: string;
+  accessToken: string;
+}): Promise<any> {
+  return fetchApi('/api/connections/shopify', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+}
+
+export async function testShopifyConnection(data: {
+  shopDomain: string;
+  accessToken: string;
+}): Promise<any> {
+  return fetchApi('/api/shopify/test', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+}
+
+export async function getShopifyStore(): Promise<any> {
+  return fetchApi('/api/shopify/store');
+}
+
+export async function getShopifyProducts(limit: number = 50): Promise<any[]> {
+  return fetchApi(`/api/shopify/products?limit=${limit}`);
+}
+
+export async function getShopifyPages(limit: number = 50): Promise<any[]> {
+  return fetchApi(`/api/shopify/pages?limit=${limit}`);
+}
+
+export async function getShopifyArticles(limit: number = 50): Promise<any[]> {
+  return fetchApi(`/api/shopify/articles?limit=${limit}`);
+}
+
+export async function executeShopifyFix(changeId: string, options: { resourceType?: 'product' | 'page' | 'article'; resourceId?: number | string; customContent?: string } = {}): Promise<any> {
+  return fetchApi(`/api/seo/changes/${changeId}/execute-shopify`, {
+    method: 'POST',
+    body: JSON.stringify(options)
+  });
+}
+
+export async function executeUniversalFix(changeId: string, options: {
+  targetFilePath?: string;
+  resourceType?: 'product' | 'page' | 'article';
+  resourceId?: number | string;
+  customContent?: string;
+  customCommitMessage?: string;
+} = {}): Promise<any> {
+  return fetchApi(`/api/seo/changes/${changeId}/execute-universal`, {
+    method: 'POST',
+    body: JSON.stringify(options)
+  });
+}
+
+
 
 
 

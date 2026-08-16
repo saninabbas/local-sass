@@ -8,6 +8,11 @@ import {
   testWordPressConnection,
   getWordPressPages,
   getWordPressPosts,
+  saveShopifyConnection,
+  testShopifyConnection,
+  getShopifyProducts,
+  getShopifyPages,
+  getShopifyArticles,
   deleteConnection, 
   getGitHubRepositories, 
   getGitHubBranches, 
@@ -33,7 +38,10 @@ import {
   Globe,
   Layout,
   FileCheck2,
-  ShieldCheck
+  ShieldCheck,
+  ShoppingBag,
+  Tag,
+  BookOpen
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
@@ -74,8 +82,24 @@ export const Connections: React.FC = () => {
   const [wpPosts, setWpPosts] = useState<any[]>([]);
   const [loadingWpData, setLoadingWpData] = useState(false);
 
+  // Shopify Connection state (Phase 4)
+  const [isShopifyModalOpen, setIsShopifyModalOpen] = useState(false);
+  const [shopifyDomain, setShopifyDomain] = useState('');
+  const [shopifyAccessToken, setShopifyAccessToken] = useState('');
+  const [testingShopify, setTestingShopify] = useState(false);
+  const [shopifyTestResult, setShopifyTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [savingShopify, setSavingShopify] = useState(false);
+
+  // Shopify Content state
+  const [shopifyTab, setShopifyTab] = useState<'products' | 'pages' | 'articles'>('products');
+  const [shopifyProducts, setShopifyProducts] = useState<any[]>([]);
+  const [shopifyPages, setShopifyPages] = useState<any[]>([]);
+  const [shopifyArticles, setShopifyArticles] = useState<any[]>([]);
+  const [loadingShopifyData, setLoadingShopifyData] = useState(false);
+
   const activeGitHubConnection = connections.find(c => c.provider === 'github' && c.status === 'CONNECTED');
   const activeWpConnection = connections.find(c => c.provider === 'wordpress' && c.status === 'CONNECTED');
+  const activeShopifyConnection = connections.find(c => c.provider === 'shopify' && c.status === 'CONNECTED');
 
   const loadConnections = async () => {
     try {
@@ -97,8 +121,13 @@ export const Connections: React.FC = () => {
     setTreeItems([]);
     setWpPages([]);
     setWpPosts([]);
+    setShopifyProducts([]);
+    setShopifyPages([]);
+    setShopifyArticles([]);
     if (activeBusiness?.website_url) {
-      setWpUrl(activeBusiness.website_url.startsWith('http') ? activeBusiness.website_url : `https://${activeBusiness.website_url}`);
+      const cleanUrl = activeBusiness.website_url.startsWith('http') ? activeBusiness.website_url : `https://${activeBusiness.website_url}`;
+      setWpUrl(cleanUrl);
+      setShopifyDomain(activeBusiness.website_url.replace(/^https?:\/\//, '').split('/')[0]);
     }
   }, [activeBusiness?.id]);
 
@@ -121,6 +150,13 @@ export const Connections: React.FC = () => {
       loadWordPressContent();
     }
   }, [activeWpConnection?.id]);
+
+  // Fetch Shopify products/pages when active Shopify connection is present
+  useEffect(() => {
+    if (activeShopifyConnection) {
+      loadShopifyContent();
+    }
+  }, [activeShopifyConnection?.id]);
 
   const loadTree = async (owner: string, repo: string, branch: string, path: string = '') => {
     try {
@@ -149,6 +185,24 @@ export const Connections: React.FC = () => {
       console.warn("Failed to load WP content:", e);
     } finally {
       setLoadingWpData(false);
+    }
+  };
+
+  const loadShopifyContent = async () => {
+    try {
+      setLoadingShopifyData(true);
+      const [products, pages, articles] = await Promise.all([
+        getShopifyProducts(20).catch(() => []),
+        getShopifyPages(20).catch(() => []),
+        getShopifyArticles(20).catch(() => [])
+      ]);
+      setShopifyProducts(Array.isArray(products) ? products : []);
+      setShopifyPages(Array.isArray(pages) ? pages : []);
+      setShopifyArticles(Array.isArray(articles) ? articles : []);
+    } catch (e) {
+      console.warn("Failed to load Shopify content:", e);
+    } finally {
+      setLoadingShopifyData(false);
     }
   };
 
@@ -249,6 +303,52 @@ export const Connections: React.FC = () => {
     }
   };
 
+  const handleTestShopify = async () => {
+    if (!shopifyDomain || !shopifyAccessToken) {
+      setFeedback({ type: 'error', message: "Please fill in Shopify Store Domain and Admin Access Token." });
+      return;
+    }
+
+    try {
+      setTestingShopify(true);
+      setShopifyTestResult(null);
+      const res = await testShopifyConnection({
+        shopDomain: shopifyDomain.trim(),
+        accessToken: shopifyAccessToken.trim()
+      });
+
+      if (res.success) {
+        setShopifyTestResult({ success: true, message: `Successfully connected to "${res.data?.store?.name || res.data?.store?.domain}" (${res.data?.store?.currency})!` });
+      } else {
+        setShopifyTestResult({ success: false, message: res.error || 'Connection failed' });
+      }
+    } catch (err: any) {
+      setShopifyTestResult({ success: false, message: err.message || 'Connection failed' });
+    } finally {
+      setTestingShopify(false);
+    }
+  };
+
+  const handleSaveShopify = async () => {
+    if (!shopifyDomain || !shopifyAccessToken) return;
+    try {
+      setSavingShopify(true);
+      await saveShopifyConnection({
+        shopDomain: shopifyDomain.trim(),
+        accessToken: shopifyAccessToken.trim()
+      });
+
+      setFeedback({ type: 'success', message: `Connected Shopify store successfully!` });
+      setTimeout(() => setFeedback(null), 4000);
+      setIsShopifyModalOpen(false);
+      await loadConnections();
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err.message || 'Failed to save Shopify connection.' });
+    } finally {
+      setSavingShopify(false);
+    }
+  };
+
   const handleDisconnect = async (connId: string) => {
     if (!window.confirm("Are you sure you want to disconnect this integration from the current project?")) return;
     try {
@@ -259,6 +359,9 @@ export const Connections: React.FC = () => {
       setSelectedFile(null);
       setWpPages([]);
       setWpPosts([]);
+      setShopifyProducts([]);
+      setShopifyPages([]);
+      setShopifyArticles([]);
       await loadConnections();
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message || 'Failed to disconnect.' });
@@ -293,7 +396,7 @@ export const Connections: React.FC = () => {
             <div className="flex items-center gap-2 mb-1">
               <span className="px-2.5 py-0.5 rounded-full bg-[#cc785c]/10 text-[#cc785c] text-[11px] font-mono font-bold tracking-wider uppercase flex items-center gap-1.5">
                 <GitBranch size={12} />
-                Execution Provider Architecture
+                Universal Execution Engine
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-serif font-bold text-[#141413]">
@@ -330,7 +433,7 @@ export const Connections: React.FC = () => {
         {/* Provider Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
-          {/* 1. GITHUB (Active Phase 1 & 2) */}
+          {/* 1. GITHUB */}
           <div className={`rounded-2xl p-6 border transition-all flex flex-col justify-between ${
             activeGitHubConnection 
               ? 'bg-white border-[#cc785c]/40 shadow-xs' 
@@ -405,7 +508,7 @@ export const Connections: React.FC = () => {
             </div>
           </div>
 
-          {/* 2. WORDPRESS (Phase 3 Active) */}
+          {/* 2. WORDPRESS */}
           <div className={`rounded-2xl p-6 border transition-all flex flex-col justify-between ${
             activeWpConnection 
               ? 'bg-white border-[#0073aa]/40 shadow-xs' 
@@ -484,27 +587,182 @@ export const Connections: React.FC = () => {
             </div>
           </div>
 
-          {/* 3. SHOPIFY (Phase 4 Roadmap) */}
-          <div className="rounded-2xl p-6 border border-[#e6dfd8] bg-[#faf9f5]/50 flex flex-col justify-between opacity-80">
+          {/* 3. SHOPIFY (Phase 4 Active) */}
+          <div className={`rounded-2xl p-6 border transition-all flex flex-col justify-between ${
+            activeShopifyConnection 
+              ? 'bg-white border-[#96bf48]/40 shadow-xs' 
+              : 'bg-white border-[#e6dfd8] shadow-2xs hover:border-[#96bf48]/30'
+          }`}>
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div className="w-10 h-10 rounded-xl bg-[#96bf48] text-white flex items-center justify-center font-bold text-sm">
                   SH
                 </div>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#efe9de] text-[#8e8b82] border border-[#e6dfd8]">
-                  PHASE 4
-                </span>
+                {activeShopifyConnection ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    CONNECTED
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#efe9de] text-[#8e8b82] border border-[#e6dfd8]">
+                    AVAILABLE
+                  </span>
+                )}
               </div>
+
               <h2 className="text-lg font-serif font-bold text-[#141413] mb-1">Shopify Store</h2>
-              <p className="text-xs text-[#6c6a64] font-sans leading-relaxed">
-                App bridge for automated Liquid template schema markup and collection page canonicalization.
+              <p className="text-xs text-[#6c6a64] font-sans leading-relaxed mb-4">
+                Admin REST API integration for automated product and page SEO titles, descriptions, and metadata.
               </p>
+
+              {activeShopifyConnection && (
+                <div className="p-3 bg-[#faf9f5] border border-[#e6dfd8] rounded-xl space-y-1.5 mb-4 text-xs font-mono">
+                  <div className="flex justify-between">
+                    <span className="text-[#8e8b82]">Store:</span>
+                    <span className="font-bold text-[#141413] truncate max-w-[160px]">
+                      {activeShopifyConnection.repository_name || activeShopifyConnection.repository_id}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#8e8b82]">Domain:</span>
+                    <span className="font-bold text-[#5e8e3e] truncate max-w-[160px]">{activeShopifyConnection.repository_id}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-[#8e8b82]">Cached:</span>
+                    <span className="text-[#141413]">{shopifyProducts.length} Prods &bull; {shopifyPages.length} Pages</span>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="pt-4 border-t border-[#e6dfd8]/60">
-              <span className="text-[11px] font-mono text-[#8e8b82]">Coming Soon in Phase 4</span>
+
+            <div className="pt-2 border-t border-[#e6dfd8]/60 flex items-center justify-between gap-3">
+              {activeShopifyConnection ? (
+                <>
+                  <button
+                    onClick={() => handleDisconnect(activeShopifyConnection.id)}
+                    className="text-xs font-sans font-medium text-rose-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Trash2 size={13} />
+                    <span>Disconnect</span>
+                  </button>
+                  <Button
+                    size="sm"
+                    onClick={() => setIsShopifyModalOpen(true)}
+                    className="bg-[#faf9f5] border border-[#e6dfd8] text-[#141413] hover:bg-[#efe9de] text-xs font-semibold"
+                  >
+                    Update Auth
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => setIsShopifyModalOpen(true)}
+                  className="w-full bg-[#141413] hover:bg-[#252320] text-[#faf9f5] text-xs font-semibold flex items-center justify-center gap-2"
+                >
+                  <ShoppingBag size={13} className="text-[#96bf48]" />
+                  <span>Connect Shopify</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>
+
+        {/* SHOPIFY CONTENT EXPLORER (PHASE 4) */}
+        {activeShopifyConnection && (
+          <div className="rounded-2xl border border-[#e6dfd8] bg-white p-6 shadow-2xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#e6dfd8]">
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#8e8b82] block mb-1">
+                  Connected Shopify Store
+                </span>
+                <h2 className="text-xl font-serif font-bold text-[#141413] flex items-center gap-2">
+                  <span>{activeShopifyConnection.repository_name || 'Shopify Store'}</span>
+                  <span className="font-mono text-xs font-normal text-[#5e8e3e]">
+                    ({activeShopifyConnection.repository_id})
+                  </span>
+                </h2>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex items-center gap-1 bg-[#efe9de] p-1 rounded-xl">
+                <button
+                  onClick={() => setShopifyTab('products')}
+                  className={`px-3 py-1 text-xs font-mono rounded-lg transition-colors cursor-pointer ${
+                    shopifyTab === 'products' ? 'bg-[#141413] text-white font-bold' : 'text-[#6c6a64] hover:text-[#141413]'
+                  }`}
+                >
+                  Products ({shopifyProducts.length})
+                </button>
+                <button
+                  onClick={() => setShopifyTab('pages')}
+                  className={`px-3 py-1 text-xs font-mono rounded-lg transition-colors cursor-pointer ${
+                    shopifyTab === 'pages' ? 'bg-[#141413] text-white font-bold' : 'text-[#6c6a64] hover:text-[#141413]'
+                  }`}
+                >
+                  Pages ({shopifyPages.length})
+                </button>
+                <button
+                  onClick={() => setShopifyTab('articles')}
+                  className={`px-3 py-1 text-xs font-mono rounded-lg transition-colors cursor-pointer ${
+                    shopifyTab === 'articles' ? 'bg-[#141413] text-white font-bold' : 'text-[#6c6a64] hover:text-[#141413]'
+                  }`}
+                >
+                  Articles ({shopifyArticles.length})
+                </button>
+              </div>
+            </div>
+
+            {loadingShopifyData ? (
+              <div className="py-8 text-center text-xs font-mono text-[#8e8b82]">
+                <RefreshCw size={14} className="animate-spin inline mr-1 text-[#5e8e3e]" /> Loading Shopify store content...
+              </div>
+            ) : shopifyTab === 'products' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto">
+                {shopifyProducts.length === 0 ? (
+                  <p className="col-span-3 text-xs text-[#8e8b82] py-4 text-center">No products found in this Shopify store.</p>
+                ) : (
+                  shopifyProducts.map((prod) => (
+                    <div key={prod.id} className="p-3 bg-[#faf9f5] rounded-xl border border-[#e6dfd8] space-y-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[#141413] truncate block max-w-[200px]">{prod.title}</span>
+                        <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          {prod.status}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#8e8b82] font-mono truncate">{prod.handle}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : shopifyTab === 'pages' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto">
+                {shopifyPages.length === 0 ? (
+                  <p className="col-span-3 text-xs text-[#8e8b82] py-4 text-center">No custom pages found.</p>
+                ) : (
+                  shopifyPages.map((page) => (
+                    <div key={page.id} className="p-3 bg-[#faf9f5] rounded-xl border border-[#e6dfd8] space-y-1 text-xs">
+                      <span className="font-bold text-[#141413] truncate block">{page.title}</span>
+                      <p className="text-[11px] text-[#8e8b82] font-mono truncate">/{page.handle}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto">
+                {shopifyArticles.length === 0 ? (
+                  <p className="col-span-3 text-xs text-[#8e8b82] py-4 text-center">No blog articles found.</p>
+                ) : (
+                  shopifyArticles.map((art) => (
+                    <div key={art.id} className="p-3 bg-[#faf9f5] rounded-xl border border-[#e6dfd8] space-y-1 text-xs">
+                      <span className="font-bold text-[#141413] truncate block">{art.title}</span>
+                      <p className="text-[11px] text-[#8e8b82] font-mono truncate">{art.handle}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* WORDPRESS CONTENT EXPLORER */}
         {activeWpConnection && (
@@ -528,9 +786,7 @@ export const Connections: React.FC = () => {
               </div>
             </div>
 
-            {/* WordPress Content Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Pages Column */}
               <div className="border border-[#e6dfd8] rounded-xl bg-[#faf9f5] p-4">
                 <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#e6dfd8] text-xs font-mono font-bold text-[#141413]">
                   <div className="flex items-center gap-2">
@@ -562,7 +818,6 @@ export const Connections: React.FC = () => {
                 )}
               </div>
 
-              {/* Posts Column */}
               <div className="border border-[#e6dfd8] rounded-xl bg-[#faf9f5] p-4">
                 <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#e6dfd8] text-xs font-mono font-bold text-[#141413]">
                   <div className="flex items-center gap-2">
@@ -597,7 +852,7 @@ export const Connections: React.FC = () => {
           </div>
         )}
 
-        {/* GITHUB REPOSITORY EXPLORER (READ ONLY) */}
+        {/* GITHUB REPOSITORY EXPLORER */}
         {activeGitHubConnection && (
           <div className="rounded-2xl border border-[#e6dfd8] bg-white p-6 shadow-2xs space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#e6dfd8]">
@@ -619,10 +874,7 @@ export const Connections: React.FC = () => {
               </div>
             </div>
 
-            {/* Explorer Layout: Tree on Left, File Viewer on Right */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[420px]">
-              
-              {/* Left Column: File Tree */}
               <div className="lg:col-span-5 border border-[#e6dfd8] rounded-xl bg-[#faf9f5] p-3 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#e6dfd8] text-[11px] font-mono text-[#8e8b82]">
@@ -673,7 +925,6 @@ export const Connections: React.FC = () => {
                 </div>
               </div>
 
-              {/* Right Column: Code / File Viewer */}
               <div className="lg:col-span-7 border border-[#252320] rounded-xl bg-[#181715] text-[#faf9f5] p-4 flex flex-col justify-between overflow-hidden">
                 {loadingFile ? (
                   <div className="flex flex-col items-center justify-center h-full py-20 text-xs font-mono text-[#8e8b82] gap-2">
@@ -800,7 +1051,6 @@ export const Connections: React.FC = () => {
         {isWpModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#141413]/60 backdrop-blur-sm animate-in fade-in duration-150">
             <div className="bg-white border border-[#e6dfd8] rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-5">
-              
               <div className="flex items-center justify-between pb-3 border-b border-[#e6dfd8]">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-[#0073aa] text-white flex items-center justify-center font-bold text-xs">
@@ -816,7 +1066,6 @@ export const Connections: React.FC = () => {
                 </button>
               </div>
 
-              {/* Form Fields */}
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-mono font-bold text-[#141413] uppercase mb-1">
@@ -861,7 +1110,6 @@ export const Connections: React.FC = () => {
                 </div>
               </div>
 
-              {/* Test Result Message */}
               {wpTestResult && (
                 <div className={`p-3 rounded-xl text-xs font-sans flex items-center gap-2 ${
                   wpTestResult.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
@@ -871,15 +1119,8 @@ export const Connections: React.FC = () => {
                 </div>
               )}
 
-              {/* Modal Actions */}
               <div className="pt-3 border-t border-[#e6dfd8] flex items-center justify-between">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleTestWordPress}
-                  disabled={testingWp}
-                  className="text-xs font-semibold"
-                >
+                <Button size="sm" variant="outline" onClick={handleTestWordPress} disabled={testingWp} className="text-xs font-semibold">
                   {testingWp ? <RefreshCw size={13} className="animate-spin text-[#0073aa]" /> : 'Test Connection'}
                 </Button>
 
@@ -896,7 +1137,90 @@ export const Connections: React.FC = () => {
                   </Button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
 
+        {/* CONNECT SHOPIFY MODAL (PHASE 4) */}
+        {isShopifyModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#141413]/60 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="bg-white border border-[#e6dfd8] rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-5">
+              <div className="flex items-center justify-between pb-3 border-b border-[#e6dfd8]">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#96bf48] text-white flex items-center justify-center font-bold text-xs">
+                    SH
+                  </div>
+                  <div>
+                    <h3 className="font-serif font-bold text-base text-[#141413]">Connect Shopify Store</h3>
+                    <p className="text-[11px] text-[#8e8b82] font-mono">Scoped to: {activeBusiness?.name}</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsShopifyModalOpen(false)} className="p-1 rounded-lg text-[#8e8b82] hover:text-[#141413]">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#141413] uppercase mb-1">
+                    Shopify Store Domain
+                  </label>
+                  <input
+                    type="text"
+                    value={shopifyDomain}
+                    onChange={(e) => setShopifyDomain(e.target.value)}
+                    placeholder="your-store.myshopify.com"
+                    className="w-full h-9 px-3 text-xs font-mono rounded-xl border border-[#e6dfd8] bg-[#faf9f5]"
+                  />
+                  <p className="text-[10px] text-[#8e8b82] font-sans mt-1">
+                    Enter your .myshopify.com domain or primary store hostname.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#141413] uppercase mb-1">
+                    Admin API Access Token
+                  </label>
+                  <input
+                    type="password"
+                    value={shopifyAccessToken}
+                    onChange={(e) => setShopifyAccessToken(e.target.value)}
+                    placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx"
+                    className="w-full h-9 px-3 text-xs font-mono rounded-xl border border-[#e6dfd8] bg-[#faf9f5]"
+                  />
+                  <p className="text-[10px] text-[#8e8b82] font-sans mt-1">
+                    Generate in Shopify Admin &rarr; Settings &rarr; Apps & Sales Channels &rarr; Develop Apps. Requires read_products, write_products, read_content, write_content scopes.
+                  </p>
+                </div>
+              </div>
+
+              {shopifyTestResult && (
+                <div className={`p-3 rounded-xl text-xs font-sans flex items-center gap-2 ${
+                  shopifyTestResult.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+                }`}>
+                  {shopifyTestResult.success ? <CheckCircle2 size={15} className="text-emerald-600 shrink-0" /> : <AlertCircle size={15} className="text-red-600 shrink-0" />}
+                  <span>{shopifyTestResult.message}</span>
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-[#e6dfd8] flex items-center justify-between">
+                <Button size="sm" variant="outline" onClick={handleTestShopify} disabled={testingShopify} className="text-xs font-semibold">
+                  {testingShopify ? <RefreshCw size={13} className="animate-spin text-[#5e8e3e]" /> : 'Test Connection'}
+                </Button>
+
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setIsShopifyModalOpen(false)}>Cancel</Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveShopify}
+                    disabled={savingShopify || !shopifyDomain || !shopifyAccessToken}
+                    className="bg-[#141413] text-[#faf9f5] text-xs font-semibold"
+                  >
+                    {savingShopify ? <RefreshCw size={13} className="animate-spin text-[#cc785c]" /> : <CheckCircle2 size={13} className="text-[#cc785c]" />}
+                    <span>Save & Connect</span>
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         )}
