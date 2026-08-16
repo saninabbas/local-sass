@@ -4,6 +4,10 @@ import { useBusiness } from '../../context/BusinessContext';
 import { 
   getConnections, 
   saveGitHubConnection, 
+  saveWordPressConnection,
+  testWordPressConnection,
+  getWordPressPages,
+  getWordPressPosts,
   deleteConnection, 
   getGitHubRepositories, 
   getGitHubBranches, 
@@ -25,7 +29,11 @@ import {
   Lock, 
   Eye, 
   Layers,
-  ArrowRight
+  ArrowRight,
+  Globe,
+  Layout,
+  FileCheck2,
+  ShieldCheck
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
@@ -35,24 +43,39 @@ export const Connections: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Connection Modal state
-  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+  // GitHub Connection Modal state
+  const [isGitHubModalOpen, setIsGitHubModalOpen] = useState(false);
   const [gitHubToken, setGitHubToken] = useState('');
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [repositories, setRepositories] = useState<any[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<any | null>(null);
   const [branches, setBranches] = useState<any[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<string>('main');
-  const [savingConnection, setSavingConnection] = useState(false);
+  const [savingGitHub, setSavingGitHub] = useState(false);
 
-  // Repository Explorer state
+  // GitHub Repository Explorer state
   const [treeItems, setTreeItems] = useState<any[]>([]);
   const [loadingTree, setLoadingTree] = useState(false);
   const [currentPath, setCurrentPath] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<{ path: string; content: string; size: number } | null>(null);
   const [loadingFile, setLoadingFile] = useState(false);
 
+  // WordPress Connection state
+  const [isWpModalOpen, setIsWpModalOpen] = useState(false);
+  const [wpUrl, setWpUrl] = useState('');
+  const [wpUsername, setWpUsername] = useState('');
+  const [wpAppPassword, setWpAppPassword] = useState('');
+  const [testingWp, setTestingWp] = useState(false);
+  const [wpTestResult, setWpTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [savingWp, setSavingWp] = useState(false);
+
+  // WordPress Content state
+  const [wpPages, setWpPages] = useState<any[]>([]);
+  const [wpPosts, setWpPosts] = useState<any[]>([]);
+  const [loadingWpData, setLoadingWpData] = useState(false);
+
   const activeGitHubConnection = connections.find(c => c.provider === 'github' && c.status === 'CONNECTED');
+  const activeWpConnection = connections.find(c => c.provider === 'wordpress' && c.status === 'CONNECTED');
 
   const loadConnections = async () => {
     try {
@@ -69,10 +92,14 @@ export const Connections: React.FC = () => {
 
   useEffect(() => {
     loadConnections();
-    // Reset file explorer when active business changes
     setSelectedFile(null);
     setCurrentPath('');
     setTreeItems([]);
+    setWpPages([]);
+    setWpPosts([]);
+    if (activeBusiness?.website_url) {
+      setWpUrl(activeBusiness.website_url.startsWith('http') ? activeBusiness.website_url : `https://${activeBusiness.website_url}`);
+    }
   }, [activeBusiness?.id]);
 
   useEffect(() => {
@@ -88,6 +115,13 @@ export const Connections: React.FC = () => {
     }
   }, [activeGitHubConnection?.id, activeGitHubConnection?.default_branch]);
 
+  // Fetch WordPress pages/posts when active WP connection is present
+  useEffect(() => {
+    if (activeWpConnection) {
+      loadWordPressContent();
+    }
+  }, [activeWpConnection?.id]);
+
   const loadTree = async (owner: string, repo: string, branch: string, path: string = '') => {
     try {
       setLoadingTree(true);
@@ -99,6 +133,22 @@ export const Connections: React.FC = () => {
       setTreeItems([]);
     } finally {
       setLoadingTree(false);
+    }
+  };
+
+  const loadWordPressContent = async () => {
+    try {
+      setLoadingWpData(true);
+      const [pages, posts] = await Promise.all([
+        getWordPressPages(20).catch(() => []),
+        getWordPressPosts(20).catch(() => [])
+      ]);
+      setWpPages(Array.isArray(pages) ? pages : []);
+      setWpPosts(Array.isArray(posts) ? posts : []);
+    } catch (e) {
+      console.warn("Failed to load WP content:", e);
+    } finally {
+      setLoadingWpData(false);
     }
   };
 
@@ -128,10 +178,10 @@ export const Connections: React.FC = () => {
     }
   };
 
-  const handleSaveConnection = async () => {
+  const handleSaveGitHub = async () => {
     if (!selectedRepo) return;
     try {
-      setSavingConnection(true);
+      setSavingGitHub(true);
       await saveGitHubConnection({
         repositoryName: selectedRepo.name,
         repositoryOwner: selectedRepo.owner,
@@ -142,23 +192,73 @@ export const Connections: React.FC = () => {
 
       setFeedback({ type: 'success', message: `Connected repository ${selectedRepo.owner}/${selectedRepo.name} (${selectedBranch})!` });
       setTimeout(() => setFeedback(null), 4000);
-      setIsConnectModalOpen(false);
+      setIsGitHubModalOpen(false);
       await loadConnections();
     } catch (err: any) {
-      setFeedback({ type: 'error', message: err.message || 'Failed to save connection.' });
+      setFeedback({ type: 'error', message: err.message || 'Failed to save GitHub connection.' });
     } finally {
-      setSavingConnection(false);
+      setSavingGitHub(false);
+    }
+  };
+
+  const handleTestWordPress = async () => {
+    if (!wpUrl || !wpUsername || !wpAppPassword) {
+      setFeedback({ type: 'error', message: "Please fill in Site URL, Username, and Application Password." });
+      return;
+    }
+
+    try {
+      setTestingWp(true);
+      setWpTestResult(null);
+      const res = await testWordPressConnection({
+        siteUrl: wpUrl.trim(),
+        username: wpUsername.trim(),
+        appPassword: wpAppPassword.trim()
+      });
+
+      if (res.success) {
+        setWpTestResult({ success: true, message: `Successfully connected to "${res.data?.siteName || res.data?.siteUrl}" as ${res.data?.user?.name}!` });
+      } else {
+        setWpTestResult({ success: false, message: res.error || 'Connection failed' });
+      }
+    } catch (err: any) {
+      setWpTestResult({ success: false, message: err.message || 'Connection failed' });
+    } finally {
+      setTestingWp(false);
+    }
+  };
+
+  const handleSaveWordPress = async () => {
+    if (!wpUrl || !wpUsername || !wpAppPassword) return;
+    try {
+      setSavingWp(true);
+      await saveWordPressConnection({
+        siteUrl: wpUrl.trim(),
+        username: wpUsername.trim(),
+        appPassword: wpAppPassword.trim()
+      });
+
+      setFeedback({ type: 'success', message: `Connected WordPress website successfully!` });
+      setTimeout(() => setFeedback(null), 4000);
+      setIsWpModalOpen(false);
+      await loadConnections();
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err.message || 'Failed to save WordPress connection.' });
+    } finally {
+      setSavingWp(false);
     }
   };
 
   const handleDisconnect = async (connId: string) => {
-    if (!window.confirm("Are you sure you want to disconnect this repository from the current project?")) return;
+    if (!window.confirm("Are you sure you want to disconnect this integration from the current project?")) return;
     try {
       await deleteConnection(connId);
-      setFeedback({ type: 'success', message: "Repository connection removed." });
+      setFeedback({ type: 'success', message: "Connection removed." });
       setTimeout(() => setFeedback(null), 4000);
       setTreeItems([]);
       setSelectedFile(null);
+      setWpPages([]);
+      setWpPosts([]);
       await loadConnections();
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message || 'Failed to disconnect.' });
@@ -193,14 +293,14 @@ export const Connections: React.FC = () => {
             <div className="flex items-center gap-2 mb-1">
               <span className="px-2.5 py-0.5 rounded-full bg-[#cc785c]/10 text-[#cc785c] text-[11px] font-mono font-bold tracking-wider uppercase flex items-center gap-1.5">
                 <GitBranch size={12} />
-                Phase 1 Execution Architecture
+                Execution Provider Architecture
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-serif font-bold text-[#141413]">
-              Website Connections & Code Repositories
+              Website Connections & CMS Integrations
             </h1>
             <p className="text-xs text-[#6c6a64] font-sans mt-1">
-              Secure, read-only repository integration for <strong className="text-[#141413]">{activeBusiness?.name || 'Current Project'}</strong> ({activeBusiness?.website_url}).
+              Secure, tenant-isolated execution providers for <strong className="text-[#141413]">{activeBusiness?.name || 'Current Project'}</strong> ({activeBusiness?.website_url}).
             </p>
           </div>
 
@@ -230,7 +330,7 @@ export const Connections: React.FC = () => {
         {/* Provider Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
-          {/* 1. GITHUB (Active Phase 1) */}
+          {/* 1. GITHUB (Active Phase 1 & 2) */}
           <div className={`rounded-2xl p-6 border transition-all flex flex-col justify-between ${
             activeGitHubConnection 
               ? 'bg-white border-[#cc785c]/40 shadow-xs' 
@@ -255,7 +355,7 @@ export const Connections: React.FC = () => {
 
               <h2 className="text-lg font-serif font-bold text-[#141413] mb-1">GitHub Repository</h2>
               <p className="text-xs text-[#6c6a64] font-sans leading-relaxed mb-4">
-                Connect your custom-code website repository for automated structure inspection and future AI SEO pull requests.
+                Automated Pull Request engine for custom-code web stacks (Next.js, Astro, Remix, static HTML).
               </p>
 
               {activeGitHubConnection && (
@@ -269,10 +369,6 @@ export const Connections: React.FC = () => {
                   <div className="flex justify-between">
                     <span className="text-[#8e8b82]">Branch:</span>
                     <span className="font-bold text-[#cc785c]">{activeGitHubConnection.default_branch || 'main'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#8e8b82]">Permissions:</span>
-                    <span className="text-emerald-700 font-bold">Read-Only</span>
                   </div>
                 </div>
               )}
@@ -290,7 +386,7 @@ export const Connections: React.FC = () => {
                   </button>
                   <Button
                     size="sm"
-                    onClick={() => setIsConnectModalOpen(true)}
+                    onClick={() => setIsGitHubModalOpen(true)}
                     className="bg-[#faf9f5] border border-[#e6dfd8] text-[#141413] hover:bg-[#efe9de] text-xs font-semibold"
                   >
                     Change Repo
@@ -299,7 +395,7 @@ export const Connections: React.FC = () => {
               ) : (
                 <Button
                   size="sm"
-                  onClick={() => setIsConnectModalOpen(true)}
+                  onClick={() => setIsGitHubModalOpen(true)}
                   className="w-full bg-[#141413] hover:bg-[#252320] text-[#faf9f5] text-xs font-semibold flex items-center justify-center gap-2"
                 >
                   <GitBranch size={13} className="text-[#cc785c]" />
@@ -309,28 +405,86 @@ export const Connections: React.FC = () => {
             </div>
           </div>
 
-          {/* 2. WORDPRESS (Phase 2 Roadmap) */}
-          <div className="rounded-2xl p-6 border border-[#e6dfd8] bg-[#faf9f5]/50 flex flex-col justify-between opacity-80">
+          {/* 2. WORDPRESS (Phase 3 Active) */}
+          <div className={`rounded-2xl p-6 border transition-all flex flex-col justify-between ${
+            activeWpConnection 
+              ? 'bg-white border-[#0073aa]/40 shadow-xs' 
+              : 'bg-white border-[#e6dfd8] shadow-2xs hover:border-[#0073aa]/30'
+          }`}>
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div className="w-10 h-10 rounded-xl bg-[#0073aa] text-white flex items-center justify-center font-bold text-sm">
                   WP
                 </div>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#efe9de] text-[#8e8b82] border border-[#e6dfd8]">
-                  PHASE 2
-                </span>
+                {activeWpConnection ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    CONNECTED
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#efe9de] text-[#8e8b82] border border-[#e6dfd8]">
+                    AVAILABLE
+                  </span>
+                )}
               </div>
-              <h2 className="text-lg font-serif font-bold text-[#141413] mb-1">WordPress Integration</h2>
-              <p className="text-xs text-[#6c6a64] font-sans leading-relaxed">
-                Direct integration via Rankora WordPress Plugin for automated SEO meta injection and Yoast/RankMath syncing.
+
+              <h2 className="text-lg font-serif font-bold text-[#141413] mb-1">WordPress REST API</h2>
+              <p className="text-xs text-[#6c6a64] font-sans leading-relaxed mb-4">
+                Direct CMS integration via Application Passwords for verified meta tag, H1, and content updates.
               </p>
+
+              {activeWpConnection && (
+                <div className="p-3 bg-[#faf9f5] border border-[#e6dfd8] rounded-xl space-y-1.5 mb-4 text-xs font-mono">
+                  <div className="flex justify-between">
+                    <span className="text-[#8e8b82]">Site:</span>
+                    <span className="font-bold text-[#141413] truncate max-w-[160px]">
+                      {activeWpConnection.repository_name || activeWpConnection.repository_id}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#8e8b82]">User:</span>
+                    <span className="font-bold text-[#0073aa]">{activeWpConnection.repository_owner}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-[#8e8b82]">Cached:</span>
+                    <span className="text-[#141413]">{wpPages.length} Pages &bull; {wpPosts.length} Posts</span>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="pt-4 border-t border-[#e6dfd8]/60">
-              <span className="text-[11px] font-mono text-[#8e8b82]">Coming Soon in Phase 2</span>
+
+            <div className="pt-2 border-t border-[#e6dfd8]/60 flex items-center justify-between gap-3">
+              {activeWpConnection ? (
+                <>
+                  <button
+                    onClick={() => handleDisconnect(activeWpConnection.id)}
+                    className="text-xs font-sans font-medium text-rose-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Trash2 size={13} />
+                    <span>Disconnect</span>
+                  </button>
+                  <Button
+                    size="sm"
+                    onClick={() => setIsWpModalOpen(true)}
+                    className="bg-[#faf9f5] border border-[#e6dfd8] text-[#141413] hover:bg-[#efe9de] text-xs font-semibold"
+                  >
+                    Update Auth
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => setIsWpModalOpen(true)}
+                  className="w-full bg-[#141413] hover:bg-[#252320] text-[#faf9f5] text-xs font-semibold flex items-center justify-center gap-2"
+                >
+                  <Globe size={13} className="text-[#0073aa]" />
+                  <span>Connect WordPress</span>
+                </Button>
+              )}
             </div>
           </div>
 
-          {/* 3. SHOPIFY (Phase 2 Roadmap) */}
+          {/* 3. SHOPIFY (Phase 4 Roadmap) */}
           <div className="rounded-2xl p-6 border border-[#e6dfd8] bg-[#faf9f5]/50 flex flex-col justify-between opacity-80">
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -338,7 +492,7 @@ export const Connections: React.FC = () => {
                   SH
                 </div>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#efe9de] text-[#8e8b82] border border-[#e6dfd8]">
-                  PHASE 2
+                  PHASE 4
                 </span>
               </div>
               <h2 className="text-lg font-serif font-bold text-[#141413] mb-1">Shopify Store</h2>
@@ -347,12 +501,103 @@ export const Connections: React.FC = () => {
               </p>
             </div>
             <div className="pt-4 border-t border-[#e6dfd8]/60">
-              <span className="text-[11px] font-mono text-[#8e8b82]">Coming Soon in Phase 2</span>
+              <span className="text-[11px] font-mono text-[#8e8b82]">Coming Soon in Phase 4</span>
             </div>
           </div>
         </div>
 
-        {/* REPOSITORY STRUCTURE EXPLORER (READ ONLY) */}
+        {/* WORDPRESS CONTENT EXPLORER */}
+        {activeWpConnection && (
+          <div className="rounded-2xl border border-[#e6dfd8] bg-white p-6 shadow-2xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#e6dfd8]">
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#8e8b82] block mb-1">
+                  Connected WordPress Site
+                </span>
+                <h2 className="text-xl font-serif font-bold text-[#141413] flex items-center gap-2">
+                  <span>{activeWpConnection.repository_name || 'WordPress Site'}</span>
+                  <span className="font-mono text-xs font-normal text-[#0073aa]">
+                    ({activeWpConnection.repository_id})
+                  </span>
+                </h2>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs font-mono text-[#8e8b82]">
+                <ShieldCheck size={13} className="text-emerald-600" />
+                <span>REST API Status: Connected</span>
+              </div>
+            </div>
+
+            {/* WordPress Content Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Pages Column */}
+              <div className="border border-[#e6dfd8] rounded-xl bg-[#faf9f5] p-4">
+                <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#e6dfd8] text-xs font-mono font-bold text-[#141413]">
+                  <div className="flex items-center gap-2">
+                    <Layout size={14} className="text-[#0073aa]" />
+                    <span>Pages ({wpPages.length})</span>
+                  </div>
+                </div>
+
+                {loadingWpData ? (
+                  <div className="py-8 text-center text-xs font-mono text-[#8e8b82]">
+                    <RefreshCw size={14} className="animate-spin inline mr-1 text-[#0073aa]" /> Loading pages...
+                  </div>
+                ) : wpPages.length === 0 ? (
+                  <p className="text-xs text-[#8e8b82] py-4 text-center">No published pages found.</p>
+                ) : (
+                  <div className="max-h-48 overflow-y-auto space-y-1 text-xs">
+                    {wpPages.map((page) => (
+                      <div key={page.id} className="p-2 bg-white rounded-lg border border-[#e6dfd8] flex items-center justify-between">
+                        <div className="truncate pr-2">
+                          <span className="font-bold text-[#141413] block truncate">{page.title?.rendered || 'Untitled'}</span>
+                          <span className="text-[10px] text-[#8e8b82] font-mono truncate block">{page.slug}</span>
+                        </div>
+                        <a href={page.link} target="_blank" rel="noreferrer" className="text-[#8e8b82] hover:text-[#0073aa] shrink-0">
+                          <ExternalLink size={12} />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Posts Column */}
+              <div className="border border-[#e6dfd8] rounded-xl bg-[#faf9f5] p-4">
+                <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#e6dfd8] text-xs font-mono font-bold text-[#141413]">
+                  <div className="flex items-center gap-2">
+                    <FileText size={14} className="text-[#0073aa]" />
+                    <span>Posts ({wpPosts.length})</span>
+                  </div>
+                </div>
+
+                {loadingWpData ? (
+                  <div className="py-8 text-center text-xs font-mono text-[#8e8b82]">
+                    <RefreshCw size={14} className="animate-spin inline mr-1 text-[#0073aa]" /> Loading posts...
+                  </div>
+                ) : wpPosts.length === 0 ? (
+                  <p className="text-xs text-[#8e8b82] py-4 text-center">No published posts found.</p>
+                ) : (
+                  <div className="max-h-48 overflow-y-auto space-y-1 text-xs">
+                    {wpPosts.map((post) => (
+                      <div key={post.id} className="p-2 bg-white rounded-lg border border-[#e6dfd8] flex items-center justify-between">
+                        <div className="truncate pr-2">
+                          <span className="font-bold text-[#141413] block truncate">{post.title?.rendered || 'Untitled'}</span>
+                          <span className="text-[10px] text-[#8e8b82] font-mono truncate block">{post.slug}</span>
+                        </div>
+                        <a href={post.link} target="_blank" rel="noreferrer" className="text-[#8e8b82] hover:text-[#0073aa] shrink-0">
+                          <ExternalLink size={12} />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* GITHUB REPOSITORY EXPLORER (READ ONLY) */}
         {activeGitHubConnection && (
           <div className="rounded-2xl border border-[#e6dfd8] bg-white p-6 shadow-2xs space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#e6dfd8]">
@@ -471,10 +716,9 @@ export const Connections: React.FC = () => {
         )}
 
         {/* CONNECT GITHUB MODAL */}
-        {isConnectModalOpen && (
+        {isGitHubModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#141413]/60 backdrop-blur-sm animate-in fade-in duration-150">
             <div className="bg-white border border-[#e6dfd8] rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-5">
-              
               <div className="flex items-center justify-between pb-3 border-b border-[#e6dfd8]">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-[#141413] text-white flex items-center justify-center font-bold text-xs">
@@ -485,111 +729,172 @@ export const Connections: React.FC = () => {
                     <p className="text-[11px] text-[#8e8b82] font-mono">Scoped to: {activeBusiness?.name}</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setIsConnectModalOpen(false)}
-                  className="p-1 rounded-lg text-[#8e8b82] hover:text-[#141413] cursor-pointer"
-                >
+                <button onClick={() => setIsGitHubModalOpen(false)} className="p-1 rounded-lg text-[#8e8b82] hover:text-[#141413]">
                   <X size={18} />
                 </button>
               </div>
 
-              {/* Step 1: Token / App Auth */}
               <div className="space-y-2">
-                <label className="block text-xs font-mono font-bold text-[#141413] uppercase">
-                  1. GitHub Token (Read-Only)
-                </label>
+                <label className="block text-xs font-mono font-bold text-[#141413] uppercase">1. GitHub Token</label>
                 <div className="flex gap-2">
                   <input
                     type="password"
                     value={gitHubToken}
                     onChange={(e) => setGitHubToken(e.target.value)}
                     placeholder="ghp_... or GitHub App Token"
-                    className="flex-1 h-9 px-3 text-xs font-mono rounded-xl border border-[#e6dfd8] bg-[#faf9f5] focus:outline-none focus:ring-1 focus:ring-[#cc785c]"
+                    className="flex-1 h-9 px-3 text-xs font-mono rounded-xl border border-[#e6dfd8] bg-[#faf9f5]"
                   />
-                  <Button
-                    size="sm"
-                    onClick={handleFetchRepos}
-                    disabled={loadingRepos}
-                    className="bg-[#141413] hover:bg-[#252320] text-[#faf9f5] text-xs font-semibold"
-                  >
+                  <Button size="sm" onClick={handleFetchRepos} disabled={loadingRepos} className="bg-[#141413] text-[#faf9f5] text-xs">
                     {loadingRepos ? <RefreshCw size={13} className="animate-spin text-[#cc785c]" /> : 'Fetch Repos'}
                   </Button>
                 </div>
-                <p className="text-[10px] text-[#8e8b82] font-sans">
-                  Requires <span className="font-mono font-bold">repo (read)</span> permission. Credentials are never sent to third-party servers.
-                </p>
               </div>
 
-              {/* Step 2: Select Repository */}
               {repositories.length > 0 && (
                 <div className="space-y-2">
-                  <label className="block text-xs font-mono font-bold text-[#141413] uppercase">
-                    2. Select Repository ({repositories.length} found)
-                  </label>
+                  <label className="block text-xs font-mono font-bold text-[#141413] uppercase">2. Select Repository</label>
                   <div className="max-h-40 overflow-y-auto border border-[#e6dfd8] rounded-xl divide-y divide-[#e6dfd8] bg-[#faf9f5]">
-                    {repositories.map((repo) => {
-                      const isSelected = selectedRepo?.id === repo.id;
-                      return (
-                        <button
-                          key={repo.id}
-                          onClick={() => handleSelectRepo(repo)}
-                          className={`w-full px-3 py-2 text-left flex items-center justify-between text-xs transition-colors cursor-pointer ${
-                            isSelected ? 'bg-[#efe9de] text-[#141413] font-bold' : 'hover:bg-[#efe9de]/50 text-[#6c6a64]'
-                          }`}
-                        >
-                          <div className="truncate">
-                            <span className="font-mono font-bold text-[#141413]">{repo.fullName}</span>
-                            {repo.description && (
-                              <p className="text-[10px] text-[#8e8b82] truncate font-sans">{repo.description}</p>
-                            )}
-                          </div>
-                          {isSelected && <CheckCircle2 size={14} className="text-[#cc785c] shrink-0 ml-2" />}
-                        </button>
-                      );
-                    })}
+                    {repositories.map((repo) => (
+                      <button
+                        key={repo.id}
+                        onClick={() => handleSelectRepo(repo)}
+                        className={`w-full px-3 py-2 text-left flex items-center justify-between text-xs cursor-pointer ${
+                          selectedRepo?.id === repo.id ? 'bg-[#efe9de] text-[#141413] font-bold' : 'hover:bg-[#efe9de]/50'
+                        }`}
+                      >
+                        <span className="font-mono">{repo.fullName}</span>
+                        {selectedRepo?.id === repo.id && <CheckCircle2 size={14} className="text-[#cc785c]" />}
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* Step 3: Select Branch */}
               {selectedRepo && (
                 <div className="space-y-2">
-                  <label className="block text-xs font-mono font-bold text-[#141413] uppercase">
-                    3. Select Default Branch
-                  </label>
+                  <label className="block text-xs font-mono font-bold text-[#141413] uppercase">3. Default Branch</label>
                   <select
                     value={selectedBranch}
                     onChange={(e) => setSelectedBranch(e.target.value)}
-                    className="w-full h-9 px-3 text-xs font-mono rounded-xl border border-[#e6dfd8] bg-[#faf9f5] focus:outline-none focus:ring-1 focus:ring-[#cc785c]"
+                    className="w-full h-9 px-3 text-xs font-mono rounded-xl border border-[#e6dfd8] bg-[#faf9f5]"
                   >
                     {branches.map((b) => (
-                      <option key={b.name} value={b.name}>
-                        {b.name} {b.isProtected ? '(protected)' : ''}
-                      </option>
+                      <option key={b.name} value={b.name}>{b.name}</option>
                     ))}
                   </select>
                 </div>
               )}
 
-              {/* Modal Actions */}
-              <div className="pt-3 border-t border-[#e6dfd8] flex items-center justify-end gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsConnectModalOpen(false)}
-                  className="text-xs"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleSaveConnection}
-                  disabled={!selectedRepo || savingConnection}
-                  className="bg-[#141413] hover:bg-[#252320] text-[#faf9f5] text-xs font-semibold flex items-center gap-1.5"
-                >
-                  {savingConnection ? <RefreshCw size={13} className="animate-spin text-[#cc785c]" /> : <CheckCircle2 size={13} className="text-[#cc785c]" />}
+              <div className="pt-3 border-t border-[#e6dfd8] flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setIsGitHubModalOpen(false)}>Cancel</Button>
+                <Button size="sm" onClick={handleSaveGitHub} disabled={!selectedRepo || savingGitHub} className="bg-[#141413] text-[#faf9f5]">
+                  {savingGitHub ? <RefreshCw size={13} className="animate-spin text-[#cc785c]" /> : <CheckCircle2 size={13} className="text-[#cc785c]" />}
                   <span>Save Connection</span>
                 </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CONNECT WORDPRESS MODAL */}
+        {isWpModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#141413]/60 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="bg-white border border-[#e6dfd8] rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-5">
+              
+              <div className="flex items-center justify-between pb-3 border-b border-[#e6dfd8]">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#0073aa] text-white flex items-center justify-center font-bold text-xs">
+                    WP
+                  </div>
+                  <div>
+                    <h3 className="font-serif font-bold text-base text-[#141413]">Connect WordPress Website</h3>
+                    <p className="text-[11px] text-[#8e8b82] font-mono">Scoped to: {activeBusiness?.name}</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsWpModalOpen(false)} className="p-1 rounded-lg text-[#8e8b82] hover:text-[#141413]">
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Form Fields */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#141413] uppercase mb-1">
+                    WordPress Site URL (HTTPS)
+                  </label>
+                  <input
+                    type="url"
+                    value={wpUrl}
+                    onChange={(e) => setWpUrl(e.target.value)}
+                    placeholder="https://example.com"
+                    className="w-full h-9 px-3 text-xs font-mono rounded-xl border border-[#e6dfd8] bg-[#faf9f5]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#141413] uppercase mb-1">
+                    WordPress Username
+                  </label>
+                  <input
+                    type="text"
+                    value={wpUsername}
+                    onChange={(e) => setWpUsername(e.target.value)}
+                    placeholder="admin"
+                    className="w-full h-9 px-3 text-xs font-mono rounded-xl border border-[#e6dfd8] bg-[#faf9f5]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#141413] uppercase mb-1">
+                    Application Password
+                  </label>
+                  <input
+                    type="password"
+                    value={wpAppPassword}
+                    onChange={(e) => setWpAppPassword(e.target.value)}
+                    placeholder="xxxx xxxx xxxx xxxx"
+                    className="w-full h-9 px-3 text-xs font-mono rounded-xl border border-[#e6dfd8] bg-[#faf9f5]"
+                  />
+                  <p className="text-[10px] text-[#8e8b82] font-sans mt-1">
+                    Generate in WordPress Admin &rarr; Users &rarr; Profile &rarr; Application Passwords.
+                  </p>
+                </div>
+              </div>
+
+              {/* Test Result Message */}
+              {wpTestResult && (
+                <div className={`p-3 rounded-xl text-xs font-sans flex items-center gap-2 ${
+                  wpTestResult.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+                }`}>
+                  {wpTestResult.success ? <CheckCircle2 size={15} className="text-emerald-600 shrink-0" /> : <AlertCircle size={15} className="text-red-600 shrink-0" />}
+                  <span>{wpTestResult.message}</span>
+                </div>
+              )}
+
+              {/* Modal Actions */}
+              <div className="pt-3 border-t border-[#e6dfd8] flex items-center justify-between">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleTestWordPress}
+                  disabled={testingWp}
+                  className="text-xs font-semibold"
+                >
+                  {testingWp ? <RefreshCw size={13} className="animate-spin text-[#0073aa]" /> : 'Test Connection'}
+                </Button>
+
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setIsWpModalOpen(false)}>Cancel</Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveWordPress}
+                    disabled={savingWp || !wpUrl || !wpUsername || !wpAppPassword}
+                    className="bg-[#141413] text-[#faf9f5] text-xs font-semibold"
+                  >
+                    {savingWp ? <RefreshCw size={13} className="animate-spin text-[#cc785c]" /> : <CheckCircle2 size={13} className="text-[#cc785c]" />}
+                    <span>Save & Connect</span>
+                  </Button>
+                </div>
               </div>
 
             </div>

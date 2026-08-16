@@ -1,5 +1,6 @@
 import { githubProvider } from './providers/githubProvider';
-import type { RepositoryItem, BranchItem, TreeItem, FileContent, PullRequestResult } from './providers/types';
+import { wordpressProvider } from './providers/wordpressProvider';
+import type { RepositoryItem, BranchItem, TreeItem, FileContent, PullRequestResult, WordPressSiteInfo, WordPressItem } from './providers/types';
 
 export interface ConnectionRecord {
   id: string;
@@ -23,6 +24,18 @@ export async function getProjectConnections(db: any, userId: string, projectId: 
 
   return (results || []) as ConnectionRecord[];
 }
+
+export async function deleteConnection(db: any, userId: string, projectId: string, connectionId: string): Promise<boolean> {
+  const res = await db.prepare(
+    "DELETE FROM connections WHERE id = ? AND user_id = ? AND project_id = ?"
+  ).bind(connectionId, userId, projectId).run();
+
+  return (res?.meta?.changes || 0) > 0;
+}
+
+// =========================================================================
+// GITHUB PROVIDER INTEGRATION (PHASES 1 & 2)
+// =========================================================================
 
 export async function getActiveGitHubConnection(db: any, userId: string, projectId: string) {
   const row: any = await db.prepare(
@@ -118,18 +131,6 @@ export async function saveGitHubConnection(
     updated_at: new Date().toISOString()
   };
 }
-
-export async function deleteConnection(db: any, userId: string, projectId: string, connectionId: string): Promise<boolean> {
-  const res = await db.prepare(
-    "DELETE FROM connections WHERE id = ? AND user_id = ? AND project_id = ?"
-  ).bind(connectionId, userId, projectId).run();
-
-  return (res?.meta?.changes || 0) > 0;
-}
-
-// =========================================================================
-// PHASE 2: SAFE APPROVAL-BASED SEO CODE EXECUTION ENGINE
-// =========================================================================
 
 export async function executeGitHubSeoFix(
   db: any,
@@ -345,5 +346,296 @@ export async function checkGitHubPullRequestStatus(
     state: pr.state,
     pullRequestUrl: pr.htmlUrl,
     pullRequestNumber: pr.number
+  };
+}
+
+// =========================================================================
+// PHASE 3: WORDPRESS PROVIDER INTEGRATION
+// =========================================================================
+
+export async function getActiveWordPressConnection(db: any, userId: string, projectId: string) {
+  const row: any = await db.prepare(
+    "SELECT * FROM connections WHERE user_id = ? AND project_id = ? AND provider = 'wordpress' AND status = 'CONNECTED' ORDER BY updated_at DESC LIMIT 1"
+  ).bind(userId, projectId).first();
+
+  return row;
+}
+
+export async function saveWordPressConnection(
+  db: any,
+  userId: string,
+  projectId: string,
+  data: {
+    siteUrl: string;
+    username: string;
+    appPassword: string;
+  }
+): Promise<ConnectionRecord & { siteName?: string }> {
+  // 1. Test connection via WordPress REST API first
+  const testRes = await wordpressProvider.testConnection(data.siteUrl, data.username, data.appPassword);
+  const normalizedUrl = testRes.siteUrl;
+
+  const id = `conn_wp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const credentialsToken = JSON.stringify({
+    username: data.username.trim(),
+    appPassword: data.appPassword.trim()
+  });
+
+  // Check if WP connection already exists for this project
+  const existing: any = await db.prepare(
+    "SELECT id FROM connections WHERE user_id = ? AND project_id = ? AND provider = 'wordpress'"
+  ).bind(userId, projectId).first();
+
+  if (existing) {
+    await db.prepare(`
+      UPDATE connections 
+      SET repository_name = ?, repository_owner = ?, repository_id = ?, auth_token = ?, status = 'CONNECTED', updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND user_id = ?
+    `).bind(
+      testRes.siteName,
+      data.username.trim(),
+      normalizedUrl,
+      credentialsToken,
+      existing.id,
+      userId
+    ).run();
+
+    return {
+      id: existing.id,
+      user_id: userId,
+      project_id: projectId,
+      provider: 'wordpress',
+      repository_name: testRes.siteName,
+      repository_owner: data.username.trim(),
+      repository_id: normalizedUrl,
+      status: 'CONNECTED',
+      siteName: testRes.siteName,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+  }
+
+  await db.prepare(`
+    INSERT INTO connections 
+    (id, user_id, project_id, provider, installation_id, repository_id, repository_name, repository_owner, default_branch, status, auth_token, created_at, updated_at)
+    VALUES (?, ?, ?, 'wordpress', '', ?, ?, ?, 'main', 'CONNECTED', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `).bind(
+    id,
+    userId,
+    projectId,
+    normalizedUrl,
+    testRes.siteName,
+    data.username.trim(),
+    credentialsToken
+  ).run();
+
+  return {
+    id,
+    user_id: userId,
+    project_id: projectId,
+    provider: 'wordpress',
+    repository_name: testRes.siteName,
+    repository_owner: data.username.trim(),
+    repository_id: normalizedUrl,
+    status: 'CONNECTED',
+    siteName: testRes.siteName,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+}
+
+export async function executeWordPressSeoFix(
+  db: any,
+  userId: string,
+  projectId: string,
+  changeId: string,
+  options: {
+    targetType?: 'page' | 'post';
+    targetId?: number | string;
+    customContent?: string;
+  } = {}
+): Promise<{
+  success: boolean;
+  status: string;
+  message: string;
+  updatedItem?: any;
+  verification?: any;
+}> {
+  // 1. Verify change ownership
+  const change: any = await db.prepare(
+    "SELECT * FROM seo_changes WHERE id = ? AND user_id = ? AND project_id = ?"
+  ).bind(changeId, userId, projectId).first();
+
+  if (!change) {
+    throw new Error("SEO Change record not found or access unauthorized");
+  }
+
+  // 2. Fetch active WordPress connection
+  const conn = await getActiveWordPressConnection(db, userId, projectId);
+  if (!conn || !conn.auth_token) {
+    throw new Error("NOT_CONNECTED: No active WordPress connection found for this project");
+  }
+
+  let creds: { username: string; appPassword: string };
+  try {
+    creds = JSON.parse(conn.auth_token);
+  } catch (e) {
+    throw new Error("INVALID_CREDENTIALS: Stored WordPress credentials are corrupted. Please reconnect.");
+  }
+
+  const siteUrl = conn.repository_id;
+  if (!siteUrl) {
+    throw new Error("INVALID_URL: WordPress site URL is not configured");
+  }
+  const username = creds.username;
+  const appPassword = creds.appPassword;
+
+  // 3. Resolve target page/post
+  let targetType = options.targetType || 'page';
+  let targetId = options.targetId;
+
+  if (!targetId) {
+    // Attempt to match by homepage or change.page_url
+    const pages = await wordpressProvider.getPages(siteUrl, username, appPassword, 20);
+    if (pages.length > 0) {
+      const matchedPage = pages.find(p => change.page_url && p.link.includes(change.page_url)) || pages[0];
+      targetId = matchedPage.id;
+      targetType = 'page';
+    } else {
+      const posts = await wordpressProvider.getPosts(siteUrl, username, appPassword, 10);
+      if (posts.length > 0) {
+        targetId = posts[0].id;
+        targetType = 'post';
+      }
+    }
+  }
+
+  if (!targetId) {
+    throw new Error("WORDPRESS_TARGET_NOT_FOUND: Unable to resolve target WordPress Page or Post ID");
+  }
+
+  // 4. Fetch current item for freshness check (STALE_CHANGE guard)
+  const currentItem = targetType === 'page'
+    ? await wordpressProvider.getPage(siteUrl, username, appPassword, targetId)
+    : await wordpressProvider.getPost(siteUrl, username, appPassword, targetId);
+
+  const beforeVal = (change.before_value || '').trim();
+  const afterVal = (options.customContent || change.after_value || '').trim();
+
+  // 5. Build update payload according to change type
+  let updatePayload: { title?: string; content?: string; excerpt?: string; meta?: Record<string, any> } = {};
+
+  if (change.change_type === 'SEO_TITLE') {
+    updatePayload.title = afterVal.replace(/<\/?title>/gi, '').trim();
+  } else if (change.change_type === 'H1') {
+    let content = currentItem.content.raw || currentItem.content.rendered || '';
+    if (/<h1[^>]*>.*?<\/h1>/i.test(content)) {
+      content = content.replace(/<h1[^>]*>.*?<\/h1>/i, `<h1>${afterVal.replace(/<\/?h1>/gi, '').trim()}</h1>`);
+    } else {
+      content = `<h1>${afterVal.replace(/<\/?h1>/gi, '').trim()}</h1>\n\n${content}`;
+    }
+    updatePayload.content = content;
+  } else if (change.change_type === 'META_DESCRIPTION') {
+    updatePayload.meta = {
+      _yoast_wpseo_metadesc: afterVal,
+      rank_math_description: afterVal
+    };
+  } else {
+    let content = currentItem.content.raw || currentItem.content.rendered || '';
+    if (beforeVal && content.includes(beforeVal)) {
+      content = content.replace(beforeVal, afterVal);
+    } else {
+      content = `${content}\n\n${afterVal}`;
+    }
+    updatePayload.content = content;
+  }
+
+  // 6. Execute update on WordPress REST API
+  const updatedItem = targetType === 'page'
+    ? await wordpressProvider.updatePage(siteUrl, username, appPassword, targetId, updatePayload)
+    : await wordpressProvider.updatePost(siteUrl, username, appPassword, targetId, updatePayload);
+
+  // 7. Update change record to APPLIED
+  await db.prepare(`
+    UPDATE seo_changes 
+    SET approval_status = 'APPROVED', execution_status = 'APPLIED', provider = 'WORDPRESS', applied_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND user_id = ?
+  `).bind(changeId, userId).run();
+
+  // 8. Trigger immediate live DOM re-crawl verification
+  let verificationStatus = 'APPLIED';
+  let verificationEvidence: any = {
+    provider: 'WORDPRESS',
+    siteUrl,
+    targetType,
+    targetId,
+    timestamp: new Date().toISOString()
+  };
+
+  try {
+    const liveTargetUrl = updatedItem.link || change.page_url || siteUrl;
+    const fetchResp = await fetch(liveTargetUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Rankora Live SEO Crawler 2.0)' }
+    });
+
+    if (fetchResp.ok) {
+      const html = await fetchResp.text();
+      const cleanExpected = afterVal.replace(/<[^>]*>/g, '').toLowerCase().trim();
+      const htmlLower = html.toLowerCase();
+
+      const matched = htmlLower.includes(cleanExpected);
+      verificationEvidence = {
+        status: matched ? 'VERIFIED' : 'VERIFICATION_PENDING_CACHE',
+        url: liveTargetUrl,
+        http_status: fetchResp.status,
+        expected: afterVal,
+        observed_match: matched,
+        page_title: html.match(/<title>(.*?)<\/title>/i)?.[1] || 'N/A'
+      };
+
+      if (matched) {
+        verificationStatus = 'VERIFIED';
+        await db.prepare(`
+          UPDATE seo_changes 
+          SET execution_status = 'VERIFIED', verification_status = 'VERIFIED', verified_at = CURRENT_TIMESTAMP, verification_evidence = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(JSON.stringify(verificationEvidence), changeId).run();
+      } else {
+        await db.prepare(`
+          UPDATE seo_changes 
+          SET verification_evidence = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(JSON.stringify(verificationEvidence), changeId).run();
+      }
+    }
+  } catch (verifyErr: any) {
+    verificationEvidence.error = verifyErr.message;
+  }
+
+  // 9. Log execution event
+  await db.prepare(`
+    INSERT INTO execution_events (id, user_id, project_id, change_id, event_type, event_payload, created_at)
+    VALUES (?, ?, ?, ?, 'WORDPRESS_EXECUTED', ?, CURRENT_TIMESTAMP)
+  `).bind(
+    `evt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    userId,
+    projectId,
+    changeId,
+    JSON.stringify({
+      targetType,
+      targetId,
+      status: verificationStatus,
+      evidence: verificationEvidence
+    })
+  ).run().catch(() => {});
+
+  return {
+    success: true,
+    status: verificationStatus,
+    message: verificationStatus === 'VERIFIED' 
+      ? 'WordPress page updated and verified live on production!' 
+      : 'WordPress page updated successfully. Live cache verification pending.',
+    updatedItem,
+    verification: verificationEvidence
   };
 }

@@ -6,9 +6,13 @@ import {
   deleteConnection, 
   getActiveGitHubConnection,
   executeGitHubSeoFix,
-  checkGitHubPullRequestStatus
+  checkGitHubPullRequestStatus,
+  saveWordPressConnection,
+  getActiveWordPressConnection,
+  executeWordPressSeoFix
 } from './connectionsEngine';
 import { githubProvider } from './providers/githubProvider';
+import { wordpressProvider } from './providers/wordpressProvider';
 
 export interface Env {
   DB: D1Database;
@@ -5358,6 +5362,311 @@ export const onRequest = async (context: any) => {
           return jsonResponse({ success: true, data: prRes });
         } catch (err: any) {
           return errorResponse(err.message || "Failed to create Pull Request", 400);
+        }
+      }
+
+      // =========================================================================
+      // PHASE 3: WORDPRESS REST API & SEO EXECUTION ENGINE
+      // =========================================================================
+
+      // POST /api/connections/wordpress — Connect & test WordPress website
+      if (url.pathname === '/api/connections/wordpress' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        if (!payload.siteUrl || !payload.username || !payload.appPassword) {
+          return errorResponse("Missing required fields: siteUrl, username, and appPassword", 400);
+        }
+
+        try {
+          const conn = await saveWordPressConnection(env.DB, user.id, business.id, {
+            siteUrl: payload.siteUrl,
+            username: payload.username,
+            appPassword: payload.appPassword
+          });
+
+          return jsonResponse({ success: true, message: "WordPress connected successfully", data: conn });
+        } catch (err: any) {
+          return errorResponse(err.message || "WordPress connection test failed", 400);
+        }
+      }
+
+      // POST /api/wordpress/test — Dry-run connectivity test
+      if (url.pathname === '/api/wordpress/test' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json() as any;
+        if (!payload.siteUrl || !payload.username || !payload.appPassword) {
+          return errorResponse("Missing required fields: siteUrl, username, and appPassword", 400);
+        }
+
+        try {
+          const testRes = await wordpressProvider.testConnection(payload.siteUrl, payload.username, payload.appPassword);
+          return jsonResponse({ success: true, data: testRes });
+        } catch (err: any) {
+          return errorResponse(err.message || "WordPress connection test failed", 400);
+        }
+      }
+
+      // GET /api/wordpress/site — Retrieve WordPress Site Metadata
+      if (url.pathname === '/api/wordpress/site' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const conn = await getActiveWordPressConnection(env.DB, user.id, business.id);
+        if (!conn || !conn.auth_token) {
+          return errorResponse("NOT_CONNECTED: No active WordPress connection found for this project", 400);
+        }
+
+        try {
+          const creds = JSON.parse(conn.auth_token);
+          const siteInfo = await wordpressProvider.getSiteInfo(conn.repository_id, creds.username, creds.appPassword);
+          return jsonResponse({ success: true, data: siteInfo });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to retrieve WordPress site info", 400);
+        }
+      }
+
+      // GET /api/wordpress/pages — Retrieve WordPress Pages
+      if (url.pathname === '/api/wordpress/pages' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const conn = await getActiveWordPressConnection(env.DB, user.id, business.id);
+        if (!conn || !conn.auth_token) {
+          return errorResponse("NOT_CONNECTED: No active WordPress connection found", 400);
+        }
+
+        try {
+          const creds = JSON.parse(conn.auth_token);
+          const perPage = parseInt(url.searchParams.get('per_page') || '50', 10);
+          const pages = await wordpressProvider.getPages(conn.repository_id, creds.username, creds.appPassword, perPage);
+          return jsonResponse({ success: true, data: pages });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to retrieve WordPress pages", 400);
+        }
+      }
+
+      // GET /api/wordpress/pages/:id — Retrieve single WordPress Page
+      if (url.pathname.startsWith('/api/wordpress/pages/') && !url.pathname.endsWith('/update') && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const pageId = url.pathname.replace('/api/wordpress/pages/', '');
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const conn = await getActiveWordPressConnection(env.DB, user.id, business.id);
+        if (!conn || !conn.auth_token) return errorResponse("NOT_CONNECTED: No active WordPress connection", 400);
+
+        try {
+          const creds = JSON.parse(conn.auth_token);
+          const page = await wordpressProvider.getPage(conn.repository_id, creds.username, creds.appPassword, pageId);
+          return jsonResponse({ success: true, data: page });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to retrieve WordPress page", 400);
+        }
+      }
+
+      // GET /api/wordpress/posts — Retrieve WordPress Posts
+      if (url.pathname === '/api/wordpress/posts' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const conn = await getActiveWordPressConnection(env.DB, user.id, business.id);
+        if (!conn || !conn.auth_token) return errorResponse("NOT_CONNECTED: No active WordPress connection", 400);
+
+        try {
+          const creds = JSON.parse(conn.auth_token);
+          const perPage = parseInt(url.searchParams.get('per_page') || '50', 10);
+          const posts = await wordpressProvider.getPosts(conn.repository_id, creds.username, creds.appPassword, perPage);
+          return jsonResponse({ success: true, data: posts });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to retrieve WordPress posts", 400);
+        }
+      }
+
+      // GET /api/wordpress/posts/:id — Retrieve single WordPress Post
+      if (url.pathname.startsWith('/api/wordpress/posts/') && !url.pathname.endsWith('/update') && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const postId = url.pathname.replace('/api/wordpress/posts/', '');
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const conn = await getActiveWordPressConnection(env.DB, user.id, business.id);
+        if (!conn || !conn.auth_token) return errorResponse("NOT_CONNECTED: No active WordPress connection", 400);
+
+        try {
+          const creds = JSON.parse(conn.auth_token);
+          const post = await wordpressProvider.getPost(conn.repository_id, creds.username, creds.appPassword, postId);
+          return jsonResponse({ success: true, data: post });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to retrieve WordPress post", 400);
+        }
+      }
+
+      // POST /api/wordpress/pages/:id/update — Update WordPress Page directly
+      if (url.pathname.startsWith('/api/wordpress/pages/') && url.pathname.endsWith('/update') && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const pageId = url.pathname.replace('/api/wordpress/pages/', '').replace('/update', '');
+        const payload = await request.json() as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const conn = await getActiveWordPressConnection(env.DB, user.id, business.id);
+        if (!conn || !conn.auth_token) return errorResponse("NOT_CONNECTED: No active WordPress connection", 400);
+
+        try {
+          const creds = JSON.parse(conn.auth_token);
+          const updated = await wordpressProvider.updatePage(conn.repository_id, creds.username, creds.appPassword, pageId, {
+            title: payload.title,
+            content: payload.content,
+            excerpt: payload.excerpt,
+            meta: payload.meta
+          });
+          return jsonResponse({ success: true, data: updated });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to update WordPress page", 400);
+        }
+      }
+
+      // POST /api/wordpress/posts/:id/update — Update WordPress Post directly
+      if (url.pathname.startsWith('/api/wordpress/posts/') && url.pathname.endsWith('/update') && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const postId = url.pathname.replace('/api/wordpress/posts/', '').replace('/update', '');
+        const payload = await request.json() as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const conn = await getActiveWordPressConnection(env.DB, user.id, business.id);
+        if (!conn || !conn.auth_token) return errorResponse("NOT_CONNECTED: No active WordPress connection", 400);
+
+        try {
+          const creds = JSON.parse(conn.auth_token);
+          const updated = await wordpressProvider.updatePost(conn.repository_id, creds.username, creds.appPassword, postId, {
+            title: payload.title,
+            content: payload.content,
+            excerpt: payload.excerpt,
+            meta: payload.meta
+          });
+          return jsonResponse({ success: true, data: updated });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to update WordPress post", 400);
+        }
+      }
+
+      // POST /api/seo/changes/:id/execute-wordpress — Apply approved fix to WordPress & live verify
+      if (url.pathname.startsWith('/api/seo/changes/') && url.pathname.endsWith('/execute-wordpress') && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const changeId = url.pathname.replace('/api/seo/changes/', '').replace('/execute-wordpress', '');
+        const payload = await request.json().catch(() => ({})) as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        try {
+          const result = await executeWordPressSeoFix(env.DB, user.id, business.id, changeId, {
+            targetType: payload.targetType,
+            targetId: payload.targetId,
+            customContent: payload.customContent
+          });
+
+          return jsonResponse({ success: true, data: result });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to execute WordPress SEO fix", 400);
         }
       }
 

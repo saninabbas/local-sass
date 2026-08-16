@@ -39,6 +39,43 @@ export interface PullRequestResult {
   merged?: boolean;
 }
 
+export interface WordPressSiteInfo {
+  name: string;
+  description: string;
+  url: string;
+  home: string;
+  gmt_offset?: string;
+  timezone_string?: string;
+  namespaces?: string[];
+  authentication?: Record<string, any>;
+}
+
+export interface WordPressItem {
+  id: number;
+  date: string;
+  modified: string;
+  slug: string;
+  status: string;
+  type: 'page' | 'post';
+  link: string;
+  title: {
+    rendered: string;
+    raw?: string;
+  };
+  content: {
+    rendered: string;
+    raw?: string;
+    protected?: boolean;
+  };
+  excerpt: {
+    rendered: string;
+    raw?: string;
+  };
+  yoast_head_json?: Record<string, any>;
+  rank_math_seo?: Record<string, any>;
+  meta?: Record<string, any>;
+}
+
 export interface WebsiteProvider {
   readonly providerName: string;
   getRepositories(token: string): Promise<RepositoryItem[]>;

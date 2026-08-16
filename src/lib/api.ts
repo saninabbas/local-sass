@@ -380,5 +380,50 @@ export async function checkPullRequestStatus(changeId: string): Promise<any> {
   return fetchApi(`/api/seo/changes/${changeId}/pr-status`);
 }
 
+// -----------------------------------------------------------------------------
+// PHASE 3: WORDPRESS PROVIDER INTEGRATION
+// -----------------------------------------------------------------------------
+export async function saveWordPressConnection(data: {
+  siteUrl: string;
+  username: string;
+  appPassword: string;
+}): Promise<any> {
+  return fetchApi('/api/connections/wordpress', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+}
+
+export async function testWordPressConnection(data: {
+  siteUrl: string;
+  username: string;
+  appPassword: string;
+}): Promise<any> {
+  return fetchApi('/api/wordpress/test', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+}
+
+export async function getWordPressSiteInfo(): Promise<any> {
+  return fetchApi('/api/wordpress/site');
+}
+
+export async function getWordPressPages(perPage: number = 50): Promise<any[]> {
+  return fetchApi(`/api/wordpress/pages?per_page=${perPage}`);
+}
+
+export async function getWordPressPosts(perPage: number = 50): Promise<any[]> {
+  return fetchApi(`/api/wordpress/posts?per_page=${perPage}`);
+}
+
+export async function executeWordPressFix(changeId: string, options: { targetType?: 'page' | 'post'; targetId?: number | string; customContent?: string } = {}): Promise<any> {
+  return fetchApi(`/api/seo/changes/${changeId}/execute-wordpress`, {
+    method: 'POST',
+    body: JSON.stringify(options)
+  });
+}
+
+
 
 

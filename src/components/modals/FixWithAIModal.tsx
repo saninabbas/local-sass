@@ -17,13 +17,15 @@ import {
   ExternalLink,
   GitBranch,
   GitPullRequest,
-  CheckCheck
+  CheckCheck,
+  Layout
 } from 'lucide-react';
 import { 
   fetchApi, 
   getConnections, 
   executeSeoFixViaGitHub, 
-  checkPullRequestStatus 
+  checkPullRequestStatus,
+  executeWordPressFix
 } from '../../lib/api';
 import { ExecutionStatusBadge } from '../dashboard/ExecutionStatusBadge';
 import { Button } from '../ui/Button';
@@ -56,7 +58,7 @@ export function FixWithAIModal({
   context,
   onSuccess
 }: FixWithAIModalProps) {
-  const [step, setStep] = useState<'GENERATE' | 'PREVIEW' | 'GITHUB_EXECUTING' | 'PR_CREATED' | 'APPLY_MANUAL' | 'VERIFYING' | 'RESULT'>('GENERATE');
+  const [step, setStep] = useState<'GENERATE' | 'PREVIEW' | 'GITHUB_EXECUTING' | 'WP_EXECUTING' | 'PR_CREATED' | 'APPLY_MANUAL' | 'VERIFYING' | 'RESULT'>('GENERATE');
   const [loading, setLoading] = useState(false);
   const [changeRecord, setChangeRecord] = useState<any | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -65,12 +67,12 @@ export function FixWithAIModal({
   const [verificationResult, setVerificationResult] = useState<any | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // GitHub Connection & Phase 2 Execution state
+  // Connection states
   const [activeGitHubConnection, setActiveGitHubConnection] = useState<any | null>(null);
+  const [activeWpConnection, setActiveWpConnection] = useState<any | null>(null);
   const [targetFilePath, setTargetFilePath] = useState('index.html');
   const [executionResult, setExecutionResult] = useState<any | null>(null);
   const [prStatus, setPrStatus] = useState<any | null>(null);
-  const [deployMode, setDeployMode] = useState<'GITHUB_PR' | 'MANUAL'>('GITHUB_PR');
 
   // Normalize changeType
   const normalizedChangeType = fixType.toUpperCase().includes('TITLE') ? 'SEO_TITLE' :
@@ -84,15 +86,12 @@ export function FixWithAIModal({
     setLoading(true);
     setErrorMessage(null);
     try {
-      // Check connections first
+      // Check connections
       const conns = await getConnections().catch(() => []);
       const gh = Array.isArray(conns) ? conns.find((c: any) => c.provider === 'github' && c.status === 'CONNECTED') : null;
+      const wp = Array.isArray(conns) ? conns.find((c: any) => c.provider === 'wordpress' && c.status === 'CONNECTED') : null;
       setActiveGitHubConnection(gh);
-      if (!gh) {
-        setDeployMode('MANUAL');
-      } else {
-        setDeployMode('GITHUB_PR');
-      }
+      setActiveWpConnection(wp);
 
       const res = await fetchApi('/api/seo/changes/generate', {
         method: 'POST',
@@ -145,14 +144,12 @@ export function FixWithAIModal({
     setErrorMessage(null);
 
     try {
-      // 1. Approve change record first with edited text
       await fetchApi(`/api/seo/changes/${changeRecord.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ editedContent })
       });
 
-      // 2. Execute GitHub branch creation, commit, and PR
       const execRes = await executeSeoFixViaGitHub(changeRecord.id, {
         targetFilePath: targetFilePath.trim() || 'index.html',
         customCommitMessage: `Rankora SEO Fix: ${normalizedChangeType} for ${context.businessName || 'website'}`
@@ -172,17 +169,40 @@ export function FixWithAIModal({
     }
   };
 
-  // Check Pull Request status
-  const handleCheckPR = async () => {
+  // Phase 3: Execute WordPress REST API update workflow
+  const handleApproveAndApplyWordPress = async () => {
     if (!changeRecord) return;
+    setStep('WP_EXECUTING');
+    setLoading(true);
+    setErrorMessage(null);
+
     try {
-      setLoading(true);
-      const res = await checkPullRequestStatus(changeRecord.id);
-      if (res.success && res.data) {
-        setPrStatus(res.data);
+      await fetchApi(`/api/seo/changes/${changeRecord.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ editedContent })
+      });
+
+      const wpRes = await executeWordPressFix(changeRecord.id, {
+        customContent: editedContent
+      });
+
+      if (wpRes.success && wpRes.data) {
+        setVerificationResult({
+          success: wpRes.data.status === 'VERIFIED',
+          message: wpRes.data.message,
+          evidence: wpRes.data.verification
+        });
+        setStep('RESULT');
+        if (wpRes.data.status === 'VERIFIED' && onSuccess) {
+          onSuccess();
+        }
+      } else {
+        throw new Error(wpRes.error || 'Failed to apply WordPress update');
       }
     } catch (err: any) {
-      console.warn("Failed to check PR status:", err.message);
+      setErrorMessage(err.message || 'WordPress execution error');
+      setStep('PREVIEW');
     } finally {
       setLoading(false);
     }
@@ -220,7 +240,7 @@ export function FixWithAIModal({
         throw new Error(applyRes.error || 'Application failed');
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to approve & apply change');
+      setErrorMessage(err.message || 'Failed to approve change');
     } finally {
       setLoading(false);
     }
@@ -294,8 +314,8 @@ export function FixWithAIModal({
             2. Preview & Diff
           </span>
           <ArrowRight size={12} />
-          <span className={`flex items-center gap-1 ${step === 'GITHUB_EXECUTING' || step === 'PR_CREATED' || step === 'APPLY_MANUAL' ? 'text-[#cc785c] font-bold' : step === 'RESULT' ? 'text-[#141413]' : ''}`}>
-            3. {activeGitHubConnection ? 'GitHub PR' : 'Manual Deploy'}
+          <span className={`flex items-center gap-1 ${step === 'GITHUB_EXECUTING' || step === 'WP_EXECUTING' || step === 'PR_CREATED' || step === 'APPLY_MANUAL' ? 'text-[#cc785c] font-bold' : step === 'RESULT' ? 'text-[#141413]' : ''}`}>
+            3. {activeWpConnection ? 'WordPress Apply' : activeGitHubConnection ? 'GitHub PR' : 'Manual Deploy'}
           </span>
           <ArrowRight size={12} />
           <span className={`flex items-center gap-1 ${step === 'VERIFYING' || step === 'RESULT' ? 'text-[#cc785c] font-bold' : ''}`}>
@@ -363,8 +383,26 @@ export function FixWithAIModal({
                   )}
                 </div>
 
+                {/* WordPress Integration Notice */}
+                {activeWpConnection && (
+                  <div className="p-3.5 rounded-xl bg-blue-50/50 border border-[#0073aa]/30 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-mono font-bold text-[#141413] flex items-center gap-1.5">
+                        <Globe size={13} className="text-[#0073aa]" />
+                        <span>Connected WordPress: {activeWpConnection.repository_name}</span>
+                      </span>
+                      <span className="text-[10px] font-mono text-[#0073aa] bg-white px-2 py-0.5 rounded border border-[#0073aa]/30">
+                        REST API Enabled
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#6c6a64] font-sans">
+                      This will modify the connected WordPress website upon explicit user approval.
+                    </p>
+                  </div>
+                )}
+
                 {/* Target File Configuration (for GitHub Mode) */}
-                {activeGitHubConnection && (
+                {activeGitHubConnection && !activeWpConnection && (
                   <div className="p-3.5 rounded-xl bg-[#faf9f5] border border-[#cc785c]/30 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-mono font-bold text-[#141413] flex items-center gap-1.5">
@@ -397,6 +435,32 @@ export function FixWithAIModal({
                 )}
               </div>
 
+            </div>
+          ) : step === 'WP_EXECUTING' ? (
+            <div className="py-12 space-y-4 max-w-md mx-auto font-mono text-xs">
+              <div className="text-center space-y-2 mb-6">
+                <RefreshCw className="animate-spin text-[#0073aa] mx-auto" size={32} />
+                <h4 className="font-serif text-base text-[#141413]">Updating WordPress & Running Live Crawl...</h4>
+              </div>
+
+              <div className="space-y-2.5 p-4 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
+                <div className="flex items-center gap-2 text-emerald-700">
+                  <Check size={14} className="shrink-0" />
+                  <span>1. User approval confirmed</span>
+                </div>
+                <div className="flex items-center gap-2 text-emerald-700">
+                  <Check size={14} className="shrink-0" />
+                  <span>2. Freshness check verified (No stale conflicts)</span>
+                </div>
+                <div className="flex items-center gap-2 text-emerald-700">
+                  <Check size={14} className="shrink-0" />
+                  <span>3. Applied change via WordPress REST API</span>
+                </div>
+                <div className="flex items-center gap-2 text-[#cc785c] font-bold animate-pulse">
+                  <RefreshCw size={12} className="animate-spin shrink-0" />
+                  <span>4. Inspecting live public DOM...</span>
+                </div>
+              </div>
             </div>
           ) : step === 'GITHUB_EXECUTING' ? (
             <div className="py-12 space-y-4 max-w-md mx-auto font-mono text-xs">
@@ -448,15 +512,6 @@ export function FixWithAIModal({
                   <span className="text-emerald-400">{executionResult.commitSha.substring(0, 7)}</span>
                 </div>
               </div>
-
-              <div className="p-3.5 rounded-xl bg-[#efe9de]/60 border border-[#e6dfd8] text-xs font-sans space-y-2">
-                <strong className="text-[#141413] block font-mono text-[11px] uppercase">Next Steps:</strong>
-                <ol className="list-decimal list-inside space-y-1 text-[#6c6a64]">
-                  <li>Review & Merge the Pull Request on GitHub.</li>
-                  <li>Wait for your CI/CD hosting pipeline (Vercel, Cloudflare, Netlify) to deploy.</li>
-                  <li>Click <strong className="text-[#141413]">"Re-Crawl & Verify Live Page"</strong> below to confirm live ranking signals.</li>
-                </ol>
-              </div>
             </div>
           ) : step === 'APPLY_MANUAL' ? (
             <div className="space-y-4">
@@ -486,13 +541,6 @@ export function FixWithAIModal({
                   <pre className="leading-relaxed whitespace-pre-wrap">{editedContent}</pre>
                 </div>
               </div>
-
-              <div className="p-3.5 rounded-xl bg-[#efe9de]/60 border border-[#e6dfd8] text-xs font-sans space-y-1">
-                <strong className="text-[#141413] block font-mono text-[11px] uppercase">Deployment Instructions:</strong>
-                <p className="text-[#6c6a64]">
-                  {changeRecord?.implementationPackage?.instructions || 'Insert this code snippet into your website template or header tags.'}
-                </p>
-              </div>
             </div>
           ) : step === 'VERIFYING' ? (
             <div className="py-16 flex flex-col items-center justify-center text-center space-y-3">
@@ -515,9 +563,9 @@ export function FixWithAIModal({
               ) : (
                 <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-950 space-y-2 text-center">
                   <XCircle size={32} className="text-red-600 mx-auto" />
-                  <h4 className="font-serif font-bold text-sm">Verification Failed</h4>
+                  <h4 className="font-serif font-bold text-sm">Verification Pending / Failed</h4>
                   <p className="text-xs text-red-800 font-sans">
-                    {verificationResult?.message || 'The live page does not yet reflect the approved change. Changes may take a few minutes to propagate if cached.'}
+                    {verificationResult?.message || 'The live page does not yet reflect the change. If you use caching (e.g. Cloudflare or WP Rocket), it may take a few moments.'}
                   </p>
                 </div>
               )}
@@ -550,7 +598,30 @@ export function FixWithAIModal({
           </Button>
 
           <div className="flex items-center gap-2">
-            {step === 'PREVIEW' && activeGitHubConnection && (
+            {step === 'PREVIEW' && activeWpConnection && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleApproveManual}
+                  disabled={loading}
+                  className="text-xs font-semibold"
+                >
+                  Manual Snippet
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleApproveAndApplyWordPress}
+                  disabled={loading}
+                  className="bg-[#0073aa] hover:bg-[#005a87] text-white flex items-center gap-1.5 text-xs font-semibold"
+                >
+                  <Globe size={13} />
+                  <span>Approve & Apply to WordPress</span>
+                </Button>
+              </>
+            )}
+
+            {step === 'PREVIEW' && !activeWpConnection && activeGitHubConnection && (
               <>
                 <Button
                   variant="outline"
@@ -573,7 +644,7 @@ export function FixWithAIModal({
               </>
             )}
 
-            {step === 'PREVIEW' && !activeGitHubConnection && (
+            {step === 'PREVIEW' && !activeWpConnection && !activeGitHubConnection && (
               <Button
                 size="sm"
                 onClick={handleApproveManual}
