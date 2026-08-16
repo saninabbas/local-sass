@@ -237,8 +237,8 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
           {/* Header */}
           <div className="p-4 bg-[#181715] text-[#faf9f5] border-b border-[#252320] flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-[#cc785c] text-white flex items-center justify-center shadow-xs shrink-0">
-                <Bot size={18} />
+              <div className="w-8 h-8 rounded-lg bg-[#cc785c] text-white flex items-center justify-center shadow-xs shrink-0 font-serif font-bold text-xs">
+                R
               </div>
               <div className="overflow-hidden">
                 <div className="flex items-center gap-2">

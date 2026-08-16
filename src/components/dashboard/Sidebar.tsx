@@ -64,54 +64,48 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   
   const navSections = [
     {
-      title: 'GROWTH ENGINE',
+      title: 'OVERVIEW',
       items: [
-        { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'SEO Campaign', href: '/dashboard/campaign', icon: Flag },
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Growth Score', href: '/dashboard/score', icon: TrendingUp },
-        { name: 'Website Audit', href: '/dashboard/website', icon: Globe },
+      ]
+    },
+    {
+      title: 'GROWTH',
+      items: [
+        { name: 'Campaign', href: '/dashboard/campaign', icon: Flag },
         { name: 'Keywords', href: '/dashboard/keywords', icon: Search },
-        { name: 'Competitor Radar', href: '/dashboard/competitors', icon: Users },
+        { name: 'Competitors', href: '/dashboard/competitors', icon: Users },
+        { name: 'Reviews', href: '/dashboard/reviews', icon: Star },
         { name: 'Local Geo-Grid', href: '/dashboard/geogrid', icon: Navigation },
-        { name: 'Websites & Projects', href: '/dashboard/businesses', icon: FolderKanban },
-      ]
-    },
-    {
-      title: 'AUTHORITY',
-      items: [
         { name: 'Backlinks', href: '/dashboard/backlinks', icon: Link2 },
-        { name: 'Citations', href: '/dashboard/authority', icon: Building },
-        { name: 'Reviews & Reputation', href: '/dashboard/reviews', icon: Star },
       ]
     },
     {
-      title: 'CONTENT',
+      title: 'WEBSITE',
       items: [
+        { name: 'Website Audit', href: '/dashboard/website', icon: Globe },
         { name: 'Content Studio', href: '/dashboard/content', icon: Sparkles },
-        { name: 'Keyword Discovery', href: '/dashboard/keywords/discover', icon: Search },
-        { name: 'Internal Links', href: '/dashboard/content/links', icon: Link2 },
+        { name: 'Internal Links', href: '/dashboard/internal-links', icon: Link2 },
+        { name: 'Websites & Projects', href: '/dashboard/websites', icon: FolderKanban },
       ]
     },
     {
-      title: 'EXECUTION',
+      title: 'ACTIVITY',
       items: [
-        { name: 'Action Plan', href: '/dashboard/actions', icon: ListTodo },
-        { name: 'Fix With AI', href: '/dashboard/actions?fix=ai', icon: Bot },
         { name: 'Change History', href: '/dashboard/changes', icon: History },
-      ]
-    },
-    {
-      title: 'REPORTING',
-      items: [
-        { name: 'Lead Gen Widget', href: '/dashboard/leads', icon: Building },
+        { name: 'Leads & CRM', href: '/dashboard/leads', icon: Building },
         { name: 'Reports & Audits', href: '/dashboard/reports', icon: FileText },
       ]
+    },
+    {
+      title: 'ACCOUNT',
+      items: [
+        { name: 'Plan & Billing', href: '/dashboard/billing', icon: ShieldAlert },
+        { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+        { name: 'Account Profile', href: '/dashboard/account', icon: User },
+      ]
     }
-  ];
-
-  const bottomNavItems = [
-    { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-    { name: 'Account', href: '/dashboard/account', icon: User },
   ];
 
   const isActive = (path: string) => {
@@ -269,27 +263,8 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         ))}
       </div>
 
-      {/* Footer / Account / Settings / Permanent Logout */}
+      {/* Footer / Permanent Logout */}
       <div className="p-4 border-t border-[#e6dfd8] bg-[#efe9de]/30 space-y-1 font-sans text-xs">
-        {bottomNavItems.map((item) => {
-          const active = isActive(item.href);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.name}
-              to={item.href}
-              onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-all ${
-                active 
-                  ? 'bg-[#efe9de] text-[#141413] font-semibold border border-[#e6dfd8]' 
-                  : 'text-[#6c6a64] hover:text-[#141413] hover:bg-[#efe9de]/50'
-              }`}
-            >
-              <Icon size={16} className={active ? 'text-[#cc785c]' : 'text-[#6c6a64]'} />
-              <span>{item.name}</span>
-            </Link>
-          );
-        })}
 
         {/* Permanent Desktop Logout */}
         <button

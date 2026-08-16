@@ -47,29 +47,29 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     };
 
     return (
-      <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full border ${styles[status]}`}>
+      <span className={`text-[10px] font-mono font-semibold px-2.5 py-0.5 rounded-md border ${styles[status]}`}>
         {status}
       </span>
     );
   };
 
   return (
-    <div className="bg-[#efe9de] border border-[#e6dfd8] rounded-2xl p-5 shadow-xs hover:border-[#cc785c]/40 transition-all flex flex-col justify-between">
+    <div className="bg-white border border-[#e6dfd8] rounded-2xl p-6 shadow-2xs hover:border-[#cc785c]/40 transition-all flex flex-col justify-between">
       <div>
         {/* Header: Title, Icon, Status */}
         <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-[#efe9de] flex items-center justify-center text-[#cc785c]">
-              <Icon size={16} />
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[#efe9de]/60 border border-[#e6dfd8]/60 flex items-center justify-center text-[#cc785c]">
+              <Icon size={15} />
             </div>
             <div>
               <div className="flex items-center gap-1">
-                <span className="text-xs font-mono font-bold tracking-wider text-[#8e8b82] uppercase">
+                <span className="text-[10px] font-mono font-bold tracking-wider text-[#8e8b82] uppercase">
                   {title}
                 </span>
                 {tooltip && (
                   <span title={tooltip} className="text-[#8e8b82] hover:text-[#141413] cursor-help">
-                    <HelpCircle size={12} />
+                    <HelpCircle size={11} />
                   </span>
                 )}
               </div>
