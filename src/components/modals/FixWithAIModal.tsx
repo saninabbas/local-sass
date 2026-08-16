@@ -19,15 +19,13 @@ import {
   GitPullRequest,
   CheckCheck,
   Layout,
-  ShoppingBag
+  ShoppingBag,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   fetchApi, 
   getConnections, 
-  executeSeoFixViaGitHub, 
-  checkPullRequestStatus,
-  executeWordPressFix,
-  executeShopifyFix
+  executeUniversalFix
 } from '../../lib/api';
 import { ExecutionStatusBadge } from '../dashboard/ExecutionStatusBadge';
 import { Button } from '../ui/Button';
@@ -60,7 +58,7 @@ export function FixWithAIModal({
   context,
   onSuccess
 }: FixWithAIModalProps) {
-  const [step, setStep] = useState<'GENERATE' | 'PREVIEW' | 'GITHUB_EXECUTING' | 'WP_EXECUTING' | 'SHOPIFY_EXECUTING' | 'PR_CREATED' | 'APPLY_MANUAL' | 'VERIFYING' | 'RESULT'>('GENERATE');
+  const [step, setStep] = useState<'GENERATE' | 'PREVIEW' | 'EXECUTING' | 'PR_CREATED' | 'APPLY_MANUAL' | 'VERIFYING' | 'RESULT'>('GENERATE');
   const [loading, setLoading] = useState(false);
   const [changeRecord, setChangeRecord] = useState<any | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -75,7 +73,16 @@ export function FixWithAIModal({
   const [activeShopifyConnection, setActiveShopifyConnection] = useState<any | null>(null);
   const [targetFilePath, setTargetFilePath] = useState('index.html');
   const [executionResult, setExecutionResult] = useState<any | null>(null);
-  const [prStatus, setPrStatus] = useState<any | null>(null);
+
+  // Determine provider name
+  const providerName = activeShopifyConnection ? 'Shopify' :
+    activeWpConnection ? 'WordPress' :
+    activeGitHubConnection ? 'GitHub' : 'Manual';
+
+  // Determine target resource type
+  const targetResource = activeShopifyConnection ? 'Product / Page' :
+    activeWpConnection ? 'Page / Post' :
+    activeGitHubConnection ? 'Source Code / Repo' : 'Website DOM';
 
   // Normalize changeType
   const normalizedChangeType = fixType.toUpperCase().includes('TITLE') ? 'SEO_TITLE' :
@@ -89,7 +96,7 @@ export function FixWithAIModal({
     setLoading(true);
     setErrorMessage(null);
     try {
-      // Check connections
+      // 1. Check connections in parallel
       const conns = await getConnections().catch(() => []);
       const gh = Array.isArray(conns) ? conns.find((c: any) => c.provider === 'github' && c.status === 'CONNECTED') : null;
       const wp = Array.isArray(conns) ? conns.find((c: any) => c.provider === 'wordpress' && c.status === 'CONNECTED') : null;
@@ -98,6 +105,7 @@ export function FixWithAIModal({
       setActiveWpConnection(wp);
       setActiveShopifyConnection(sh);
 
+      // 2. Generate solution
       const res = await fetchApi('/api/seo/changes/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -116,7 +124,7 @@ export function FixWithAIModal({
         setEditedContent(res.data.proposedValue);
         setStep('PREVIEW');
       } else {
-        setErrorMessage(res.error || 'Failed to generate solution');
+        setErrorMessage(res.error || res.message || 'Failed to generate solution');
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Generation error');
@@ -131,7 +139,6 @@ export function FixWithAIModal({
       setChangeRecord(null);
       setVerificationResult(null);
       setExecutionResult(null);
-      setPrStatus(null);
       setErrorMessage(null);
       setIsEditing(false);
       setCopied(false);
@@ -141,156 +148,59 @@ export function FixWithAIModal({
 
   if (!isOpen) return null;
 
-  // Phase 2: Execute GitHub Pull Request workflow
-  const handleApproveAndCreatePR = async () => {
+  // Phase 5: Universal Execution Entry Point
+  const handleApproveAndExecute = async () => {
     if (!changeRecord) return;
-    setStep('GITHUB_EXECUTING');
+    setStep('EXECUTING');
     setLoading(true);
     setErrorMessage(null);
 
     try {
+      // 1. Record customer approval
       await fetchApi(`/api/seo/changes/${changeRecord.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ editedContent })
       });
 
-      const execRes = await executeSeoFixViaGitHub(changeRecord.id, {
+      // 2. Execute via Universal Router
+      const execRes = await executeUniversalFix(changeRecord.id, {
         targetFilePath: targetFilePath.trim() || 'index.html',
+        customContent: editedContent,
         customCommitMessage: `Rankora SEO Fix: ${normalizedChangeType} for ${context.businessName || 'website'}`
       });
 
-      if (execRes.success && execRes.data) {
-        setExecutionResult(execRes.data);
+      if (!execRes.success) {
+        throw new Error(execRes.message || execRes.error || 'Execution failed');
+      }
+
+      setExecutionResult(execRes.data);
+
+      if (execRes.data?.provider === 'github') {
         setStep('PR_CREATED');
-      } else {
-        throw new Error(execRes.error || 'Failed to create GitHub Pull Request');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'GitHub execution failed');
-      setStep('PREVIEW');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Phase 3: Execute WordPress REST API update workflow
-  const handleApproveAndApplyWordPress = async () => {
-    if (!changeRecord) return;
-    setStep('WP_EXECUTING');
-    setLoading(true);
-    setErrorMessage(null);
-
-    try {
-      await fetchApi(`/api/seo/changes/${changeRecord.id}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ editedContent })
-      });
-
-      const wpRes = await executeWordPressFix(changeRecord.id, {
-        customContent: editedContent
-      });
-
-      if (wpRes.success && wpRes.data) {
-        setVerificationResult({
-          success: wpRes.data.status === 'VERIFIED',
-          message: wpRes.data.message,
-          evidence: wpRes.data.verification
-        });
-        setStep('RESULT');
-        if (wpRes.data.status === 'VERIFIED' && onSuccess) {
-          onSuccess();
-        }
-      } else {
-        throw new Error(wpRes.error || 'Failed to apply WordPress update');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'WordPress execution error');
-      setStep('PREVIEW');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Phase 4: Execute Shopify Store update workflow
-  const handleApproveAndApplyShopify = async () => {
-    if (!changeRecord) return;
-    setStep('SHOPIFY_EXECUTING');
-    setLoading(true);
-    setErrorMessage(null);
-
-    try {
-      await fetchApi(`/api/seo/changes/${changeRecord.id}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ editedContent })
-      });
-
-      const shRes = await executeShopifyFix(changeRecord.id, {
-        customContent: editedContent
-      });
-
-      if (shRes.success && shRes.data) {
-        setVerificationResult({
-          success: shRes.data.status === 'VERIFIED',
-          message: shRes.data.message,
-          evidence: shRes.data.verification
-        });
-        setStep('RESULT');
-        if (shRes.data.status === 'VERIFIED' && onSuccess) {
-          onSuccess();
-        }
-      } else {
-        throw new Error(shRes.error || 'Failed to apply Shopify update');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Shopify execution error');
-      setStep('PREVIEW');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Manual deployment mode handler
-  const handleApproveManual = async () => {
-    if (!changeRecord) return;
-    setLoading(true);
-    setErrorMessage(null);
-    try {
-      const approveRes = await fetchApi(`/api/seo/changes/${changeRecord.id}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ editedContent })
-      });
-
-      if (!approveRes.success) {
-        throw new Error(approveRes.error || 'Approval failed');
-      }
-
-      const applyRes = await fetchApi(`/api/seo/changes/${changeRecord.id}/apply`, {
-        method: 'POST'
-      });
-
-      if (applyRes.success) {
-        setChangeRecord({
-          ...changeRecord,
-          after_value: editedContent,
-          execution_status: applyRes.executionStatus,
-          implementationPackage: applyRes.implementationPackage
-        });
+      } else if (execRes.data?.provider === 'manual') {
         setStep('APPLY_MANUAL');
       } else {
-        throw new Error(applyRes.error || 'Application failed');
+        // WordPress or Shopify with live verification
+        setVerificationResult({
+          success: execRes.data?.status === 'VERIFIED',
+          message: execRes.data?.message,
+          evidence: execRes.data?.verification
+        });
+        setStep('RESULT');
+        if (execRes.data?.status === 'VERIFIED' && onSuccess) {
+          onSuccess();
+        }
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to approve change');
+      setErrorMessage(err.message || 'Execution error');
+      setStep('PREVIEW');
     } finally {
       setLoading(false);
     }
   };
 
-  // Re-Crawl & Verify
+  // Re-Crawl & Verify Live Page
   const handleVerify = async () => {
     if (!changeRecord) return;
     setStep('VERIFYING');
@@ -358,8 +268,8 @@ export function FixWithAIModal({
             2. Preview & Diff
           </span>
           <ArrowRight size={12} />
-          <span className={`flex items-center gap-1 ${step === 'GITHUB_EXECUTING' || step === 'WP_EXECUTING' || step === 'SHOPIFY_EXECUTING' || step === 'PR_CREATED' || step === 'APPLY_MANUAL' ? 'text-[#cc785c] font-bold' : step === 'RESULT' ? 'text-[#141413]' : ''}`}>
-            3. {activeShopifyConnection ? 'Shopify Apply' : activeWpConnection ? 'WordPress Apply' : activeGitHubConnection ? 'GitHub PR' : 'Manual Deploy'}
+          <span className={`flex items-center gap-1 ${step === 'EXECUTING' || step === 'PR_CREATED' || step === 'APPLY_MANUAL' ? 'text-[#cc785c] font-bold' : step === 'RESULT' ? 'text-[#141413]' : ''}`}>
+            3. {providerName} Execute
           </span>
           <ArrowRight size={12} />
           <span className={`flex items-center gap-1 ${step === 'VERIFYING' || step === 'RESULT' ? 'text-[#cc785c] font-bold' : ''}`}>
@@ -381,10 +291,25 @@ export function FixWithAIModal({
           ) : step === 'PREVIEW' && changeRecord ? (
             <div className="space-y-4">
               
-              {/* Target & Impact Header */}
-              <div className="p-3 rounded-xl bg-[#efe9de]/50 border border-[#e6dfd8] flex items-center justify-between text-xs font-mono">
-                <span className="text-[#6c6a64]">Target URL: <strong className="text-[#141413]">{changeRecord.pageUrl}</strong></span>
-                <span className="text-[#cc785c] font-bold uppercase">{changeRecord.impact} Impact</span>
+              {/* Context Header */}
+              <div className="p-3.5 rounded-2xl bg-[#efe9de]/60 border border-[#e6dfd8] grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-mono">
+                <div>
+                  <span className="text-[10px] text-[#8e8b82] uppercase block">Provider:</span>
+                  <strong className="text-[#141413] flex items-center gap-1">
+                    {providerName === 'Shopify' && <ShoppingBag size={12} className="text-[#5e8e3e]" />}
+                    {providerName === 'WordPress' && <Globe size={12} className="text-[#0073aa]" />}
+                    {providerName === 'GitHub' && <GitBranch size={12} className="text-[#cc785c]" />}
+                    {providerName}
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-[#8e8b82] uppercase block">Target Resource:</span>
+                  <strong className="text-[#141413] truncate block">{targetResource}</strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-[#8e8b82] uppercase block">Element:</span>
+                  <strong className="text-[#cc785c]">{normalizedChangeType}</strong>
+                </div>
               </div>
 
               {/* Diff View */}
@@ -427,67 +352,36 @@ export function FixWithAIModal({
                   )}
                 </div>
 
-                {/* Shopify Integration Notice */}
-                {activeShopifyConnection && (
-                  <div className="p-3.5 rounded-xl bg-emerald-50/50 border border-[#96bf48]/40 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono font-bold text-[#141413] flex items-center gap-1.5">
-                        <ShoppingBag size={13} className="text-[#5e8e3e]" />
-                        <span>Connected Shopify: {activeShopifyConnection.repository_name}</span>
-                      </span>
-                      <span className="text-[10px] font-mono text-[#5e8e3e] bg-white px-2 py-0.5 rounded border border-[#96bf48]/40">
-                        Admin API Active
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[#6c6a64] font-sans">
-                      This will update the connected Shopify store product/page metadata upon explicit user approval.
-                    </p>
+                {/* Target File Configuration (for GitHub Mode) */}
+                {activeGitHubConnection && !activeShopifyConnection && !activeWpConnection && (
+                  <div className="p-3 rounded-xl bg-[#faf9f5] border border-[#cc785c]/30 flex items-center gap-2">
+                    <label className="text-[11px] font-mono text-[#6c6a64] whitespace-nowrap">Target Repo File:</label>
+                    <input
+                      type="text"
+                      value={targetFilePath}
+                      onChange={(e) => setTargetFilePath(e.target.value)}
+                      placeholder="index.html, app/page.tsx, or header.php"
+                      className="flex-1 h-8 px-2.5 text-xs font-mono bg-white border border-[#e6dfd8] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#cc785c]"
+                    />
                   </div>
                 )}
 
-                {/* WordPress Integration Notice */}
-                {!activeShopifyConnection && activeWpConnection && (
-                  <div className="p-3.5 rounded-xl bg-blue-50/50 border border-[#0073aa]/30 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono font-bold text-[#141413] flex items-center gap-1.5">
-                        <Globe size={13} className="text-[#0073aa]" />
-                        <span>Connected WordPress: {activeWpConnection.repository_name}</span>
-                      </span>
-                      <span className="text-[10px] font-mono text-[#0073aa] bg-white px-2 py-0.5 rounded border border-[#0073aa]/30">
-                        REST API Enabled
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[#6c6a64] font-sans">
-                      This will modify the connected WordPress website upon explicit user approval.
-                    </p>
+                {/* Explicit Safety Notice */}
+                <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 flex items-start gap-2.5 text-xs text-amber-900 font-sans">
+                  <AlertTriangle size={15} className="text-amber-700 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block font-semibold">Pre-Execution Safety Verification:</strong>
+                    <span>
+                      {providerName === 'GitHub' 
+                        ? 'This action will create a safe, isolated feature branch and submit a GitHub Pull Request.'
+                        : providerName === 'Shopify'
+                        ? 'This action will update the connected Shopify store metadata upon explicit execution.'
+                        : providerName === 'WordPress'
+                        ? 'This action will apply the approved update directly via WordPress REST API.'
+                        : 'This action will prepare a manual deployment package for your live site.'}
+                    </span>
                   </div>
-                )}
-
-                {/* GitHub Mode */}
-                {!activeShopifyConnection && !activeWpConnection && activeGitHubConnection && (
-                  <div className="p-3.5 rounded-xl bg-[#faf9f5] border border-[#cc785c]/30 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono font-bold text-[#141413] flex items-center gap-1.5">
-                        <GitBranch size={13} className="text-[#cc785c]" />
-                        <span>Connected Repository: {activeGitHubConnection.repository_owner}/{activeGitHubConnection.repository_name}</span>
-                      </span>
-                      <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                        Safe Branch Strategy Active
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-1">
-                      <label className="text-[11px] text-[#6c6a64] whitespace-nowrap">Target File:</label>
-                      <input
-                        type="text"
-                        value={targetFilePath}
-                        onChange={(e) => setTargetFilePath(e.target.value)}
-                        placeholder="index.html, app/page.tsx, or header.php"
-                        className="flex-1 h-8 px-2.5 text-xs font-mono bg-white border border-[#e6dfd8] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#cc785c]"
-                      />
-                    </div>
-                  </div>
-                )}
+                </div>
 
                 {changeRecord.reason && (
                   <p className="text-xs text-[#6c6a64] font-sans pt-1">
@@ -498,11 +392,13 @@ export function FixWithAIModal({
               </div>
 
             </div>
-          ) : step === 'SHOPIFY_EXECUTING' ? (
+          ) : step === 'EXECUTING' ? (
             <div className="py-12 space-y-4 max-w-md mx-auto font-mono text-xs">
               <div className="text-center space-y-2 mb-6">
-                <RefreshCw className="animate-spin text-[#5e8e3e] mx-auto" size={32} />
-                <h4 className="font-serif text-base text-[#141413]">Updating Shopify Store & Running Live Crawl...</h4>
+                <RefreshCw className="animate-spin text-[#cc785c] mx-auto" size={32} />
+                <h4 className="font-serif text-base text-[#141413]">
+                  Executing Fix via {providerName} & Inspecting Live DOM...
+                </h4>
               </div>
 
               <div className="space-y-2.5 p-4 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
@@ -516,63 +412,11 @@ export function FixWithAIModal({
                 </div>
                 <div className="flex items-center gap-2 text-emerald-700">
                   <Check size={14} className="shrink-0" />
-                  <span>3. Applied change via Shopify Admin API</span>
+                  <span>3. Applied change via {providerName} Provider</span>
                 </div>
                 <div className="flex items-center gap-2 text-[#cc785c] font-bold animate-pulse">
                   <RefreshCw size={12} className="animate-spin shrink-0" />
                   <span>4. Inspecting live public DOM...</span>
-                </div>
-              </div>
-            </div>
-          ) : step === 'WP_EXECUTING' ? (
-            <div className="py-12 space-y-4 max-w-md mx-auto font-mono text-xs">
-              <div className="text-center space-y-2 mb-6">
-                <RefreshCw className="animate-spin text-[#0073aa] mx-auto" size={32} />
-                <h4 className="font-serif text-base text-[#141413]">Updating WordPress & Running Live Crawl...</h4>
-              </div>
-
-              <div className="space-y-2.5 p-4 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
-                <div className="flex items-center gap-2 text-emerald-700">
-                  <Check size={14} className="shrink-0" />
-                  <span>1. User approval confirmed</span>
-                </div>
-                <div className="flex items-center gap-2 text-emerald-700">
-                  <Check size={14} className="shrink-0" />
-                  <span>2. Freshness check verified</span>
-                </div>
-                <div className="flex items-center gap-2 text-emerald-700">
-                  <Check size={14} className="shrink-0" />
-                  <span>3. Applied change via WordPress REST API</span>
-                </div>
-                <div className="flex items-center gap-2 text-[#cc785c] font-bold animate-pulse">
-                  <RefreshCw size={12} className="animate-spin shrink-0" />
-                  <span>4. Inspecting live public DOM...</span>
-                </div>
-              </div>
-            </div>
-          ) : step === 'GITHUB_EXECUTING' ? (
-            <div className="py-12 space-y-4 max-w-md mx-auto font-mono text-xs">
-              <div className="text-center space-y-2 mb-6">
-                <RefreshCw className="animate-spin text-[#cc785c] mx-auto" size={32} />
-                <h4 className="font-serif text-base text-[#141413]">Creating Safe Pull Request on GitHub...</h4>
-              </div>
-
-              <div className="space-y-2.5 p-4 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
-                <div className="flex items-center gap-2 text-emerald-700">
-                  <Check size={14} className="shrink-0" />
-                  <span>1. Verified customer approval & file integrity</span>
-                </div>
-                <div className="flex items-center gap-2 text-emerald-700">
-                  <Check size={14} className="shrink-0" />
-                  <span>2. Created separate feature branch</span>
-                </div>
-                <div className="flex items-center gap-2 text-emerald-700">
-                  <Check size={14} className="shrink-0" />
-                  <span>3. Committed SEO changes</span>
-                </div>
-                <div className="flex items-center gap-2 text-[#cc785c] font-bold animate-pulse">
-                  <RefreshCw size={12} className="animate-spin shrink-0" />
-                  <span>4. Creating GitHub Pull Request...</span>
                 </div>
               </div>
             </div>
@@ -582,22 +426,22 @@ export function FixWithAIModal({
                 <CheckCheck size={36} className="text-emerald-600 mx-auto" />
                 <h4 className="font-serif font-bold text-base">Pull Request Created Successfully!</h4>
                 <p className="text-xs text-emerald-800 font-sans max-w-md mx-auto">
-                  Rankora created branch <strong className="font-mono">{executionResult.branch}</strong> and submitted Pull Request #{executionResult.pullRequestNumber}.
+                  Rankora created branch <strong className="font-mono">{executionResult.details?.branch || executionResult.branch}</strong> and submitted Pull Request #{executionResult.details?.pullRequestNumber || executionResult.pullRequestNumber}.
                 </p>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#181715] text-[#faf9f5] border border-[#252320] space-y-3 font-mono text-xs">
                 <div className="flex justify-between items-center pb-2 border-b border-[#252320]">
                   <span className="text-[#a09d96]">Pull Request:</span>
-                  <span className="font-bold text-[#cc785c]">#{executionResult.pullRequestNumber}</span>
+                  <span className="font-bold text-[#cc785c]">#{executionResult.details?.pullRequestNumber || executionResult.pullRequestNumber}</span>
                 </div>
                 <div className="flex justify-between items-center pb-2 border-b border-[#252320]">
                   <span className="text-[#a09d96]">Feature Branch:</span>
-                  <span className="text-white truncate max-w-[220px]">{executionResult.branch}</span>
+                  <span className="text-white truncate max-w-[220px]">{executionResult.details?.branch || executionResult.branch}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-[#a09d96]">Commit SHA:</span>
-                  <span className="text-emerald-400">{executionResult.commitSha.substring(0, 7)}</span>
+                  <span className="text-emerald-400">{(executionResult.details?.commitSha || executionResult.commitSha || '').substring(0, 7)}</span>
                 </div>
               </div>
             </div>
@@ -686,95 +530,22 @@ export function FixWithAIModal({
           </Button>
 
           <div className="flex items-center gap-2">
-            {/* Mode 1: Shopify */}
-            {step === 'PREVIEW' && activeShopifyConnection && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleApproveManual}
-                  disabled={loading}
-                  className="text-xs font-semibold"
-                >
-                  Manual Snippet
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleApproveAndApplyShopify}
-                  disabled={loading}
-                  className="bg-[#5e8e3e] hover:bg-[#4a7231] text-white flex items-center gap-1.5 text-xs font-semibold"
-                >
-                  <ShoppingBag size={13} />
-                  <span>Approve & Apply to Shopify</span>
-                </Button>
-              </>
-            )}
-
-            {/* Mode 2: WordPress */}
-            {step === 'PREVIEW' && !activeShopifyConnection && activeWpConnection && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleApproveManual}
-                  disabled={loading}
-                  className="text-xs font-semibold"
-                >
-                  Manual Snippet
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleApproveAndApplyWordPress}
-                  disabled={loading}
-                  className="bg-[#0073aa] hover:bg-[#005a87] text-white flex items-center gap-1.5 text-xs font-semibold"
-                >
-                  <Globe size={13} />
-                  <span>Approve & Apply to WordPress</span>
-                </Button>
-              </>
-            )}
-
-            {/* Mode 3: GitHub */}
-            {step === 'PREVIEW' && !activeShopifyConnection && !activeWpConnection && activeGitHubConnection && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleApproveManual}
-                  disabled={loading}
-                  className="text-xs font-semibold"
-                >
-                  Manual Snippet
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleApproveAndCreatePR}
-                  disabled={loading}
-                  className="bg-[#141413] hover:bg-[#252320] text-[#faf9f5] flex items-center gap-1.5 text-xs font-semibold"
-                >
-                  <GitPullRequest size={13} className="text-[#cc785c]" />
-                  <span>Approve & Create Pull Request</span>
-                </Button>
-              </>
-            )}
-
-            {/* Mode 4: Manual fallback */}
-            {step === 'PREVIEW' && !activeShopifyConnection && !activeWpConnection && !activeGitHubConnection && (
+            {step === 'PREVIEW' && (
               <Button
                 size="sm"
-                onClick={handleApproveManual}
+                onClick={handleApproveAndExecute}
                 disabled={loading}
                 className="bg-[#141413] hover:bg-[#252320] text-[#faf9f5] flex items-center gap-1.5 text-xs font-semibold"
               >
                 <Check size={13} className="text-emerald-400" />
-                <span>Approve & Get Snippet</span>
+                <span>Approve & Execute Fix</span>
               </Button>
             )}
 
             {step === 'PR_CREATED' && executionResult && (
               <>
                 <a
-                  href={executionResult.pullRequestUrl}
+                  href={executionResult.details?.pullRequestUrl || executionResult.pullRequestUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[#e6dfd8] bg-white hover:bg-[#efe9de] text-[#141413] text-xs font-semibold"

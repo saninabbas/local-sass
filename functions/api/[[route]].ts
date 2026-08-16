@@ -12,7 +12,8 @@ import {
   executeWordPressSeoFix,
   saveShopifyConnection,
   getActiveShopifyConnection,
-  executeShopifySeoFix
+  executeShopifySeoFix,
+  testProviderHealth
 } from './connectionsEngine';
 import { githubProvider } from './providers/githubProvider';
 import { wordpressProvider } from './providers/wordpressProvider';
@@ -28,7 +29,11 @@ export interface Env {
   BASE_URL?: string;
   GITHUB_APP_TOKEN?: string;
   GITHUB_TOKEN?: string;
+  APP_ENV?: string;
 }
+
+// In-isolate rate limit tracker for expensive endpoints
+const rateLimitMap = ((globalThis as any).__rankora_rate_limits ||= new Map<string, { count: number; resetAt: number }>());
 
 // -----------------------------------------------------------------------------
 // CRYPTO HELPERS
@@ -90,8 +95,33 @@ export const onRequest = async (context: any) => {
         headers: { 'Content-Type': 'application/json', ...headers } 
       });
       
-    const errorResponse = (error: string, status = 500) =>
-      jsonResponse({ success: false, error }, status);
+    const errorResponse = (error: string, status = 500, code?: string) => {
+      const derivedCode = code || (
+        status === 401 ? 'AUTH_FAILED' :
+        status === 403 ? 'PERMISSION_DENIED' :
+        status === 404 ? 'RESOURCE_NOT_FOUND' :
+        status === 429 ? 'RATE_LIMITED' :
+        error.includes('STALE') ? 'STALE_CHANGE' :
+        error.includes('CONNECTION') ? 'CONNECTION_FAILED' :
+        error.includes('VERIF') ? 'VERIFICATION_FAILED' :
+        'PROVIDER_ERROR'
+      );
+      return jsonResponse({ success: false, error, code: derivedCode, message: error }, status);
+    };
+
+    const checkRateLimit = (key: string, maxRequests = 60, windowMs = 60000): boolean => {
+      const now = Date.now();
+      const entry = rateLimitMap.get(key);
+      if (!entry || now > entry.resetAt) {
+        rateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
+        return true;
+      }
+      if (entry.count >= maxRequests) {
+        return false;
+      }
+      entry.count++;
+      return true;
+    };
 
     // Helper to ensure admin user exists and schema is up to date
     const ensureAdminUser = async () => {
@@ -4814,6 +4844,10 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
+        if (!checkRateLimit(`gen_${user.id}`, 40, 60000)) {
+          return errorResponse("Rate limit exceeded: Maximum 40 fix generations per minute. Please wait a moment.", 429, "RATE_LIMITED");
+        }
+
         const payload = await request.json() as any;
         const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
         let business;
@@ -5998,10 +6032,41 @@ export const onRequest = async (context: any) => {
         }
       }
 
+      // POST /api/connections/health — Test live health of a provider (Phase 5)
+      if (url.pathname === '/api/connections/health' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json().catch(() => ({})) as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+        if (!payload.provider) return errorResponse("Missing provider field", 400);
+
+        try {
+          const health = await testProviderHealth(env.DB, user.id, business.id, payload.provider);
+          return jsonResponse({ success: health.success, data: health });
+        } catch (err: any) {
+          return errorResponse(err.message || "Provider health check failed", 400);
+        }
+      }
+
       // POST /api/seo/changes/:id/execute-universal — Universal SEO Execution Router
       if (url.pathname.startsWith('/api/seo/changes/') && url.pathname.endsWith('/execute-universal') && request.method === 'POST') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
+
+        // Rate limiting guard: max 30 executions per minute per user
+        if (!checkRateLimit(`exec_${user.id}`, 30, 60000)) {
+          return errorResponse("Rate limit exceeded: Maximum 30 executions per minute. Please try again shortly.", 429, "RATE_LIMITED");
+        }
 
         const changeId = url.pathname.replace('/api/seo/changes/', '').replace('/execute-universal', '');
         const payload = await request.json().catch(() => ({})) as any;

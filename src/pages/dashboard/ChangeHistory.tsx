@@ -16,7 +16,12 @@ import {
   TrendingUp,
   X,
   Layers,
-  Activity
+  Activity,
+  Filter,
+  Globe,
+  ShoppingBag,
+  GitBranch,
+  AlertTriangle
 } from 'lucide-react';
 import { ExecutionStatusBadge } from '../../components/dashboard/ExecutionStatusBadge';
 import { Button } from '../../components/ui/Button';
@@ -28,7 +33,11 @@ export const ChangeHistory: React.FC = () => {
   const [selectedChange, setSelectedChange] = useState<any | null>(null);
   const [changeEvents, setChangeEvents] = useState<any[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  
+  // Filters
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [providerFilter, setProviderFilter] = useState<string>('ALL');
+  const [changeTypeFilter, setChangeTypeFilter] = useState<string>('ALL');
 
   const loadChanges = async () => {
     try {
@@ -66,9 +75,25 @@ export const ChangeHistory: React.FC = () => {
   };
 
   const filteredChanges = changes.filter(c => {
-    if (statusFilter === 'ALL') return true;
-    const st = (c.execution_status || c.verification_status || 'PENDING').toUpperCase();
-    return st.includes(statusFilter);
+    // 1. Status Filter
+    if (statusFilter !== 'ALL') {
+      const st = (c.execution_status || c.verification_status || 'PENDING').toUpperCase();
+      if (!st.includes(statusFilter)) return false;
+    }
+
+    // 2. Provider Filter
+    if (providerFilter !== 'ALL') {
+      const prov = (c.provider || 'MANUAL').toUpperCase();
+      if (!prov.includes(providerFilter)) return false;
+    }
+
+    // 3. Change Type Filter
+    if (changeTypeFilter !== 'ALL') {
+      const ct = (c.change_type || '').toUpperCase();
+      if (!ct.includes(changeTypeFilter)) return false;
+    }
+
+    return true;
   });
 
   return (
@@ -88,7 +113,7 @@ export const ChangeHistory: React.FC = () => {
               SEO Change History & Verification
             </h1>
             <p className="text-xs text-[#6c6a64] font-sans mt-1">
-              Complete before/after diffs, live HTTP verification evidence, and ranking impact observations.
+              Complete before/after diffs, live HTTP verification evidence, and ranking impact observations for <strong className="text-[#141413]">{activeBusiness?.name || 'Current Project'}</strong>.
             </p>
           </div>
 
@@ -103,21 +128,64 @@ export const ChangeHistory: React.FC = () => {
           </Button>
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-[#e6dfd8]">
-          {['ALL', 'VERIFIED', 'APPLIED', 'GENERATED', 'FAILED'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setStatusFilter(tab)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-medium cursor-pointer transition-all ${
-                statusFilter === tab
-                  ? 'bg-[#141413] text-[#faf9f5] shadow-xs font-bold'
-                  : 'text-[#6c6a64] hover:bg-[#efe9de]'
-              }`}
-            >
-              {tab === 'ALL' ? `All Changes (${changes.length})` : tab}
-            </button>
-          ))}
+        {/* Multi-Vector Filters Bar */}
+        <div className="p-4 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs space-y-3">
+          <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#141413] uppercase">
+            <Filter size={13} className="text-[#cc785c]" />
+            <span>Filter Execution History:</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Status Filter */}
+            <div>
+              <label className="block text-[10px] font-mono text-[#8e8b82] uppercase mb-1">Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-[#e6dfd8] bg-[#faf9f5]"
+              >
+                <option value="ALL">All Statuses ({changes.length})</option>
+                <option value="VERIFIED">Verified (Live Confirmed)</option>
+                <option value="COMPLETED">Completed / Applied</option>
+                <option value="PENDING">Pending Approval</option>
+                <option value="STALE_CHANGE">Stale Change</option>
+                <option value="FAILED">Failed</option>
+              </select>
+            </div>
+
+            {/* Provider Filter */}
+            <div>
+              <label className="block text-[10px] font-mono text-[#8e8b82] uppercase mb-1">Provider</label>
+              <select
+                value={providerFilter}
+                onChange={(e) => setProviderFilter(e.target.value)}
+                className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-[#e6dfd8] bg-[#faf9f5]"
+              >
+                <option value="ALL">All Providers</option>
+                <option value="GITHUB">GitHub (Pull Requests)</option>
+                <option value="WORDPRESS">WordPress (REST API)</option>
+                <option value="SHOPIFY">Shopify (Admin API)</option>
+                <option value="MANUAL">Manual Deployments</option>
+              </select>
+            </div>
+
+            {/* Change Type Filter */}
+            <div>
+              <label className="block text-[10px] font-mono text-[#8e8b82] uppercase mb-1">Change Type</label>
+              <select
+                value={changeTypeFilter}
+                onChange={(e) => setChangeTypeFilter(e.target.value)}
+                className="w-full h-8 px-2.5 text-xs font-mono rounded-lg border border-[#e6dfd8] bg-[#faf9f5]"
+              >
+                <option value="ALL">All Types</option>
+                <option value="SEO_TITLE">SEO Title</option>
+                <option value="META_DESCRIPTION">Meta Description</option>
+                <option value="H1">H1 Heading</option>
+                <option value="SCHEMA">Schema JSON-LD</option>
+                <option value="SECURITY">Security Headers</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* Table / List */}
@@ -140,18 +208,21 @@ export const ChangeHistory: React.FC = () => {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-[#efe9de] border-b border-[#e6dfd8] text-[10px] font-mono uppercase text-[#6c6a64] tracking-wider">
-                    <th className="p-4 font-bold">Change Type & Element</th>
+                    <th className="p-4 font-bold">Element & Type</th>
+                    <th className="p-4 font-bold">Provider</th>
                     <th className="p-4 font-bold">Target URL</th>
-                    <th className="p-4 font-bold">Execution Status</th>
+                    <th className="p-4 font-bold">Status</th>
                     <th className="p-4 font-bold">Before</th>
-                    <th className="p-4 font-bold">Applied / Proposed</th>
+                    <th className="p-4 font-bold">Applied Fix</th>
                     <th className="p-4 font-bold">Verified Date</th>
-                    <th className="p-4 font-bold text-right">Details</th>
+                    <th className="p-4 font-bold text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#e6dfd8]">
                   {filteredChanges.map((change) => {
                     const status = change.execution_status || change.verification_status || 'GENERATED';
+                    const prov = (change.provider || 'MANUAL').toUpperCase();
+
                     return (
                       <tr 
                         key={change.id}
@@ -161,6 +232,14 @@ export const ChangeHistory: React.FC = () => {
                         <td className="p-4 font-mono font-bold text-[#141413]">
                           <div>{change.change_type}</div>
                           <span className="text-[10px] text-[#8e8b82] font-normal">{change.target_element || 'DOM Element'}</span>
+                        </td>
+                        <td className="p-4 font-mono text-xs">
+                          <span className="inline-flex items-center gap-1 font-bold text-[#141413]">
+                            {prov === 'SHOPIFY' && <ShoppingBag size={12} className="text-[#5e8e3e]" />}
+                            {prov === 'WORDPRESS' && <Globe size={12} className="text-[#0073aa]" />}
+                            {prov === 'GITHUB' && <GitBranch size={12} className="text-[#cc785c]" />}
+                            {prov}
+                          </span>
                         </td>
                         <td className="p-4 font-mono text-[#6c6a64] max-w-[180px] truncate">
                           {change.page_url || change.target_url || activeBusiness?.website_url}
@@ -179,7 +258,7 @@ export const ChangeHistory: React.FC = () => {
                         </td>
                         <td className="p-4 text-right">
                           <Button size="sm" variant="outline" className="text-[10px] font-semibold py-1 px-2">
-                            View Evidence
+                            View Audit
                           </Button>
                         </td>
                       </tr>
@@ -206,7 +285,7 @@ export const ChangeHistory: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-serif font-bold text-lg text-[#141413]">
-                    {selectedChange.change_type} Execution Details
+                    {selectedChange.change_type} Execution Audit
                   </h3>
                   <p className="text-xs text-[#8e8b82] font-mono">
                     ID: {selectedChange.id} &bull; Target: {selectedChange.page_url || selectedChange.target_url}
@@ -227,7 +306,7 @@ export const ChangeHistory: React.FC = () => {
                 <span className="text-xs font-mono uppercase text-[#6c6a64]">Status:</span>
                 <ExecutionStatusBadge status={selectedChange.execution_status || selectedChange.verification_status} />
               </div>
-              <span className="text-xs font-mono text-[#8e8b82]">
+              <span className="text-xs font-mono text-[#141413] font-bold">
                 Provider: {selectedChange.provider || 'MANUAL'}
               </span>
             </div>
@@ -289,64 +368,35 @@ export const ChangeHistory: React.FC = () => {
               <div className="space-y-2">
                 <h4 className="font-mono text-xs font-bold uppercase text-[#141413] flex items-center gap-1.5">
                   <ShieldCheck size={14} className="text-emerald-600" />
-                  Live HTTP Crawl Evidence
+                  Live Re-Crawl Evidence Payload
                 </h4>
-                <div className="p-4 rounded-xl bg-[#181715] text-[#faf9f5] border border-[#252320] font-mono text-xs overflow-x-auto">
-                  <pre>{typeof selectedChange.verification_evidence === 'string' 
-                    ? selectedChange.verification_evidence 
-                    : JSON.stringify(selectedChange.verification_evidence, null, 2)}
-                  </pre>
+                <div className="p-4 rounded-xl bg-[#181715] text-[#faf9f5] font-mono text-xs overflow-x-auto">
+                  <pre>{typeof selectedChange.verification_evidence === 'string' ? selectedChange.verification_evidence : JSON.stringify(selectedChange.verification_evidence, null, 2)}</pre>
                 </div>
               </div>
             )}
 
-            {/* Execution Audit Trail Timeline */}
-            <div className="space-y-3">
-              <h4 className="font-mono text-xs font-bold uppercase text-[#141413] flex items-center gap-1.5">
-                <Activity size={14} className="text-[#cc785c]" />
-                Execution Event Timeline
-              </h4>
-
-              {loadingDetails ? (
-                <div className="py-4 text-center text-xs font-mono text-[#8e8b82]">
-                  <RefreshCw size={14} className="animate-spin text-[#cc785c] inline mr-1" />
-                  Loading events...
-                </div>
-              ) : changeEvents.length === 0 ? (
-                <div className="text-xs font-mono text-[#8e8b82] p-3 bg-[#efe9de]/30 rounded-xl">
-                  Initial execution record logged.
-                </div>
-              ) : (
-                <div className="divide-y divide-[#e6dfd8] border border-[#e6dfd8] rounded-xl overflow-hidden text-xs">
-                  {changeEvents.map((evt, idx) => (
-                    <div key={idx} className="p-3 bg-white flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[#cc785c]" />
-                        <span className="font-mono font-bold text-[#141413]">{evt.event_type}</span>
-                      </div>
-                      <span className="text-[10px] font-mono text-[#8e8b82]">
-                        {new Date(evt.created_at).toLocaleTimeString()}
-                      </span>
+            {/* Execution Events Timeline */}
+            {changeEvents.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-mono text-xs font-bold uppercase text-[#141413] flex items-center gap-1.5">
+                  <Activity size={14} className="text-[#cc785c]" />
+                  Telemetry Timeline
+                </h4>
+                <div className="space-y-1.5 font-mono text-xs">
+                  {changeEvents.map((evt) => (
+                    <div key={evt.id} className="p-2.5 rounded-lg bg-white border border-[#e6dfd8] flex items-center justify-between">
+                      <span className="font-bold text-[#141413]">{evt.event_type}</span>
+                      <span className="text-[#8e8b82] text-[10px]">{new Date(evt.created_at).toLocaleString()}</span>
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
-
-            {/* Ranking Observation Disclaimer */}
-            <div className="p-4 rounded-2xl bg-[#efe9de]/40 border border-[#e6dfd8] text-xs font-sans space-y-1">
-              <div className="flex items-center gap-1.5 font-bold text-[#141413] font-mono text-[11px]">
-                <TrendingUp size={13} className="text-[#cc785c]" />
-                <span>Ranking Telemetry Observation</span>
               </div>
-              <p className="text-[#6c6a64]">
-                Serper SERP positions are refreshed automatically. Any rank movement observed after this verified timestamp is tracked against your target keywords.
-              </p>
-            </div>
+            )}
 
-            <div className="flex justify-end pt-2">
+            <div className="pt-4 border-t border-[#e6dfd8] flex justify-end">
               <Button size="sm" onClick={() => setSelectedChange(null)} className="bg-[#141413] text-[#faf9f5]">
-                Close
+                Close Audit View
               </Button>
             </div>
 

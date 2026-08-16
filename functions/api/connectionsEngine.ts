@@ -916,3 +916,164 @@ export async function executeShopifySeoFix(
   };
 }
 
+// =========================================================================
+// PHASE 5: LIVE CONNECTION HEALTH & TELEMETRY ENGINE
+// =========================================================================
+
+export async function testProviderHealth(
+  db: any,
+  userId: string,
+  projectId: string,
+  provider: 'github' | 'wordpress' | 'shopify'
+): Promise<{
+  success: boolean;
+  provider: string;
+  status: 'CONNECTED' | 'ERROR';
+  latencyMs: number;
+  message: string;
+  testedAt: string;
+  details?: any;
+}> {
+  const startTime = Date.now();
+  const testedAt = new Date().toISOString();
+
+  if (provider === 'github') {
+    const conn = await getActiveGitHubConnection(db, userId, projectId);
+    if (!conn) {
+      return {
+        success: false,
+        provider: 'github',
+        status: 'ERROR',
+        latencyMs: 0,
+        message: 'No active GitHub connection found for this project',
+        testedAt
+      };
+    }
+
+    try {
+      // Test GitHub connection by getting default branch info
+      const branches = await githubProvider.getBranches(conn.auth_token || '', conn.repository_owner, conn.repository_name);
+      const latencyMs = Date.now() - startTime;
+
+      // Update connection status
+      await db.prepare("UPDATE connections SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(conn.id).run();
+
+      return {
+        success: true,
+        provider: 'github',
+        status: 'CONNECTED',
+        latencyMs,
+        message: `GitHub repository ${conn.repository_owner}/${conn.repository_name} reachable (${branches.length} branches)`,
+        testedAt,
+        details: { repository: `${conn.repository_owner}/${conn.repository_name}`, branchesCount: branches.length }
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        provider: 'github',
+        status: 'ERROR',
+        latencyMs: Date.now() - startTime,
+        message: `GitHub connection health check failed: ${err.message}`,
+        testedAt
+      };
+    }
+  }
+
+  if (provider === 'wordpress') {
+    const conn = await getActiveWordPressConnection(db, userId, projectId);
+    if (!conn || !conn.auth_token) {
+      return {
+        success: false,
+        provider: 'wordpress',
+        status: 'ERROR',
+        latencyMs: 0,
+        message: 'No active WordPress connection found for this project',
+        testedAt
+      };
+    }
+
+    try {
+      let credentials: { username: string; appPassword: string } = { username: '', appPassword: '' };
+      try {
+        credentials = JSON.parse(conn.auth_token);
+      } catch {
+        credentials = { username: conn.repository_owner || '', appPassword: conn.auth_token };
+      }
+
+      const siteInfo = await wordpressProvider.getSiteInfo(conn.repository_id, credentials.username, credentials.appPassword);
+      const latencyMs = Date.now() - startTime;
+
+      await db.prepare("UPDATE connections SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(conn.id).run();
+
+      return {
+        success: true,
+        provider: 'wordpress',
+        status: 'CONNECTED',
+        latencyMs,
+        message: `WordPress site "${siteInfo.name || siteInfo.url}" reachable via REST API v2`,
+        testedAt,
+        details: { siteName: siteInfo.name, url: siteInfo.url }
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        provider: 'wordpress',
+        status: 'ERROR',
+        latencyMs: Date.now() - startTime,
+        message: `WordPress connection health check failed: ${err.message}`,
+        testedAt
+      };
+    }
+  }
+
+  if (provider === 'shopify') {
+    const conn = await getActiveShopifyConnection(db, userId, projectId);
+    if (!conn || !conn.auth_token) {
+      return {
+        success: false,
+        provider: 'shopify',
+        status: 'ERROR',
+        latencyMs: 0,
+        message: 'No active Shopify connection found for this project',
+        testedAt
+      };
+    }
+
+    try {
+      const storeInfo = await shopifyProvider.getStoreInfo(conn.repository_id, conn.auth_token);
+      const latencyMs = Date.now() - startTime;
+
+      await db.prepare("UPDATE connections SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(conn.id).run();
+
+      return {
+        success: true,
+        provider: 'shopify',
+        status: 'CONNECTED',
+        latencyMs,
+        message: `Shopify store "${storeInfo.name}" (${storeInfo.domain}) reachable via Admin API`,
+        testedAt,
+        details: { storeName: storeInfo.name, domain: storeInfo.domain, currency: storeInfo.currency }
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        provider: 'shopify',
+        status: 'ERROR',
+        latencyMs: Date.now() - startTime,
+        message: `Shopify connection health check failed: ${err.message}`,
+        testedAt
+      };
+    }
+  }
+
+  return {
+    success: false,
+    provider,
+    status: 'ERROR',
+    latencyMs: 0,
+    message: `Unsupported provider: ${provider}`,
+    testedAt
+  };
+}
+
+

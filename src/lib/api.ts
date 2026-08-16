@@ -483,6 +483,14 @@ export async function executeUniversalFix(changeId: string, options: {
   });
 }
 
+export async function testConnectionHealth(provider: 'github' | 'wordpress' | 'shopify'): Promise<any> {
+  return fetchApi('/api/connections/health', {
+    method: 'POST',
+    body: JSON.stringify({ provider })
+  });
+}
+
+
 
 
 

@@ -17,7 +17,8 @@ import {
   getGitHubRepositories, 
   getGitHubBranches, 
   getGitHubTree, 
-  getGitHubFile 
+  getGitHubFile,
+  testConnectionHealth
 } from '../../lib/api';
 import { 
   GitBranch, 
@@ -41,7 +42,9 @@ import {
   ShieldCheck,
   ShoppingBag,
   Tag,
-  BookOpen
+  BookOpen,
+  Activity,
+  Zap
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
@@ -50,6 +53,9 @@ export const Connections: React.FC = () => {
   const [connections, setConnections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Live health testing state
+  const [testingHealthProvider, setTestingHealthProvider] = useState<string | null>(null);
 
   // GitHub Connection Modal state
   const [isGitHubModalOpen, setIsGitHubModalOpen] = useState(false);
@@ -203,6 +209,30 @@ export const Connections: React.FC = () => {
       console.warn("Failed to load Shopify content:", e);
     } finally {
       setLoadingShopifyData(false);
+    }
+  };
+
+  const handleTestLiveHealth = async (provider: 'github' | 'wordpress' | 'shopify') => {
+    try {
+      setTestingHealthProvider(provider);
+      const res = await testConnectionHealth(provider);
+      if (res.success && res.data) {
+        setFeedback({
+          type: 'success',
+          message: `🟢 ${provider.toUpperCase()} Health Test Passed: ${res.data.message} (${res.data.latencyMs}ms)`
+        });
+      } else {
+        setFeedback({
+          type: 'error',
+          message: `🔴 ${provider.toUpperCase()} Health Test Failed: ${res.data?.message || res.error || 'Connection unreachable'}`
+        });
+      }
+      setTimeout(() => setFeedback(null), 6000);
+      await loadConnections();
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: `Health check error: ${err.message}` });
+    } finally {
+      setTestingHealthProvider(null);
     }
   };
 
@@ -477,9 +507,9 @@ export const Connections: React.FC = () => {
               )}
             </div>
 
-            <div className="pt-2 border-t border-[#e6dfd8]/60 flex items-center justify-between gap-3">
+            <div className="pt-3 border-t border-[#e6dfd8]/60 space-y-2">
               {activeGitHubConnection ? (
-                <>
+                <div className="flex items-center justify-between gap-2">
                   <button
                     onClick={() => handleDisconnect(activeGitHubConnection.id)}
                     className="text-xs font-sans font-medium text-rose-700 hover:underline flex items-center gap-1 cursor-pointer"
@@ -487,14 +517,27 @@ export const Connections: React.FC = () => {
                     <Trash2 size={13} />
                     <span>Disconnect</span>
                   </button>
-                  <Button
-                    size="sm"
-                    onClick={() => setIsGitHubModalOpen(true)}
-                    className="bg-[#faf9f5] border border-[#e6dfd8] text-[#141413] hover:bg-[#efe9de] text-xs font-semibold"
-                  >
-                    Change Repo
-                  </Button>
-                </>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleTestLiveHealth('github')}
+                      disabled={testingHealthProvider === 'github'}
+                      className="text-[11px] font-semibold flex items-center gap-1 py-1"
+                    >
+                      {testingHealthProvider === 'github' ? <RefreshCw size={11} className="animate-spin text-[#cc785c]" /> : <Activity size={11} className="text-[#cc785c]" />}
+                      <span>Test Health</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setIsGitHubModalOpen(true)}
+                      className="bg-[#faf9f5] border border-[#e6dfd8] text-[#141413] hover:bg-[#efe9de] text-xs font-semibold"
+                    >
+                      Change Repo
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <Button
                   size="sm"
@@ -556,9 +599,9 @@ export const Connections: React.FC = () => {
               )}
             </div>
 
-            <div className="pt-2 border-t border-[#e6dfd8]/60 flex items-center justify-between gap-3">
+            <div className="pt-3 border-t border-[#e6dfd8]/60 space-y-2">
               {activeWpConnection ? (
-                <>
+                <div className="flex items-center justify-between gap-2">
                   <button
                     onClick={() => handleDisconnect(activeWpConnection.id)}
                     className="text-xs font-sans font-medium text-rose-700 hover:underline flex items-center gap-1 cursor-pointer"
@@ -566,14 +609,27 @@ export const Connections: React.FC = () => {
                     <Trash2 size={13} />
                     <span>Disconnect</span>
                   </button>
-                  <Button
-                    size="sm"
-                    onClick={() => setIsWpModalOpen(true)}
-                    className="bg-[#faf9f5] border border-[#e6dfd8] text-[#141413] hover:bg-[#efe9de] text-xs font-semibold"
-                  >
-                    Update Auth
-                  </Button>
-                </>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleTestLiveHealth('wordpress')}
+                      disabled={testingHealthProvider === 'wordpress'}
+                      className="text-[11px] font-semibold flex items-center gap-1 py-1"
+                    >
+                      {testingHealthProvider === 'wordpress' ? <RefreshCw size={11} className="animate-spin text-[#0073aa]" /> : <Activity size={11} className="text-[#0073aa]" />}
+                      <span>Test Health</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setIsWpModalOpen(true)}
+                      className="bg-[#faf9f5] border border-[#e6dfd8] text-[#141413] hover:bg-[#efe9de] text-xs font-semibold"
+                    >
+                      Update Auth
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <Button
                   size="sm"
@@ -635,9 +691,9 @@ export const Connections: React.FC = () => {
               )}
             </div>
 
-            <div className="pt-2 border-t border-[#e6dfd8]/60 flex items-center justify-between gap-3">
+            <div className="pt-3 border-t border-[#e6dfd8]/60 space-y-2">
               {activeShopifyConnection ? (
-                <>
+                <div className="flex items-center justify-between gap-2">
                   <button
                     onClick={() => handleDisconnect(activeShopifyConnection.id)}
                     className="text-xs font-sans font-medium text-rose-700 hover:underline flex items-center gap-1 cursor-pointer"
@@ -645,14 +701,27 @@ export const Connections: React.FC = () => {
                     <Trash2 size={13} />
                     <span>Disconnect</span>
                   </button>
-                  <Button
-                    size="sm"
-                    onClick={() => setIsShopifyModalOpen(true)}
-                    className="bg-[#faf9f5] border border-[#e6dfd8] text-[#141413] hover:bg-[#efe9de] text-xs font-semibold"
-                  >
-                    Update Auth
-                  </Button>
-                </>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleTestLiveHealth('shopify')}
+                      disabled={testingHealthProvider === 'shopify'}
+                      className="text-[11px] font-semibold flex items-center gap-1 py-1"
+                    >
+                      {testingHealthProvider === 'shopify' ? <RefreshCw size={11} className="animate-spin text-[#5e8e3e]" /> : <Activity size={11} className="text-[#5e8e3e]" />}
+                      <span>Test Health</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setIsShopifyModalOpen(true)}
+                      className="bg-[#faf9f5] border border-[#e6dfd8] text-[#141413] hover:bg-[#efe9de] text-xs font-semibold"
+                    >
+                      Update Auth
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <Button
                   size="sm"
