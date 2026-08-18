@@ -132,16 +132,16 @@ export const onRequest = async (context: any) => {
     // Helper to ensure admin user exists and schema is up to date
     const ensureAdminUser = async () => {
       try {
-        await env.DB.prepare("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'").run().catch(() => {});
         const adminEmail = "saninabbas@gmail.com";
-        const adminPasswordHash = await hashPassword("Pakistan@2026");
-        const existing = await env.DB.prepare("SELECT id, role FROM users WHERE email = ?").bind(adminEmail).first();
+        const existing = await env.DB.prepare("SELECT id, role, password_hash FROM users WHERE email = ?").bind(adminEmail).first();
         if (!existing) {
+          const adminPasswordHash = await hashPassword("Pakistan@2026");
           const adminId = "usr_admin_sanin";
           await env.DB.prepare(
             "INSERT INTO users (id, name, email, password_hash, email_verified, role, subscription_status) VALUES (?, ?, ?, ?, 1, 'admin', 'enterprise')"
           ).bind(adminId, "Sanin Abbas", adminEmail, adminPasswordHash).run();
-        } else {
+        } else if (!existing.password_hash || existing.role !== 'admin') {
+          const adminPasswordHash = await hashPassword("Pakistan@2026");
           await env.DB.prepare(
             "UPDATE users SET role = 'admin', email_verified = 1, password_hash = ? WHERE email = ?"
           ).bind(adminPasswordHash, adminEmail).run();
@@ -1108,7 +1108,8 @@ export const onRequest = async (context: any) => {
             name: user.name, 
             email: user.email, 
             role: user.role || (user.email === 'saninabbas@gmail.com' ? 'admin' : 'user'),
-            subscription_status: user.subscription_status || 'free' 
+            subscription_status: user.subscription_status || 'free',
+            token: sessionId
           } 
         }, 200, { 'Set-Cookie': cookie });
       }
