@@ -1,6 +1,7 @@
 import { githubProvider } from './providers/githubProvider';
 import { wordpressProvider } from './providers/wordpressProvider';
 import { shopifyProvider } from './providers/shopifyProvider';
+import { createSerpProvider } from './serp/serpFactory';
 import type { 
   RepositoryItem, 
   BranchItem, 
@@ -924,7 +925,8 @@ export async function testProviderHealth(
   db: any,
   userId: string,
   projectId: string,
-  provider: 'github' | 'wordpress' | 'shopify'
+  provider: 'github' | 'wordpress' | 'shopify' | 'serp',
+  env?: any
 ): Promise<{
   success: boolean;
   provider: string;
@@ -936,6 +938,21 @@ export async function testProviderHealth(
 }> {
   const startTime = Date.now();
   const testedAt = new Date().toISOString();
+
+  if (provider === 'serp') {
+    const serpProvider = createSerpProvider(env || {});
+    if (serpProvider.testConnection) {
+      const res = await serpProvider.testConnection();
+      return {
+        success: res.success,
+        provider: `serp_${serpProvider.name.toLowerCase()}`,
+        status: res.success ? 'CONNECTED' : 'ERROR',
+        latencyMs: res.latencyMs,
+        message: res.message,
+        testedAt
+      };
+    }
+  }
 
   if (provider === 'github') {
     const conn = await getActiveGitHubConnection(db, userId, projectId);

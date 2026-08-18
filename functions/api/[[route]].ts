@@ -29,6 +29,10 @@ export interface Env {
   BASE_URL?: string;
   GITHUB_APP_TOKEN?: string;
   GITHUB_TOKEN?: string;
+  DATAFORSEO_LOGIN?: string;
+  DATAFORSEO_PASSWORD?: string;
+  SERP_API_KEY?: string;
+  SERPER_API_KEY?: string;
   APP_ENV?: string;
 }
 
@@ -727,6 +731,54 @@ export const onRequest = async (context: any) => {
           completed_at DATETIME,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`).run().catch(() => {});
+
+        // Phase 6: Real SERP & Local Ranking Intelligence Schema
+        await db.prepare(`CREATE TABLE IF NOT EXISTS ranking_keywords (
+          id TEXT PRIMARY KEY,
+          business_id TEXT NOT NULL,
+          keyword TEXT NOT NULL,
+          location TEXT NOT NULL,
+          country_code TEXT NOT NULL DEFAULT 'US',
+          language_code TEXT NOT NULL DEFAULT 'en',
+          device TEXT NOT NULL DEFAULT 'desktop',
+          target_domain TEXT,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+
+        await db.prepare(`CREATE TABLE IF NOT EXISTS ranking_results (
+          id TEXT PRIMARY KEY,
+          business_id TEXT NOT NULL,
+          keyword_id TEXT NOT NULL,
+          keyword TEXT NOT NULL,
+          location TEXT NOT NULL,
+          country_code TEXT NOT NULL DEFAULT 'US',
+          device TEXT NOT NULL DEFAULT 'desktop',
+          position INTEGER,
+          previous_position INTEGER,
+          position_change INTEGER,
+          ranking_url TEXT,
+          found INTEGER NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'NOT_RANKING',
+          checked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+
+        await db.prepare(`CREATE TABLE IF NOT EXISTS ranking_snapshots (
+          id TEXT PRIMARY KEY,
+          business_id TEXT NOT NULL,
+          keyword_id TEXT NOT NULL,
+          position INTEGER,
+          ranking_url TEXT,
+          device TEXT NOT NULL DEFAULT 'desktop',
+          checked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_ranking_kw_biz ON ranking_keywords(business_id, is_active)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_ranking_res_biz ON ranking_results(business_id, checked_at DESC)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_ranking_res_kw ON ranking_results(keyword_id, checked_at DESC)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_ranking_snap_kw ON ranking_snapshots(keyword_id, checked_at DESC)").run().catch(() => {});
       } catch (err) {
         console.warn("Auto-migration notice:", err);
       }
@@ -3701,6 +3753,542 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true, data: { score, history } });
       }
 
+      // =========================================================================
+      // PHASE 6: REAL SERP & LOCAL RANKING INTELLIGENCE ENGINE ENDPOINTS
+      // =========================================================================
+
+      // POST /api/rankings/keywords — Add a keyword to track with live initial SERP lookup
+      if (url.pathname === '/api/rankings/keywords' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json().catch(() => ({})) as any;
+        if (!payload.keyword || typeof payload.keyword !== 'string' || !payload.keyword.trim()) {
+          return errorResponse("Keyword is required and must be a valid string", 400);
+        }
+
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const keyword = payload.keyword.trim();
+        const location = (payload.location || payload.city || business.city || 'United States').trim();
+        const countryCode = (payload.countryCode || payload.country_code || 'US').toUpperCase();
+        const languageCode = (payload.languageCode || payload.language_code || 'en').toLowerCase();
+        const device = payload.device === 'mobile' ? 'mobile' : 'desktop';
+        const targetDomain = (payload.targetDomain || business.website_url || '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+
+        const keywordId = crypto.randomUUID();
+
+        // 1. Save to ranking_keywords
+        await env.DB.prepare(`
+          INSERT INTO ranking_keywords (id, business_id, keyword, location, country_code, language_code, device, target_domain, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `).bind(keywordId, business.id, keyword, location, countryCode, languageCode, device, targetDomain).run();
+
+        // 2. Perform live SERP search if provider is configured
+        const { executeSERPSearch, calculateRankingMovement } = await import('./rankingEngine');
+        let serpResult: any = null;
+        let serpError: string | null = null;
+
+        try {
+          serpResult = await executeSERPSearch(env, {
+            keyword,
+            location,
+            countryCode,
+            languageCode,
+            device,
+            targetDomain
+          });
+        } catch (err: any) {
+          serpError = err.message || 'SERP search failed';
+          console.warn("SERP initial check error:", serpError);
+        }
+
+        const currentPos = serpResult?.position || null;
+        const movement = calculateRankingMovement(null, currentPos);
+        const rankingUrl = serpResult?.rankingUrl || null;
+        const found = currentPos !== null ? 1 : 0;
+        const status = serpResult ? movement.status : 'NOT_RANKING';
+
+        // 3. Save initial result in ranking_results & ranking_snapshots
+        const resultId = crypto.randomUUID();
+        await env.DB.prepare(`
+          INSERT INTO ranking_results (id, business_id, keyword_id, keyword, location, country_code, device, position, previous_position, position_change, ranking_url, found, status, checked_at, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `).bind(resultId, business.id, keywordId, keyword, location, countryCode, device, currentPos, rankingUrl, found, status).run();
+
+        if (currentPos !== null) {
+          await env.DB.prepare(`
+            INSERT INTO ranking_snapshots (id, business_id, keyword_id, position, ranking_url, device, checked_at)
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          `).bind(crypto.randomUUID(), business.id, keywordId, currentPos, rankingUrl, device).run().catch(() => {});
+        }
+
+        // Backward compatibility sync into `keywords` table
+        await env.DB.prepare(`
+          INSERT OR REPLACE INTO keywords (id, business_id, keyword, location, zip_code, intent, current_position, previous_position, local_pack_position, status, data_source, best_competitor, competitor_position, last_checked_at)
+          VALUES (?, ?, ?, ?, ?, 'LOCAL', ?, NULL, ?, ?, 'serp_engine', ?, ?, CURRENT_TIMESTAMP)
+        `).bind(
+          keywordId,
+          business.id,
+          keyword,
+          location,
+          payload.zip || '',
+          currentPos,
+          serpResult?.localPackPosition || null,
+          currentPos ? 'UP' : 'NOT FOUND',
+          serpResult?.competitors?.[0]?.title || 'Competitor',
+          serpResult?.competitors?.[0]?.position || 1
+        ).run().catch(() => {});
+
+        return jsonResponse({
+          success: true,
+          data: {
+            id: keywordId,
+            keyword,
+            location,
+            countryCode,
+            languageCode,
+            device,
+            currentPosition: currentPos,
+            previousPosition: null,
+            positionChange: null,
+            status,
+            rankingUrl,
+            found: found === 1,
+            competitors: serpResult?.competitors || [],
+            lastCheckedAt: new Date().toISOString(),
+            providerError: serpError
+          }
+        });
+      }
+
+      // GET /api/rankings/keywords — List all tracked keywords for the authenticated business
+      if (url.pathname === '/api/rankings/keywords' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const { results: kwResults } = await env.DB.prepare(`
+          SELECT 
+            k.id,
+            k.keyword,
+            k.location,
+            k.country_code,
+            k.language_code,
+            k.device,
+            k.target_domain,
+            r.position as current_position,
+            r.previous_position,
+            r.position_change,
+            r.status,
+            r.ranking_url,
+            r.checked_at as last_checked_at
+          FROM ranking_keywords k
+          LEFT JOIN ranking_results r ON r.keyword_id = k.id AND r.id = (
+            SELECT id FROM ranking_results WHERE keyword_id = k.id ORDER BY checked_at DESC LIMIT 1
+          )
+          WHERE k.business_id = ? AND k.is_active = 1
+          ORDER BY k.created_at DESC
+        `).bind(business.id).all();
+
+        // Fallback to legacy `keywords` table if ranking_keywords is empty
+        if (!kwResults || kwResults.length === 0) {
+          const { results: legacyKws } = await env.DB.prepare(
+            "SELECT * FROM keywords WHERE business_id = ? ORDER BY created_at DESC"
+          ).bind(business.id).all();
+
+          return jsonResponse({
+            success: true,
+            data: (legacyKws || []).map((k: any) => ({
+              id: k.id,
+              keyword: k.keyword,
+              location: k.location || business.city || 'United States',
+              countryCode: 'US',
+              device: 'desktop',
+              currentPosition: k.current_position,
+              previousPosition: k.previous_position,
+              positionChange: (k.previous_position && k.current_position) ? (k.previous_position - k.current_position) : null,
+              status: k.current_position ? 'FOUND' : 'NOT_RANKING',
+              rankingUrl: null,
+              lastCheckedAt: k.last_checked_at
+            }))
+          });
+        }
+
+        return jsonResponse({
+          success: true,
+          data: (kwResults || []).map((k: any) => ({
+            id: k.id,
+            keyword: k.keyword,
+            location: k.location,
+            countryCode: k.country_code,
+            languageCode: k.language_code,
+            device: k.device,
+            targetDomain: k.target_domain,
+            currentPosition: k.current_position,
+            previousPosition: k.previous_position,
+            positionChange: k.position_change,
+            status: k.status || (k.current_position ? 'STABLE' : 'NOT_RANKING'),
+            rankingUrl: k.ranking_url,
+            lastCheckedAt: k.last_checked_at
+          }))
+        });
+      }
+
+      // DELETE /api/rankings/keywords/:id — Deactivate/delete keyword
+      if (url.pathname.startsWith('/api/rankings/keywords/') && request.method === 'DELETE') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const kwId = url.pathname.replace('/api/rankings/keywords/', '');
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        await env.DB.prepare("UPDATE ranking_keywords SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND business_id = ?").bind(kwId, business.id).run();
+        await env.DB.prepare("DELETE FROM keywords WHERE id = ? AND business_id = ?").bind(kwId, business.id).run().catch(() => {});
+
+        return jsonResponse({ success: true, message: "Keyword tracking stopped" });
+      }
+
+      // POST /api/rankings/check — Single live ranking check with rate limiting (max 20 req/min)
+      if (url.pathname === '/api/rankings/check' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        // Rate limiting guard: max 20 ranking checks per minute per user
+        if (!checkRateLimit(`serp_check_${user.id}`, 20, 60000)) {
+          return errorResponse("Rate limit exceeded: Maximum 20 ranking checks per minute. Please try again shortly.", 429, "RATE_LIMITED");
+        }
+
+        const payload = await request.json().catch(() => ({})) as any;
+        if (!payload.keywordId && !payload.keyword) {
+          return errorResponse("keywordId or keyword is required", 400);
+        }
+
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business || !business.website_url) return errorResponse("Business or website URL not found", 404);
+
+        let keywordRecord: any = null;
+        if (payload.keywordId) {
+          keywordRecord = await env.DB.prepare(
+            "SELECT * FROM ranking_keywords WHERE id = ? AND business_id = ?"
+          ).bind(payload.keywordId, business.id).first();
+
+          if (!keywordRecord) {
+            keywordRecord = await env.DB.prepare(
+              "SELECT * FROM keywords WHERE id = ? AND business_id = ?"
+            ).bind(payload.keywordId, business.id).first();
+          }
+        }
+
+        const keyword = (keywordRecord?.keyword || payload.keyword || '').trim();
+        const location = (keywordRecord?.location || payload.location || business.city || 'United States').trim();
+        const countryCode = (keywordRecord?.country_code || payload.countryCode || 'US').toUpperCase();
+        const languageCode = (keywordRecord?.language_code || payload.languageCode || 'en').toLowerCase();
+        const device = (keywordRecord?.device || payload.device || 'desktop') === 'mobile' ? 'mobile' : 'desktop';
+        const targetDomain = (business.website_url as string).toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+        const keywordId = keywordRecord?.id || payload.keywordId || crypto.randomUUID();
+
+        // Retrieve latest previous position
+        const prevResult = await env.DB.prepare(
+          "SELECT position FROM ranking_results WHERE keyword_id = ? AND business_id = ? ORDER BY checked_at DESC LIMIT 1"
+        ).bind(keywordId, business.id).first();
+
+        const prevPos: number | null = prevResult ? prevResult.position : (keywordRecord?.current_position || null);
+
+        const { executeSERPSearch, calculateRankingMovement } = await import('./rankingEngine');
+        let serpResult: any = null;
+
+        try {
+          serpResult = await executeSERPSearch(env, {
+            keyword,
+            location,
+            countryCode,
+            languageCode,
+            device,
+            targetDomain
+          });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to execute SERP check", 502, "PROVIDER_ERROR");
+        }
+
+        const newPos = serpResult.position;
+        const rankingUrl = serpResult.rankingUrl;
+        const movement = calculateRankingMovement(prevPos, newPos);
+        const found = newPos !== null ? 1 : 0;
+
+        // Save result and snapshot
+        const resId = crypto.randomUUID();
+        await env.DB.prepare(`
+          INSERT INTO ranking_results (id, business_id, keyword_id, keyword, location, country_code, device, position, previous_position, position_change, ranking_url, found, status, checked_at, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `).bind(resId, business.id, keywordId, keyword, location, countryCode, device, newPos, prevPos, movement.positionChange, rankingUrl, found, movement.status).run();
+
+        if (newPos !== null) {
+          await env.DB.prepare(`
+            INSERT INTO ranking_snapshots (id, business_id, keyword_id, position, ranking_url, device, checked_at)
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          `).bind(crypto.randomUUID(), business.id, keywordId, newPos, rankingUrl, device).run().catch(() => {});
+        }
+
+        // Backward compatibility sync with `keywords` table
+        await env.DB.prepare(`
+          UPDATE keywords SET
+            previous_position = ?,
+            current_position = ?,
+            local_pack_position = ?,
+            status = ?,
+            last_checked_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND business_id = ?
+        `).bind(prevPos, newPos, serpResult.localPackPosition || null, movement.status, keywordId, business.id).run().catch(() => {});
+
+        return jsonResponse({
+          success: true,
+          data: {
+            keywordId,
+            keyword,
+            location,
+            countryCode,
+            device,
+            position: newPos,
+            previousPosition: prevPos,
+            positionChange: movement.positionChange,
+            status: movement.status,
+            rankingUrl,
+            found: found === 1,
+            checkedAt: new Date().toISOString(),
+            competitors: serpResult.competitors || []
+          }
+        });
+      }
+
+      // POST /api/rankings/bulk-check — Batch ranking check with strict cost & batch controls (max 15 keywords)
+      if (url.pathname === '/api/rankings/bulk-check' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        // Rate limiting guard: max 5 bulk checks per minute per user
+        if (!checkRateLimit(`serp_bulk_${user.id}`, 5, 60000)) {
+          return errorResponse("Rate limit exceeded: Maximum 5 bulk ranking checks per minute. Please try again shortly.", 429, "RATE_LIMITED");
+        }
+
+        const payload = await request.json().catch(() => ({})) as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business || !business.website_url) return errorResponse("Business or website URL not found", 404);
+
+        // Fetch up to 15 active keywords for business (cost control guard)
+        let { results: keywords } = await env.DB.prepare(
+          "SELECT * FROM ranking_keywords WHERE business_id = ? AND is_active = 1 LIMIT 15"
+        ).bind(business.id).all();
+
+        if (!keywords || keywords.length === 0) {
+          const { results: legacyKws } = await env.DB.prepare(
+            "SELECT * FROM keywords WHERE business_id = ? LIMIT 15"
+          ).bind(business.id).all();
+          keywords = legacyKws || [];
+        }
+
+        if (keywords.length === 0) {
+          return jsonResponse({ success: true, message: "No tracked keywords to check", updated: 0, results: [] });
+        }
+
+        const targetDomain = (business.website_url as string).toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+        const { executeSERPSearch, calculateRankingMovement } = await import('./rankingEngine');
+
+        const updatedResults: any[] = [];
+        for (const kw of keywords) {
+          try {
+            const loc = kw.location || business.city || 'United States';
+            const serpRes = await executeSERPSearch(env, {
+              keyword: kw.keyword,
+              location: loc,
+              countryCode: kw.country_code || 'US',
+              languageCode: kw.language_code || 'en',
+              device: kw.device || 'desktop',
+              targetDomain
+            });
+
+            const prevPos = kw.current_position || null;
+            const newPos = serpRes.position;
+            const movement = calculateRankingMovement(prevPos, newPos);
+            const rankingUrl = serpRes.rankingUrl;
+            const found = newPos !== null ? 1 : 0;
+
+            await env.DB.prepare(`
+              INSERT INTO ranking_results (id, business_id, keyword_id, keyword, location, country_code, device, position, previous_position, position_change, ranking_url, found, status, checked_at, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            `).bind(crypto.randomUUID(), business.id, kw.id, kw.keyword, loc, kw.country_code || 'US', kw.device || 'desktop', newPos, prevPos, movement.positionChange, rankingUrl, found, movement.status).run();
+
+            if (newPos !== null) {
+              await env.DB.prepare(`
+                INSERT INTO ranking_snapshots (id, business_id, keyword_id, position, ranking_url, device, checked_at)
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+              `).bind(crypto.randomUUID(), business.id, kw.id, newPos, rankingUrl, kw.device || 'desktop').run().catch(() => {});
+            }
+
+            // Sync legacy table
+            await env.DB.prepare(`
+              UPDATE keywords SET
+                previous_position = ?,
+                current_position = ?,
+                local_pack_position = ?,
+                status = ?,
+                last_checked_at = CURRENT_TIMESTAMP
+              WHERE id = ? AND business_id = ?
+            `).bind(prevPos, newPos, serpRes.localPackPosition || null, movement.status, kw.id, business.id).run().catch(() => {});
+
+            updatedResults.push({
+              id: kw.id,
+              keyword: kw.keyword,
+              position: newPos,
+              previousPosition: prevPos,
+              positionChange: movement.positionChange,
+              status: movement.status
+            });
+          } catch (kwErr: any) {
+            console.warn(`Error updating keyword ${kw.keyword}:`, kwErr.message);
+          }
+        }
+
+        return jsonResponse({
+          success: true,
+          updated: updatedResults.length,
+          results: updatedResults
+        });
+      }
+
+      // GET /api/rankings — Overview KPIs and keyword list
+      if (url.pathname === '/api/rankings' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const { results: kwResults } = await env.DB.prepare(`
+          SELECT 
+            k.id,
+            k.keyword,
+            k.location,
+            k.country_code,
+            k.device,
+            k.target_domain,
+            r.position as current_position,
+            r.previous_position,
+            r.position_change,
+            r.status,
+            r.ranking_url,
+            r.checked_at as last_checked_at
+          FROM ranking_keywords k
+          LEFT JOIN ranking_results r ON r.keyword_id = k.id AND r.id = (
+            SELECT id FROM ranking_results WHERE keyword_id = k.id ORDER BY checked_at DESC LIMIT 1
+          )
+          WHERE k.business_id = ? AND k.is_active = 1
+          ORDER BY k.created_at DESC
+        `).bind(business.id).all();
+
+        const { calculateRankingKPIs, calculateLocalVisibilityScore } = await import('./rankingEngine');
+        const items = kwResults || [];
+        const kpis = calculateRankingKPIs(items);
+        const visibilityScore = calculateLocalVisibilityScore(items);
+
+        return jsonResponse({
+          success: true,
+          data: {
+            kpis,
+            visibilityScore,
+            keywords: items
+          }
+        });
+      }
+
+      // GET /api/rankings/:keywordId/history — Historical ranking trajectory
+      if (url.pathname.startsWith('/api/rankings/') && url.pathname.endsWith('/history') && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const keywordId = url.pathname.replace('/api/rankings/', '').replace('/history', '');
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const days = parseInt(url.searchParams.get('days') || '30', 10);
+        const { results: snapshots } = await env.DB.prepare(`
+          SELECT position, ranking_url, device, checked_at
+          FROM ranking_snapshots
+          WHERE keyword_id = ? AND business_id = ?
+          ORDER BY checked_at ASC
+          LIMIT 100
+        `).bind(keywordId, business.id).all();
+
+        return jsonResponse({
+          success: true,
+          data: {
+            keywordId,
+            days,
+            snapshots: snapshots || []
+          }
+        });
+      }
+
       // --- LOCAL GEO-GRID: SCANS & VISIBILITY MATRIX ---
       if (url.pathname === '/api/geogrid/scans' && request.method === 'GET') {
         const user = await authenticate();
@@ -6051,7 +6639,7 @@ export const onRequest = async (context: any) => {
         if (!payload.provider) return errorResponse("Missing provider field", 400);
 
         try {
-          const health = await testProviderHealth(env.DB, user.id, business.id, payload.provider);
+          const health = await testProviderHealth(env.DB, user.id, business.id, payload.provider, env);
           return jsonResponse({ success: health.success, data: health });
         } catch (err: any) {
           return errorResponse(err.message || "Provider health check failed", 400);

@@ -483,12 +483,73 @@ export async function executeUniversalFix(changeId: string, options: {
   });
 }
 
-export async function testConnectionHealth(provider: 'github' | 'wordpress' | 'shopify'): Promise<any> {
+export async function testConnectionHealth(provider: 'github' | 'wordpress' | 'shopify' | 'serp'): Promise<any> {
   return fetchApi('/api/connections/health', {
     method: 'POST',
     body: JSON.stringify({ provider })
   });
 }
+
+// =========================================================================
+// PHASE 6: REAL SERP & LOCAL RANKING INTELLIGENCE CLIENT METHODS
+// =========================================================================
+
+export async function fetchRankingsOverview(businessId?: string): Promise<any> {
+  return fetchApi(`/api/rankings${businessId ? `?business_id=${businessId}` : ''}`);
+}
+
+export async function fetchTrackedKeywords(businessId?: string): Promise<any[]> {
+  const res = await fetchApi(`/api/rankings/keywords${businessId ? `?business_id=${businessId}` : ''}`);
+  return Array.isArray(res) ? res : (res?.data || []);
+}
+
+export async function addRankingKeyword(params: {
+  keyword: string;
+  location?: string;
+  countryCode?: string;
+  languageCode?: string;
+  device?: 'desktop' | 'mobile';
+  targetDomain?: string;
+  businessId?: string;
+}): Promise<any> {
+  return fetchApi('/api/rankings/keywords', {
+    method: 'POST',
+    body: JSON.stringify({
+      keyword: params.keyword,
+      location: params.location,
+      countryCode: params.countryCode || 'US',
+      languageCode: params.languageCode || 'en',
+      device: params.device || 'desktop',
+      targetDomain: params.targetDomain,
+      business_id: params.businessId
+    })
+  });
+}
+
+export async function deleteRankingKeyword(id: string, businessId?: string): Promise<any> {
+  return fetchApi(`/api/rankings/keywords/${id}${businessId ? `?business_id=${businessId}` : ''}`, {
+    method: 'DELETE'
+  });
+}
+
+export async function checkRanking(keywordId: string, businessId?: string): Promise<any> {
+  return fetchApi('/api/rankings/check', {
+    method: 'POST',
+    body: JSON.stringify({ keywordId, business_id: businessId })
+  });
+}
+
+export async function bulkCheckRankings(businessId?: string): Promise<any> {
+  return fetchApi('/api/rankings/bulk-check', {
+    method: 'POST',
+    body: JSON.stringify({ business_id: businessId })
+  });
+}
+
+export async function fetchRankingHistory(keywordId: string, days: number = 30, businessId?: string): Promise<any> {
+  return fetchApi(`/api/rankings/${keywordId}/history?days=${days}${businessId ? `&business_id=${businessId}` : ''}`);
+}
+
 
 
 

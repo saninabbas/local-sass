@@ -63,7 +63,11 @@ export interface CopilotFullContext {
   keywords: Array<{
     keyword: string;
     rank: number | null;
-    change?: number;
+    previousRank?: number | null;
+    change?: number | null;
+    status?: string;
+    location?: string;
+    rankingUrl?: string | null;
     bestCompetitor?: string;
   }>;
   reviews?: {
@@ -166,8 +170,8 @@ ${context.topProblems.map((p, i) => `${i + 1}. [${p.severity}] ${p.title} | Evid
 COMPETITOR TELEMETRY:
 ${context.competitors.map(c => `- ${c.name} (${c.domain}): Score ${c.score}/100`).join('\n') || 'No competitors analyzed yet.'}
 
-TRACKED KEYWORDS:
-${context.keywords.map(k => `- "${k.keyword}": Position ${k.rank ? '#' + k.rank : 'NOT_FOUND'}`).join('\n') || 'No keywords tracked.'}
+TRACKED KEYWORDS & SERP INTELLIGENCE:
+${context.keywords.map(k => `- "${k.keyword}" (${k.location || 'Local'}): Position ${k.rank ? '#' + k.rank : 'NOT_RANKING'} (Prev: ${k.previousRank ? '#' + k.previousRank : 'None'}, Movement: ${k.change ? (k.change > 0 ? '+' + k.change : k.change) : '0'}, Status: ${k.status || 'STABLE'})`).join('\n') || 'No keywords tracked.'}
 
 REVIEWS: ${context.reviews?.connected ? `${context.reviews.avgRating} ★ (${context.reviews.totalReviews} reviews)` : 'NOT_CONNECTED'}
 BACKLINKS: ${context.authority?.connected ? `${context.authority.totalBacklinks} backlinks` : 'NOT_CONNECTED / UNAVAILABLE'}
