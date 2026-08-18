@@ -18,7 +18,7 @@ export function HeroSection() {
             </h1>
             
             <p className="text-lg sm:text-xl text-[#3d3d3a] leading-relaxed mb-10 max-w-lg mx-auto xl:mx-0 font-sans">
-              Rankora audits your website, analyzes your competitors, tracks local visibility, and gives you an AI-powered plan to grow — all from one dashboard.
+              Rankora audits your website, analyzes your competitors, tracks local visibility, and gives you an AI-powered plan to grow, all from one dashboard.
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center xl:justify-start gap-4 mb-5">

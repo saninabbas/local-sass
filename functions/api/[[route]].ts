@@ -3148,15 +3148,14 @@ export const onRequest = async (context: any) => {
 
           const { validateAndNormalizeUrl, fetchWithTimeout, Extractor, calculateDeterministicAudit } = await import('./auditEngine');
           
-          let validatedUrl: URL;
-          try {
-            validatedUrl = validateAndNormalizeUrl(rawUrl);
-          } catch (err: any) {
-            return errorResponse(err.message || "Invalid or restricted website URL.", 400);
+          const urlValidation = validateAndNormalizeUrl(rawUrl);
+          if (!urlValidation.valid) {
+            return errorResponse(urlValidation.error || "Invalid or restricted website URL.", 400);
           }
 
-          const siteUrl = validatedUrl.href;
-          const origin = validatedUrl.origin;
+          const siteUrl = urlValidation.url;
+          const urlObj = new URL(siteUrl);
+          const origin = urlObj.origin;
 
           // Fetch homepage
           let fetchRes;

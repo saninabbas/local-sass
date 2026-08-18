@@ -472,7 +472,7 @@ export function Dashboard() {
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#8e8b82]">
-              1. HOW AM I DOING? — Core Telemetry
+              1. HOW AM I DOING? : Core Telemetry
             </h2>
             <button
               onClick={() => setCalcModalOpen(true)}
@@ -565,7 +565,7 @@ export function Dashboard() {
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#8e8b82]">
-              2. WHAT IS WRONG? — Top 3 Priority Problems
+              2. WHAT IS WRONG? : Top 3 Priority Problems
             </h2>
             <Link
               to="/dashboard/score"
@@ -607,7 +607,7 @@ export function Dashboard() {
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#8e8b82]">
-              3. WHO IS BEATING ME? — Competitor Snapshot
+              3. WHO IS BEATING ME? : Competitor Snapshot
             </h2>
             <Link
               to="/dashboard/competitors"
@@ -640,7 +640,7 @@ export function Dashboard() {
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#8e8b82]">
-              4. WHAT SHOULD I FIX FIRST? — Today's Highest Impact Actions
+              4. WHAT SHOULD I FIX FIRST? : Today's Highest Impact Actions
             </h2>
             <Link
               to="/dashboard/actions"
@@ -714,7 +714,7 @@ export function Dashboard() {
             <div className="flex items-center gap-2">
               <Calendar size={14} className="text-[#cc785c]" />
               <span className="font-mono font-bold uppercase text-[#8e8b82]">
-                5. WHAT CHANGED? — Telemetry Freshness
+                5. WHAT CHANGED? : Telemetry Freshness
               </span>
             </div>
             <p className="text-[#6c6a64]">
