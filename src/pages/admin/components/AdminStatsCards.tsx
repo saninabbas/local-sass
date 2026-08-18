@@ -153,15 +153,15 @@ export function AdminStatsCards({ stats, isLoading }: AdminStatsCardsProps) {
           <div className="flex items-center justify-between p-2.5 bg-[#faf9f5] rounded-lg border border-[#e6dfd8]">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#6c6a64]" />
-              <span className="text-xs text-[#3d3d3a] font-sans">Free Audit ($0)</span>
+              <span className="text-xs text-[#3d3d3a] font-sans">Starter ($15/mo)</span>
             </div>
-            <span className="text-xs font-mono font-bold text-[#141413]">{planBreakdown.free || 0}</span>
+            <span className="text-xs font-mono font-bold text-[#141413]">{planBreakdown.starter || planBreakdown.free || 0}</span>
           </div>
 
           <div className="flex items-center justify-between p-2.5 bg-[#faf9f5] rounded-lg border border-[#e6dfd8]">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#cc785c]" />
-              <span className="text-xs text-[#cc785c] font-sans font-medium">Growth ($15/mo)</span>
+              <span className="text-xs text-[#cc785c] font-sans font-medium">Growth ($30/mo)</span>
             </div>
             <span className="text-xs font-mono font-bold text-[#cc785c]">{planBreakdown.growth || 0}</span>
           </div>
@@ -169,9 +169,9 @@ export function AdminStatsCards({ stats, isLoading }: AdminStatsCardsProps) {
           <div className="flex items-center justify-between p-2.5 bg-[#faf9f5] rounded-lg border border-[#e6dfd8]">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#181715]" />
-              <span className="text-xs text-[#141413] font-sans font-medium">Pro ($30/mo)</span>
+              <span className="text-xs text-[#141413] font-sans font-medium">Agency Pro ($80/mo)</span>
             </div>
-            <span className="text-xs font-mono font-bold text-[#141413]">{planBreakdown.pro || 0}</span>
+            <span className="text-xs font-mono font-bold text-[#141413]">{planBreakdown.agency_pro || planBreakdown.pro || 0}</span>
           </div>
 
           <div className="flex items-center justify-between p-2.5 bg-[#faf9f5] rounded-lg border border-[#e6dfd8]">

@@ -24,7 +24,7 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
   free: {
     name: 'Starter / Free Trial',
     tier: 'free',
-    price: 5,
+    price: 15,
     project_limit: 1,
     keyword_limit: 10,
     audit_limit: 10,
@@ -38,7 +38,7 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
   starter: {
     name: 'Starter Plan',
     tier: 'starter',
-    price: 5,
+    price: 15,
     project_limit: 1,
     keyword_limit: 10,
     audit_limit: 10,

@@ -19,32 +19,32 @@ export function GrantPlanModal({ user, isOpen, onClose, onGrant }: GrantPlanModa
 
   const plans = [
     {
-      id: 'free',
-      name: 'Free Audit Plan',
-      price: '$0',
-      desc: 'One-time Growth Score, Basic SEO Overview, Top 3 Recommendations.',
-      badge: 'Free Tier',
+      id: 'starter',
+      name: 'Starter Plan',
+      price: '$15/mo',
+      desc: '1 Website, Deterministic 7-Vector Audit, 25 Keywords, Technical & On-Page SEO.',
+      badge: 'Starter Tier',
       badgeClass: 'bg-gray-100 text-gray-700 border border-gray-200'
     },
     {
       id: 'growth',
       name: 'Growth Plan',
-      price: '$15/mo',
-      desc: 'Weekly Growth Score updates, Full AI Action Plan, Review Monitoring & Competitor Tracking.',
+      price: '$30/mo',
+      desc: 'Up to 5 Websites, 100 Keywords, SERP Radar, GBP & Review AI, Backlink Intelligence.',
       badge: 'Recommended',
-      badgeClass: 'bg-blue-100 text-blue-700 border border-blue-200 font-bold'
+      badgeClass: 'bg-orange-100 text-orange-700 border border-orange-200 font-bold'
     },
     {
-      id: 'pro',
-      name: 'Pro Plan',
-      price: '$30/mo',
-      desc: 'Up to 3 Locations, Real-time Growth Score, AI Review Replies & Priority Support.',
-      badge: 'Pro Tier',
+      id: 'agency_pro',
+      name: 'Agency Pro',
+      price: '$80/mo',
+      desc: 'Unlimited Websites, 1,000 Keywords, Full SEO Execution Engine, White-Label Reports.',
+      badge: 'Agency Pro Tier',
       badgeClass: 'bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold'
     },
     {
       id: 'enterprise',
-      name: 'Enterprise / Agency',
+      name: 'Enterprise VIP',
       price: 'Custom / VIP',
       desc: 'Multi-location accounts, White-label PDF Reports, Authority Builder & Dedicated Compute.',
       badge: 'VIP Agency',

@@ -61,13 +61,15 @@ export function AdminUserTable({
     switch (plan?.toLowerCase()) {
       case 'enterprise':
         return 'Enterprise VIP';
+      case 'agency_pro':
       case 'pro':
-        return 'Pro ($30/mo)';
+        return 'Agency Pro ($80/mo)';
       case 'growth':
+        return 'Growth ($30/mo)';
       case 'starter':
-        return 'Growth ($15/mo)';
+        return 'Starter ($15/mo)';
       default:
-        return 'Free Audit';
+        return 'Starter ($15/mo)';
     }
   };
 
@@ -109,9 +111,9 @@ export function AdminUserTable({
               className="px-2.5 py-1.5 bg-[#faf9f5] border border-[#e6dfd8] rounded-lg text-xs text-[#141413] focus:outline-none focus:ring-1 focus:ring-[#cc785c] focus:border-[#cc785c] transition-all font-sans"
             >
               <option value="all">All Plans</option>
-              <option value="free">Free Audit ($0)</option>
-              <option value="growth">Growth ($15/mo)</option>
-              <option value="pro">Pro ($30/mo)</option>
+              <option value="starter">Starter ($15/mo)</option>
+              <option value="growth">Growth ($30/mo)</option>
+              <option value="agency_pro">Agency Pro ($80/mo)</option>
               <option value="enterprise">Enterprise VIP</option>
             </select>
           </div>

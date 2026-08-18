@@ -23,7 +23,9 @@ import {
   POLAR_PLANS,
   normalizePlanKey,
   resolvePolarProductId,
+  resolvePolarProductIdAsync,
   resolvePlanFromPolarProductId,
+  fetchPolarProducts,
   getUserPlanLimit as getPlanLimitFromEngine,
   canUseFeature,
   verifyPolarWebhookSignature,
@@ -3274,6 +3276,20 @@ export const onRequest = async (context: any) => {
         }
       }
 
+      // --- BILLING: LIST POLAR PRODUCTS ---
+      if (url.pathname === '/api/billing/products' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const polarToken = env.POLAR_ACCESS_TOKEN || (env as any).POLAR_API_KEY || (env as any).POLAR_TOKEN;
+        if (!polarToken) {
+          return jsonResponse({ success: false, error: "POLAR_ACCESS_TOKEN not configured", products: [] });
+        }
+
+        const products = await fetchPolarProducts(polarToken);
+        return jsonResponse({ success: true, products });
+      }
+
       // --- BILLING: POLAR CHECKOUT ---
       if (url.pathname === '/api/billing/checkout' && request.method === 'POST') {
         const user = await authenticate();
@@ -3291,7 +3307,7 @@ export const onRequest = async (context: any) => {
         const payload = await request.json().catch(() => ({})) as any;
         const requestedPlan = payload.plan || payload.planType || 'growth';
         const normPlan = normalizePlanKey(requestedPlan);
-        const targetProductId = resolvePolarProductId(normPlan, env);
+        const targetProductId = await resolvePolarProductIdAsync(normPlan, env, polarToken);
 
         const successUrl = `${url.origin}/dashboard/billing?checkout=success&plan=${normPlan}`;
         const checkoutRes = await createPolarCheckoutSession({
@@ -3308,7 +3324,8 @@ export const onRequest = async (context: any) => {
           return jsonResponse({
             success: false,
             code: "CHECKOUT_FAILED",
-            error: checkoutRes.error || "Failed to initialize Polar checkout session."
+            error: checkoutRes.error || "Failed to initialize Polar checkout session.",
+            availableProducts: checkoutRes.availableProducts || []
           }, 400);
         }
 
@@ -3319,6 +3336,7 @@ export const onRequest = async (context: any) => {
           plan: normPlan
         });
       }
+
 
       // --- BILLING: CUSTOMER PORTAL ---
       if (url.pathname === '/api/billing/portal' && request.method === 'POST') {

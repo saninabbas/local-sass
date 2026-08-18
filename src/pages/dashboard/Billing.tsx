@@ -38,12 +38,15 @@ export const Billing: React.FC = () => {
     }
   };
 
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
   useEffect(() => {
     loadBilling();
   }, []);
 
   const handleCheckout = async (planKey: string) => {
     setLoadingCheckout(planKey);
+    setCheckoutError(null);
     try {
       const res = await createCheckout(planKey);
       const checkoutUrl = typeof res === 'string' ? res : (res?.url || res?.checkout_url);
@@ -51,14 +54,15 @@ export const Billing: React.FC = () => {
       if (checkoutUrl) {
         window.location.href = checkoutUrl;
       } else {
-        alert((res as any)?.error || 'Failed to initiate Polar checkout session.');
+        setCheckoutError((res as any)?.error || 'Failed to initiate Polar checkout session.');
       }
     } catch (err: any) {
-      alert(err.message || 'Checkout failed.');
+      setCheckoutError(err.message || 'Checkout failed.');
     } finally {
       setLoadingCheckout(null);
     }
   };
+
 
   const handleOpenPortal = async () => {
     try {
@@ -86,7 +90,7 @@ export const Billing: React.FC = () => {
   const planCards = [
     {
       ...PLANS.starter,
-      priceDisplay: '$5',
+      priceDisplay: '$15',
       websiteLimitDisplay: '1 Website'
     },
     {
@@ -172,7 +176,29 @@ export const Billing: React.FC = () => {
           </div>
         )}
 
+        {/* Checkout Error Banner */}
+        {checkoutError && (
+          <div className="p-5 bg-amber-50 border border-amber-300 rounded-2xl text-amber-950 space-y-3">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2 font-bold text-sm">
+                <AlertTriangle className="text-amber-600" size={18} />
+                <span>Polar Product Configuration</span>
+              </div>
+              <button 
+                onClick={() => setCheckoutError(null)} 
+                className="text-amber-700 hover:text-amber-900 text-xs font-bold px-2 py-1 rounded-lg hover:bg-amber-100 cursor-pointer"
+              >
+                ✕ Close
+              </button>
+            </div>
+            <div className="text-xs whitespace-pre-line font-mono leading-relaxed text-amber-900 bg-white/70 p-3 rounded-xl border border-amber-200">
+              {checkoutError}
+            </div>
+          </div>
+        )}
+
         {/* Current Plan Bar */}
+
         {loading ? (
           <div className="py-16 text-center text-xs font-mono text-[#6c6a64]">
             <RefreshCw size={24} className="animate-spin text-[#cc785c] mx-auto mb-2" />
@@ -198,7 +224,7 @@ export const Billing: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-xs text-[#a09d96] font-mono">
-                  ${billingData?.price || 5}/month • {websiteLimit === null ? 'Unlimited Websites' : `${websiteLimit} Website Limit`}
+                  ${billingData?.price || 15}/month • {websiteLimit === null ? 'Unlimited Websites' : `${websiteLimit} Website Limit`}
                 </p>
                 {billingData?.currentPeriodEnd && (
                   <p className="text-[11px] text-[#8e8b82] font-mono">

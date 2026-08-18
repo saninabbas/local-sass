@@ -63,7 +63,7 @@ export function PricingSection() {
               </p>
               
               <div className="mb-6 flex items-baseline gap-1.5">
-                <span className="text-5xl font-serif font-bold text-[#141413]">$5</span>
+                <span className="text-5xl font-serif font-bold text-[#141413]">$15</span>
                 <span className="text-xs font-mono text-[#8e8b82]">/mo</span>
               </div>
               
@@ -93,7 +93,7 @@ export function PricingSection() {
                 <Loader2 size={14} className="animate-spin text-[#cc785c]" />
               ) : (
                 <>
-                  <span>Start Starter ($5/mo)</span>
+                  <span>Start Starter ($15/mo)</span>
                   <ArrowRight size={13} />
                 </>
               )}

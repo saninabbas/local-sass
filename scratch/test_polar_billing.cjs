@@ -46,7 +46,7 @@ async function verifyPolarSignatureNode(rawBody, headers, secret) {
 
 // Plan limits check
 const POLAR_PLANS = {
-  starter: { key: 'starter', name: 'Starter', price: 5, websiteLimit: 1 },
+  starter: { key: 'starter', name: 'Starter', price: 15, websiteLimit: 1 },
   growth: { key: 'growth', name: 'Growth', price: 30, websiteLimit: 5 },
   agency_pro: { key: 'agency_pro', name: 'Agency Pro', price: 80, websiteLimit: null }
 };

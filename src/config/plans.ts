@@ -24,7 +24,7 @@ export const PLANS: Record<string, PlanConfig> = {
   starter: {
     id: 'starter',
     name: 'STARTER',
-    price: 5,
+    price: 15,
     currency: 'USD',
     period: '/month',
     websiteLimit: 1,

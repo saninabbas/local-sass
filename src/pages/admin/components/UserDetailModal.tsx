@@ -45,13 +45,15 @@ export function UserDetailModal({ user, isOpen, onClose }: UserDetailModalProps)
     switch (plan?.toLowerCase()) {
       case 'enterprise':
         return 'Enterprise VIP';
+      case 'agency_pro':
       case 'pro':
-        return 'Pro ($30/mo)';
+        return 'Agency Pro ($80/mo)';
       case 'growth':
+        return 'Growth ($30/mo)';
       case 'starter':
-        return 'Growth ($15/mo)';
+        return 'Starter ($15/mo)';
       default:
-        return 'Free Audit';
+        return 'Starter ($15/mo)';
     }
   };
 

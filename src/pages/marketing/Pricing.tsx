@@ -39,7 +39,7 @@ export function Pricing() {
   const plansList = [
     {
       ...PLANS.starter,
-      priceFormatted: billingCycle === 'monthly' ? '$5' : '$4',
+      priceFormatted: billingCycle === 'monthly' ? '$15' : '$12',
       badge: "1 Website",
       cta: "Start Starter",
       popular: false

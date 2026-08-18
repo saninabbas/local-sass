@@ -1,7 +1,8 @@
 // ============================================================================
 // RANKORA POLAR BILLING PRODUCTION ENGINE
 // Centralized server-side plan definitions, Polar API client,
-// Webhook signature verification, and deterministic entitlement enforcement.
+// Dynamic product discovery & auto-healing, Webhook signature verification,
+// and deterministic entitlement enforcement.
 // ============================================================================
 
 export interface PolarPlanConfig {
@@ -19,12 +20,12 @@ export const POLAR_PLANS: Record<string, PolarPlanConfig> = {
   starter: {
     key: 'starter',
     name: 'Starter',
-    priceMonthly: 5,
+    priceMonthly: 15,
     websiteLimit: 1,
     keywordsLimit: 25,
     auditLimit: 25,
     envVar: 'POLAR_STARTER_PRODUCT_ID',
-    fallbackProductId: 'polar_starter_5usd'
+    fallbackProductId: 'polar_starter_15usd'
   },
   growth: {
     key: 'growth',
@@ -48,6 +49,15 @@ export const POLAR_PLANS: Record<string, PolarPlanConfig> = {
   }
 };
 
+export interface PolarProductItem {
+  id: string;
+  name: string;
+  description?: string;
+  is_recurring?: boolean;
+  is_archived?: boolean;
+  prices?: Array<{ id: string; price_amount: number; price_currency: string }>;
+}
+
 /**
  * Normalizes plan key strings (supports aliases like 'agency', 'pro' -> 'agency_pro')
  */
@@ -60,7 +70,89 @@ export function normalizePlanKey(plan?: string | null): 'starter' | 'growth' | '
 }
 
 /**
+ * Fetches all active products from Polar API v1
+ */
+export async function fetchPolarProducts(polarToken: string): Promise<PolarProductItem[]> {
+  try {
+    const res = await fetch('https://api.polar.sh/v1/products/?is_archived=false', {
+      headers: {
+        'Authorization': `Bearer ${polarToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.warn("Polar products query returned non-200:", res.status, errText);
+      return [];
+    }
+    const data = await res.json() as any;
+    return Array.isArray(data.items) ? data.items : [];
+  } catch (err) {
+    console.error("Error querying Polar products API:", err);
+    return [];
+  }
+}
+
+/**
  * Resolves the configured Polar Product ID for a given plan from Cloudflare environment variables
+ * or dynamically from Polar's live product catalog.
+ */
+export async function resolvePolarProductIdAsync(planKey: string, env: any, polarToken?: string): Promise<string> {
+  const normKey = normalizePlanKey(planKey);
+  const plan = POLAR_PLANS[normKey];
+
+  // 1. Explicit environment variable overrides
+  if (normKey === 'starter' && env.POLAR_STARTER_PRODUCT_ID) {
+    return env.POLAR_STARTER_PRODUCT_ID;
+  }
+  if (normKey === 'growth' && (env.POLAR_GROWTH_PRODUCT_ID || env.POLAR_PRODUCT_ID)) {
+    return env.POLAR_GROWTH_PRODUCT_ID || env.POLAR_PRODUCT_ID;
+  }
+  if (normKey === 'agency_pro' && env.POLAR_AGENCY_PRO_PRODUCT_ID) {
+    return env.POLAR_AGENCY_PRO_PRODUCT_ID;
+  }
+
+  // 2. Query Polar live product catalog for automatic discovery
+  const token = polarToken || env.POLAR_ACCESS_TOKEN || (env as any).POLAR_API_KEY || (env as any).POLAR_TOKEN;
+  if (token) {
+    const products = await fetchPolarProducts(token);
+    if (products.length > 0) {
+      // Match by name keyword
+      const matched = products.find(p => {
+        const name = p.name.toLowerCase();
+        if (normKey === 'starter') return name.includes('starter') || name.includes('basic') || name.includes('tier 1') || name.includes('small');
+        if (normKey === 'growth') return name.includes('growth') || name.includes('standard') || name.includes('tier 2') || (name.includes('pro') && !name.includes('agency'));
+        if (normKey === 'agency_pro') return name.includes('agency') || name.includes('enterprise') || name.includes('tier 3') || name.includes('unlimited');
+        return false;
+      });
+
+      if (matched) {
+        return matched.id;
+      }
+
+      // If only 1 product exists in the Polar organization, use it
+      if (products.length === 1) {
+        return products[0].id;
+      }
+
+      // If multiple products exist, sort by price ascending and match tier
+      const sorted = [...products].sort((a, b) => {
+        const priceA = a.prices?.[0]?.price_amount ?? 0;
+        const priceB = b.prices?.[0]?.price_amount ?? 0;
+        return priceA - priceB;
+      });
+
+      if (normKey === 'starter') return sorted[0].id;
+      if (normKey === 'growth') return sorted[Math.min(1, sorted.length - 1)].id;
+      if (normKey === 'agency_pro') return sorted[sorted.length - 1].id;
+    }
+  }
+
+  return plan.fallbackProductId;
+}
+
+/**
+ * Synchronous resolver (fallback for legacy calls)
  */
 export function resolvePolarProductId(planKey: string, env: any): string {
   const normKey = normalizePlanKey(planKey);
@@ -104,7 +196,6 @@ export function resolvePlanFromPolarProductId(productId?: string | null, env?: a
 export function getUserPlanLimit(subscriptionTier?: string | null, subscriptionStatus?: string | null, role?: string | null): number {
   if (role === 'admin') return 9999;
   
-  // If subscription is past_due or canceled, enforce current plan tier limits (non-destructive)
   const normPlan = normalizePlanKey(subscriptionTier || subscriptionStatus);
   const planConfig = POLAR_PLANS[normPlan];
   
@@ -149,7 +240,6 @@ export async function verifyPolarWebhookSignature(
   secret?: string | null
 ): Promise<{ isValid: boolean; reason?: string }> {
   if (!secret || !secret.trim()) {
-    // If webhook secret is not configured in env, allow in dev/staging with warning
     return { isValid: true, reason: 'NO_SECRET_CONFIGURED' };
   }
 
@@ -168,9 +258,6 @@ export async function verifyPolarWebhookSignature(
       cleanSecret = cleanSecret.replace('whsec_', '');
     }
 
-    // Try payload formats:
-    // 1. Standard Webhook format: `${webhookId}.${webhookTimestamp}.${rawBody}`
-    // 2. Direct rawBody HMAC
     const payloadsToTest: string[] = [];
     if (webhookId && webhookTimestamp) {
       payloadsToTest.push(`${webhookId}.${webhookTimestamp}.${rawBody}`);
@@ -179,7 +266,6 @@ export async function verifyPolarWebhookSignature(
 
     const signaturesInHeader = webhookSignature.split(' ').flatMap(s => s.split(','));
 
-    // Compute HMAC
     const keyData = encoder.encode(cleanSecret);
     const cryptoKey = await crypto.subtle.importKey(
       'raw',
@@ -210,7 +296,7 @@ export async function verifyPolarWebhookSignature(
 }
 
 /**
- * Creates Polar Checkout Session via Polar API v1
+ * Creates Polar Checkout Session via Polar API v1 with automatic product discovery and fallback healing.
  */
 export async function createPolarCheckoutSession(params: {
   polarToken: string;
@@ -220,16 +306,18 @@ export async function createPolarCheckoutSession(params: {
   userId: string;
   planKey: string;
   successUrl: string;
-}): Promise<{ success: boolean; checkoutUrl?: string; error?: string }> {
+}): Promise<{ success: boolean; checkoutUrl?: string; error?: string; availableProducts?: PolarProductItem[] }> {
   try {
-    const response = await fetch('https://api.polar.sh/v1/checkouts/', {
+    let currentProductId = params.productId;
+
+    let response = await fetch('https://api.polar.sh/v1/checkouts/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${params.polarToken}`
       },
       body: JSON.stringify({
-        product_id: params.productId,
+        product_id: currentProductId,
         customer_email: params.customerEmail,
         customer_name: params.customerName || undefined,
         customer_external_id: params.userId,
@@ -241,11 +329,78 @@ export async function createPolarCheckoutSession(params: {
       })
     });
 
+    // If product does not exist, attempt auto-discovery from live Polar catalog
+    if (!response.ok && response.status === 422) {
+      const errText = await response.text();
+      if (errText.includes("Product does not exist") || errText.includes("product_id")) {
+        console.warn(`Polar Product ID '${currentProductId}' not found. Discovering active products in Polar account...`);
+        const liveProducts = await fetchPolarProducts(params.polarToken);
+        
+        if (liveProducts.length > 0) {
+          const normKey = normalizePlanKey(params.planKey);
+          let alternative = liveProducts.find(p => {
+            const name = p.name.toLowerCase();
+            if (normKey === 'starter') return name.includes('starter') || name.includes('basic');
+            if (normKey === 'growth') return name.includes('growth') || (name.includes('pro') && !name.includes('agency'));
+            if (normKey === 'agency_pro') return name.includes('agency') || name.includes('enterprise');
+            return false;
+          });
+
+          if (!alternative) {
+            alternative = liveProducts[0];
+          }
+
+          if (alternative && alternative.id !== currentProductId) {
+            console.log(`Auto-healing checkout with discovered Polar product: '${alternative.name}' (${alternative.id})`);
+            currentProductId = alternative.id;
+
+            response = await fetch('https://api.polar.sh/v1/checkouts/', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${params.polarToken}`
+              },
+              body: JSON.stringify({
+                product_id: currentProductId,
+                customer_email: params.customerEmail,
+                customer_name: params.customerName || undefined,
+                customer_external_id: params.userId,
+                metadata: {
+                  user_id: params.userId,
+                  plan: params.planKey
+                },
+                success_url: params.successUrl
+              })
+            });
+          }
+        }
+      }
+    }
+
     if (!response.ok) {
       const errText = await response.text();
+      let errorMsg = `Polar API Error (${response.status}): ${errText}`;
+      
+      try {
+        const parsed = JSON.parse(errText);
+        if (parsed.detail && Array.isArray(parsed.detail)) {
+          const detailMsgs = parsed.detail.map((d: any) => `${d.loc?.join('.') || 'field'}: ${d.msg}`).join(', ');
+          errorMsg = `Polar Configuration Notice: ${detailMsgs}`;
+        }
+      } catch {}
+
+      const availableProducts = await fetchPolarProducts(params.polarToken);
+      if (availableProducts.length > 0) {
+        const prodList = availableProducts.map(p => `• ${p.name} (ID: ${p.id})`).join('\n');
+        errorMsg += `\n\nDiscovered live products in your Polar organization:\n${prodList}\n\nTo bind these products, add them to Cloudflare Pages Settings -> Environment Variables:\n- POLAR_STARTER_PRODUCT_ID\n- POLAR_GROWTH_PRODUCT_ID\n- POLAR_AGENCY_PRO_PRODUCT_ID`;
+      } else {
+        errorMsg += `\n\nNo products found in your Polar account. Please log in to https://polar.sh/dashboard and create your subscription products under the Products tab.`;
+      }
+
       return {
         success: false,
-        error: `Polar API Error (${response.status}): ${errText}`
+        error: errorMsg,
+        availableProducts
       };
     }
 

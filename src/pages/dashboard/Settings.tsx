@@ -461,7 +461,7 @@ export function Settings() {
                     <p className="text-xs text-[#6c6a64] font-sans">1 Website Project</p>
                   </div>
                   <div className="text-right">
-                    <span className="text-2xl font-serif font-medium text-[#141413]">$5</span>
+                    <span className="text-2xl font-serif font-medium text-[#141413]">$15</span>
                     <span className="text-[10px] text-[#8e8b82] font-mono">/mo</span>
                   </div>
                 </div>
