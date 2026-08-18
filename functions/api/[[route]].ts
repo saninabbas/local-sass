@@ -3219,10 +3219,13 @@ export const onRequest = async (context: any) => {
 
           const audit = calculateDeterministicAudit(extractor, siteUrl, tempBusiness, robotsInfo, sitemapInfo, fetchRes.durationMs);
 
+          const overallScore = audit.overallScore || 0;
+          const topIssues = (audit.issues || []).slice(0, 3);
+          const topIssuesJson = JSON.stringify(topIssues);
+
           // If email is provided, capture lead record in D1
           if (email) {
             const leadId = `lead_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-            const topIssuesJson = JSON.stringify(audit.issues.slice(0, 3));
             
             await env.DB.prepare(`
               INSERT INTO leads (
@@ -3239,7 +3242,7 @@ export const onRequest = async (context: any) => {
               payload.utm_source || '',
               payload.utm_medium || '',
               payload.utm_campaign || '',
-              audit.growthScore,
+              overallScore,
               topIssuesJson
             ).run().catch((e: any) => console.warn("Failed to persist public lead:", e.message));
           }
@@ -3249,7 +3252,8 @@ export const onRequest = async (context: any) => {
             success: true,
             data: {
               url: siteUrl,
-              growthScore: audit.growthScore,
+              growthScore: overallScore,
+              overallScore: overallScore,
               vectorScores: {
                 local: audit.vectors.local.score,
                 technical: audit.vectors.technical.score,
@@ -3259,7 +3263,7 @@ export const onRequest = async (context: any) => {
                 mobile: audit.vectors.mobile.score,
                 security: audit.vectors.security.score
               },
-              topOpportunities: audit.issues.slice(0, 3),
+              topOpportunities: topIssues,
               telemetry: {
                 httpStatus: audit.httpStatus,
                 responseTimeMs: audit.responseTimeMs,
