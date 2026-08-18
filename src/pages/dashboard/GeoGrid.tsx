@@ -162,19 +162,19 @@ export function GeoGrid() {
         <div className="bg-[#efe9de] p-4 rounded-2xl border border-[#e6dfd8] shadow-xs">
           <span className="text-xs font-semibold text-[#6c6a64] font-sans">Average Grid Rank (AGR)</span>
           <div className="mt-2 text-2xl font-serif font-medium text-[#141413]">
-            {geoData?.averageGridRank ? `#${geoData.averageGridRank}` : '—'}
+            {geoData?.averageGridRank ? `#${geoData.averageGridRank}` : '-'}
           </div>
         </div>
         <div className="bg-[#efe9de] p-4 rounded-2xl border border-[#e6dfd8] shadow-xs">
           <span className="text-xs font-semibold text-[#6c6a64] font-sans">Local Visibility Index (LVI)</span>
           <div className="mt-2 text-2xl font-serif font-medium text-[#cc785c]">
-            {geoData?.localVisibilityIndex !== undefined ? `${geoData.localVisibilityIndex}%` : '—'}
+            {geoData?.localVisibilityIndex !== undefined ? `${geoData.localVisibilityIndex}%` : '-'}
           </div>
         </div>
         <div className="bg-[#efe9de] p-4 rounded-2xl border border-[#e6dfd8] shadow-xs">
           <span className="text-xs font-semibold text-[#6c6a64] font-sans">Top 3 Local Pack Share</span>
           <div className="mt-2 text-2xl font-serif font-medium text-emerald-600">
-            {geoData?.top3Percentage !== undefined ? `${geoData.top3Percentage}%` : '—'}
+            {geoData?.top3Percentage !== undefined ? `${geoData.top3Percentage}%` : '-'}
           </div>
         </div>
         <div className="bg-[#efe9de] p-4 rounded-2xl border border-[#e6dfd8] shadow-xs">
@@ -310,7 +310,7 @@ export function GeoGrid() {
                         title={`Point ${point.label}: Rank ${point.rank ? '#' + point.rank : 'Unranked'}`}
                       >
                         <span className="text-sm font-black">
-                          {point.rank ? `#${point.rank}` : '—'}
+                          {point.rank ? `#${point.rank}` : '-'}
                         </span>
                         <span className="text-[9px] opacity-80 uppercase tracking-tighter">
                           {point.label}

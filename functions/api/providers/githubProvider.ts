@@ -31,16 +31,22 @@ export class GitHubProvider implements WebsiteProvider {
   }
 
   async getRepositories(token: string): Promise<RepositoryItem[]> {
-    const repos: any = await this.fetchGitHub(
-      'https://api.github.com/user/repos?sort=updated&per_page=50&affiliation=owner,collaborator,organization_member',
-      token
-    );
+    let allRepos: any[] = [];
+    for (let page = 1; page <= 3; page++) {
+      const pageRepos: any = await this.fetchGitHub(
+        `https://api.github.com/user/repos?sort=updated&per_page=100&page=${page}&affiliation=owner,collaborator,organization_member`,
+        token
+      ).catch(() => []);
 
-    if (!Array.isArray(repos)) {
-      return [];
+      if (Array.isArray(pageRepos) && pageRepos.length > 0) {
+        allRepos = allRepos.concat(pageRepos);
+        if (pageRepos.length < 100) break;
+      } else {
+        break;
+      }
     }
 
-    return repos.map((r: any) => ({
+    return allRepos.map((r: any) => ({
       id: String(r.id),
       name: r.name,
       fullName: r.full_name,

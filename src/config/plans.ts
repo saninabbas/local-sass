@@ -1,5 +1,5 @@
 /**
- * RANKORA 2.0 — CENTRALIZED PRICING & PLAN CONFIGURATION
+ * RANKORA 2.0 : CENTRALIZED PRICING & PLAN CONFIGURATION
  * 
  * Single source of truth for plans, pricing, website limits, and feature gating.
  */

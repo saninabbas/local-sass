@@ -62,6 +62,7 @@ export const Connections: React.FC = () => {
   const [gitHubToken, setGitHubToken] = useState('');
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [repositories, setRepositories] = useState<any[]>([]);
+  const [repoSearch, setRepoSearch] = useState('');
   const [selectedRepo, setSelectedRepo] = useState<any | null>(null);
   const [branches, setBranches] = useState<any[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<string>('main');
@@ -1072,20 +1073,31 @@ export const Connections: React.FC = () => {
 
               {repositories.length > 0 && (
                 <div className="space-y-2">
-                  <label className="block text-xs font-mono font-bold text-[#141413] uppercase">2. Select Repository</label>
-                  <div className="max-h-40 overflow-y-auto border border-[#e6dfd8] rounded-xl divide-y divide-[#e6dfd8] bg-[#faf9f5]">
-                    {repositories.map((repo) => (
-                      <button
-                        key={repo.id}
-                        onClick={() => handleSelectRepo(repo)}
-                        className={`w-full px-3 py-2 text-left flex items-center justify-between text-xs cursor-pointer ${
-                          selectedRepo?.id === repo.id ? 'bg-[#efe9de] text-[#141413] font-bold' : 'hover:bg-[#efe9de]/50'
-                        }`}
-                      >
-                        <span className="font-mono">{repo.fullName}</span>
-                        {selectedRepo?.id === repo.id && <CheckCircle2 size={14} className="text-[#cc785c]" />}
-                      </button>
-                    ))}
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-mono font-bold text-[#141413] uppercase">2. Select Repository ({repositories.length} loaded)</label>
+                  </div>
+                  <input
+                    type="text"
+                    value={repoSearch}
+                    onChange={(e) => setRepoSearch(e.target.value)}
+                    placeholder="Search repositories by name..."
+                    className="w-full h-8 px-3 text-xs font-mono rounded-lg border border-[#e6dfd8] bg-[#faf9f5]"
+                  />
+                  <div className="max-h-48 overflow-y-auto border border-[#e6dfd8] rounded-xl divide-y divide-[#e6dfd8] bg-[#faf9f5]">
+                    {repositories
+                      .filter(r => (r.fullName || r.name || '').toLowerCase().includes(repoSearch.toLowerCase()))
+                      .map((repo) => (
+                        <button
+                          key={repo.id}
+                          onClick={() => handleSelectRepo(repo)}
+                          className={`w-full px-3 py-2 text-left flex items-center justify-between text-xs cursor-pointer ${
+                            selectedRepo?.id === repo.id ? 'bg-[#efe9de] text-[#141413] font-bold' : 'hover:bg-[#efe9de]/50'
+                          }`}
+                        >
+                          <span className="font-mono">{repo.fullName}</span>
+                          {selectedRepo?.id === repo.id && <CheckCircle2 size={14} className="text-[#cc785c]" />}
+                        </button>
+                      ))}
                   </div>
                 </div>
               )}

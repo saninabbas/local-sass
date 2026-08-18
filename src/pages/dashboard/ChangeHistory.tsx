@@ -248,10 +248,10 @@ export const ChangeHistory: React.FC = () => {
                           <ExecutionStatusBadge status={status} size="sm" />
                         </td>
                         <td className="p-4 font-mono text-red-900 max-w-[140px] truncate">
-                          {change.before_value || change.before_data || '—'}
+                          {change.before_value || change.before_data || '-'}
                         </td>
                         <td className="p-4 font-mono text-emerald-950 max-w-[160px] truncate">
-                          {change.after_value || change.generated_data || change.generated_content || '—'}
+                          {change.after_value || change.generated_data || change.generated_content || '-'}
                         </td>
                         <td className="p-4 font-mono text-[10px] text-[#8e8b82]">
                           {change.verified_at ? new Date(change.verified_at).toLocaleDateString() : 'Pending'}
@@ -329,7 +329,7 @@ export const ChangeHistory: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
                   <div>
                     <span className="text-[#8e8b82] block">Feature Branch:</span>
-                    <span className="text-[#141413] font-bold truncate block">{selectedChange.feature_branch || '—'}</span>
+                    <span className="text-[#141413] font-bold truncate block">{selectedChange.feature_branch || '-'}</span>
                   </div>
                   <div>
                     <span className="text-[#8e8b82] block">Target File:</span>
@@ -357,7 +357,7 @@ export const ChangeHistory: React.FC = () => {
                 <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200">
                   <span className="text-[10px] text-emerald-700 font-bold block mb-1 uppercase">Applied / Verified Value</span>
                   <div className="text-emerald-950 whitespace-pre-wrap break-all">
-                    {selectedChange.after_value || selectedChange.generated_data || selectedChange.generated_content || '—'}
+                    {selectedChange.after_value || selectedChange.generated_data || selectedChange.generated_content || '-'}
                   </div>
                 </div>
               </div>

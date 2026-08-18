@@ -1670,7 +1670,14 @@ export const onRequest = async (context: any) => {
 
         const bizId = url.pathname.replace('/api/businesses/', '').split('/')[0];
         try {
-          const business = await resolveTargetBusiness(user.id, bizId);
+          let business;
+          if (bizId === 'active') {
+            business = await env.DB.prepare(
+              "SELECT * FROM businesses WHERE user_id = ? AND (is_archived IS NULL OR is_archived = 0) ORDER BY is_default DESC, created_at DESC LIMIT 1"
+            ).bind(user.id).first();
+          } else {
+            business = await resolveTargetBusiness(user.id, bizId);
+          }
           if (!business) return errorResponse("Business not found", 404);
           return jsonResponse({ success: true, data: business });
         } catch (err: any) {

@@ -332,7 +332,7 @@ export function Keywords() {
           <div className="p-3.5 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
             <span className="text-[10px] font-mono text-[#cc785c] font-semibold uppercase tracking-wider block mb-0.5">Avg Pos</span>
             <div className="text-2xl font-semibold text-[#141413] tracking-tight">
-              {kpis.averagePosition ? `#${kpis.averagePosition}` : '—'}
+              {kpis.averagePosition ? `#${kpis.averagePosition}` : '-'}
             </div>
             <span className="text-[10px] text-[#6c6a64]">Across Ranked</span>
           </div>
@@ -498,7 +498,7 @@ export function Keywords() {
                               <ExternalLink size={10} className="shrink-0" />
                             </a>
                           ) : (
-                            <span className="text-[#8e8b82]">—</span>
+                            <span className="text-[#8e8b82]">-</span>
                           )}
                         </td>
 
@@ -742,7 +742,7 @@ export function Keywords() {
                             )}
                           </td>
                           <td className="p-3 text-[#6c6a64] capitalize">{snap.device || 'desktop'}</td>
-                          <td className="p-3 text-[#8e8b82] truncate max-w-[200px]">{snap.ranking_url || '—'}</td>
+                          <td className="p-3 text-[#8e8b82] truncate max-w-[200px]">{snap.ranking_url || '-'}</td>
                         </tr>
                       ))}
                     </tbody>
