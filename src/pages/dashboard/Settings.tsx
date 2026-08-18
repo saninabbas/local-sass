@@ -135,12 +135,13 @@ export function Settings() {
     }
   };
 
-  const handleCheckout = async (productId: string, planName: string) => {
+  const handleCheckout = async (planKey: string) => {
     try {
-      setIsProcessing(planName);
-      const res = await createCheckout(productId);
-      if (res && res.url) {
-        window.location.href = res.url;
+      setIsProcessing(planKey);
+      const res = await createCheckout(planKey);
+      const targetUrl = typeof res === 'string' ? res : (res?.url || res?.checkout_url);
+      if (targetUrl) {
+        window.location.href = targetUrl;
       } else {
         alert("Failed to initialize checkout. Please check server logs.");
       }
@@ -446,66 +447,111 @@ export function Settings() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+            {/* Starter Tier */}
+            <div className={`p-6 rounded-2xl border transition-all flex flex-col justify-between ${
+              currentPlan === 'starter' ? 'border-[#cc785c] bg-[#efe9de]/40' : 'border-[#e6dfd8] bg-white'
+            }`}>
+              <div>
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h4 className="text-base font-serif font-medium text-[#141413]">
+                      Starter Plan
+                    </h4>
+                    <p className="text-xs text-[#6c6a64] font-sans">1 Website Project</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-serif font-medium text-[#141413]">$5</span>
+                    <span className="text-[10px] text-[#8e8b82] font-mono">/mo</span>
+                  </div>
+                </div>
+                <p className="text-xs text-[#6c6a64] font-sans mb-4">
+                  Deterministic audit baseline, technical checks, and actionable AI fixes.
+                </p>
+              </div>
+
+              <button
+                disabled={currentPlan === 'starter' || isProcessing !== null}
+                onClick={() => handleCheckout('starter')}
+                className={`w-full py-2 px-4 rounded-xl font-semibold text-xs transition-all cursor-pointer mt-4 ${
+                  currentPlan === 'starter'
+                    ? 'bg-[#efe9de] text-[#8e8b82] cursor-not-allowed'
+                    : 'bg-[#141413] hover:bg-[#252320] text-[#faf9f5]'
+                }`}
+              >
+                {isProcessing === 'starter' ? 'Processing...' : (currentPlan === 'starter' ? 'Current Plan' : 'Select Starter')}
+              </button>
+            </div>
+
             {/* Growth Tier */}
-            <div className={`p-6 rounded-2xl border transition-all ${
+            <div className={`p-6 rounded-2xl border transition-all flex flex-col justify-between ${
               currentPlan === 'growth' ? 'border-[#cc785c] bg-[#efe9de]/40' : 'border-[#e6dfd8] bg-white'
             }`}>
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <h4 className="text-base font-serif font-medium text-[#141413] flex items-center gap-1.5">
-                    <Zap className="text-[#cc785c]" size={16} />
-                    Growth Plan
-                  </h4>
-                  <p className="text-xs text-[#6c6a64] font-sans">Single local business location</p>
+              <div>
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h4 className="text-base font-serif font-medium text-[#141413] flex items-center gap-1.5">
+                      <Zap className="text-[#cc785c]" size={16} />
+                      Growth Plan
+                    </h4>
+                    <p className="text-xs text-[#6c6a64] font-sans">Up to 5 Website Projects</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-serif font-medium text-[#141413]">$30</span>
+                    <span className="text-[10px] text-[#8e8b82] font-mono">/mo</span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-2xl font-serif font-medium text-[#141413]">$15</span>
-                  <span className="text-[10px] text-[#8e8b82] font-mono">/mo</span>
-                </div>
+                <p className="text-xs text-[#6c6a64] font-sans mb-4">
+                  Real SERP rankings, Google Business AI, and competitor radar.
+                </p>
               </div>
 
               <button
                 disabled={currentPlan === 'growth' || isProcessing !== null}
-                onClick={() => handleCheckout('7594755d-5580-4b77-86ae-90baae0e20d8', 'growth')}
+                onClick={() => handleCheckout('growth')}
                 className={`w-full py-2 px-4 rounded-xl font-semibold text-xs transition-all cursor-pointer mt-4 ${
                   currentPlan === 'growth'
                     ? 'bg-[#efe9de] text-[#8e8b82] cursor-not-allowed'
-                    : 'bg-[#141413] hover:bg-[#252320] text-[#faf9f5]'
+                    : 'bg-[#cc785c] hover:bg-[#b8674d] text-white'
                 }`}
               >
-                {isProcessing === 'growth' ? 'Processing...' : (currentPlan === 'growth' ? 'Current Plan' : 'Select Growth Tier')}
+                {isProcessing === 'growth' ? 'Processing...' : (currentPlan === 'growth' ? 'Current Plan' : 'Upgrade to Growth')}
               </button>
             </div>
 
-            {/* Pro Tier */}
-            <div className={`p-6 rounded-2xl border transition-all ${
-              currentPlan === 'pro' ? 'border-[#cc785c] bg-[#efe9de]/40' : 'border-[#e6dfd8] bg-white'
+            {/* Agency Pro Tier */}
+            <div className={`p-6 rounded-2xl border transition-all flex flex-col justify-between ${
+              currentPlan === 'agency_pro' || currentPlan === 'pro' ? 'border-[#cc785c] bg-[#efe9de]/40' : 'border-[#e6dfd8] bg-white'
             }`}>
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <h4 className="text-base font-serif font-medium text-[#141413] flex items-center gap-1.5">
-                    <ShieldCheck className="text-[#cc785c]" size={16} />
-                    Pro Multi-Location
-                  </h4>
-                  <p className="text-xs text-[#6c6a64] font-sans">Agencies & multi-market brands</p>
+              <div>
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h4 className="text-base font-serif font-medium text-[#141413] flex items-center gap-1.5">
+                      <ShieldCheck className="text-[#cc785c]" size={16} />
+                      Agency Pro
+                    </h4>
+                    <p className="text-xs text-[#6c6a64] font-sans">Unlimited Websites (∞)</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-serif font-medium text-[#141413]">$80</span>
+                    <span className="text-[10px] text-[#8e8b82] font-mono">/mo</span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-2xl font-serif font-medium text-[#141413]">$29</span>
-                  <span className="text-[10px] text-[#8e8b82] font-mono">/mo</span>
-                </div>
+                <p className="text-xs text-[#6c6a64] font-sans mb-4">
+                  Full execution engine, executive client reports, and high-volume limits.
+                </p>
               </div>
 
               <button
-                disabled={currentPlan === 'pro' || isProcessing !== null}
-                onClick={() => handleCheckout('b39f379a-bf3b-4861-a083-d5951ff81561', 'pro')}
+                disabled={currentPlan === 'agency_pro' || currentPlan === 'pro' || isProcessing !== null}
+                onClick={() => handleCheckout('agency_pro')}
                 className={`w-full py-2 px-4 rounded-xl font-semibold text-xs transition-all cursor-pointer mt-4 ${
-                  currentPlan === 'pro'
+                  currentPlan === 'agency_pro' || currentPlan === 'pro'
                     ? 'bg-[#efe9de] text-[#8e8b82] cursor-not-allowed'
                     : 'bg-[#141413] hover:bg-[#252320] text-[#faf9f5]'
                 }`}
               >
-                {isProcessing === 'pro' ? 'Processing...' : (currentPlan === 'pro' ? 'Current Plan' : 'Upgrade to Pro')}
+                {isProcessing === 'agency_pro' ? 'Processing...' : (currentPlan === 'agency_pro' || currentPlan === 'pro' ? 'Current Plan' : 'Upgrade to Agency Pro')}
               </button>
             </div>
           </div>
