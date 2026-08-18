@@ -56,10 +56,10 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', 'Inter', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
-        serif: ['Lora', 'Copernicus', '"Tiempos Headline"', 'Georgia', 'serif'],
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
+        serif: ['Inter', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
-        display: ['Lora', 'Copernicus', '"Tiempos Headline"', 'Georgia', 'serif'],
+        display: ['Inter', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
       },
       letterSpacing: {
         'display-xl': '-1.5px',

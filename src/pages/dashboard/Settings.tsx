@@ -228,7 +228,7 @@ export function Settings() {
               ) : (
                 <Button
                   size="sm"
-                  onClick={connectGoogleBusiness}
+                  onClick={() => connectGoogleBusiness()}
                   className="w-full text-xs font-semibold bg-[#141413] hover:bg-[#252320] text-[#faf9f5]"
                 >
                   Connect Google

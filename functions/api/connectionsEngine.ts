@@ -925,7 +925,7 @@ export async function testProviderHealth(
   db: any,
   userId: string,
   projectId: string,
-  provider: 'github' | 'wordpress' | 'shopify' | 'serp',
+  provider: 'github' | 'wordpress' | 'shopify' | 'serp' | 'google_business' | 'gbp',
   env?: any
 ): Promise<{
   success: boolean;
@@ -938,6 +938,58 @@ export async function testProviderHealth(
 }> {
   const startTime = Date.now();
   const testedAt = new Date().toISOString();
+
+  if (provider === 'google_business' || provider === 'gbp') {
+    const integration = await db.prepare(
+      "SELECT * FROM integrations WHERE user_id = ? AND provider = 'google_business' AND status = 'active' LIMIT 1"
+    ).bind(userId).first().catch(() => null);
+
+    const reviewConn = await db.prepare(
+      "SELECT * FROM review_connections WHERE user_id = ? AND provider = 'google_business' LIMIT 1"
+    ).bind(userId).first().catch(() => null);
+
+    const gbpLoc = await db.prepare(
+      "SELECT * FROM gbp_locations WHERE user_id = ? AND business_id = ? AND is_connected = 1 LIMIT 1"
+    ).bind(userId, projectId).first().catch(() => null);
+
+    if (!integration || !integration.access_token) {
+      return {
+        success: false,
+        provider: 'google_business',
+        status: 'ERROR',
+        latencyMs: 0,
+        message: 'Google Business Profile is not connected for this account',
+        testedAt
+      };
+    }
+
+    try {
+      const { GoogleBusinessClient } = await import('./gbp/googleClient');
+      const client = new GoogleBusinessClient(env?.GOOGLE_CLIENT_ID, env?.GOOGLE_CLIENT_SECRET);
+      const accounts = await client.fetchAccounts(integration.access_token);
+      const latencyMs = Date.now() - startTime;
+      const locationName = gbpLoc?.location_name || reviewConn?.location_name || (accounts.length > 0 ? accounts[0].accountName : 'Connected');
+
+      return {
+        success: true,
+        provider: 'google_business',
+        status: 'CONNECTED',
+        latencyMs,
+        message: `Google Business Profile connected (${accounts.length} accounts found, Location: ${locationName})`,
+        testedAt,
+        details: { accountsCount: accounts.length, locationName }
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        provider: 'google_business',
+        status: 'ERROR',
+        latencyMs: Date.now() - startTime,
+        message: `Google Business API check failed: ${err.message}`,
+        testedAt
+      };
+    }
+  }
 
   if (provider === 'serp') {
     const serpProvider = createSerpProvider(env || {});

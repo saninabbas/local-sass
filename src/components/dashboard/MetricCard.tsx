@@ -80,7 +80,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 
         {/* Primary Metric Value */}
         <div className="my-2 flex items-baseline gap-2">
-          <span className="text-3xl sm:text-4xl font-serif font-medium text-[#141413] tracking-tight">
+          <span className="text-2xl sm:text-3xl font-semibold text-[#141413] tracking-tight">
             {value}
           </span>
           {trend && (

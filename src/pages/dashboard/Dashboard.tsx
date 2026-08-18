@@ -313,7 +313,7 @@ export function Dashboard() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-2xl sm:text-3xl font-serif font-normal text-[#141413]">
+              <h1 className="text-2xl sm:text-3xl font-semibold text-[#141413] tracking-tight">
                 {business.name}
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-[#efe9de] text-[#141413] border border-[#e6dfd8]">

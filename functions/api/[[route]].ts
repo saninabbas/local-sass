@@ -779,6 +779,63 @@ export const onRequest = async (context: any) => {
         await db.prepare("CREATE INDEX IF NOT EXISTS idx_ranking_res_biz ON ranking_results(business_id, checked_at DESC)").run().catch(() => {});
         await db.prepare("CREATE INDEX IF NOT EXISTS idx_ranking_res_kw ON ranking_results(keyword_id, checked_at DESC)").run().catch(() => {});
         await db.prepare("CREATE INDEX IF NOT EXISTS idx_ranking_snap_kw ON ranking_snapshots(keyword_id, checked_at DESC)").run().catch(() => {});
+
+        // GBP Accounts table
+        await db.prepare(`CREATE TABLE IF NOT EXISTS gbp_accounts (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          business_id TEXT NOT NULL,
+          account_id TEXT NOT NULL,
+          account_name TEXT NOT NULL,
+          type TEXT DEFAULT 'PERSONAL',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+
+        // GBP Locations table
+        await db.prepare(`CREATE TABLE IF NOT EXISTS gbp_locations (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          business_id TEXT NOT NULL,
+          account_id TEXT,
+          google_location_id TEXT NOT NULL,
+          location_name TEXT NOT NULL,
+          address TEXT,
+          phone TEXT,
+          website TEXT,
+          primary_category TEXT,
+          is_connected INTEGER NOT NULL DEFAULT 1,
+          total_reviews INTEGER NOT NULL DEFAULT 0,
+          average_rating REAL NOT NULL DEFAULT 0.0,
+          last_synced_at DATETIME,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+
+        // Alter reviews table for tenant isolation and rich intelligence
+        await db.prepare("ALTER TABLE reviews ADD COLUMN business_id TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE reviews ADD COLUMN google_location_id TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE reviews ADD COLUMN google_review_id TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE reviews ADD COLUMN reviewer_profile_url TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE reviews ADD COLUMN reviewer_photo_url TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE reviews ADD COLUMN comment TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE reviews ADD COLUMN review_created_at DATETIME").run().catch(() => {});
+        await db.prepare("ALTER TABLE reviews ADD COLUMN review_updated_at DATETIME").run().catch(() => {});
+        await db.prepare("ALTER TABLE reviews ADD COLUMN reply_comment TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE reviews ADD COLUMN reply_updated_at DATETIME").run().catch(() => {});
+        await db.prepare("ALTER TABLE reviews ADD COLUMN is_replied INTEGER NOT NULL DEFAULT 0").run().catch(() => {});
+        await db.prepare("ALTER TABLE reviews ADD COLUMN sentiment TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE reviews ADD COLUMN sentiment_confidence REAL").run().catch(() => {});
+        await db.prepare("ALTER TABLE reviews ADD COLUMN sentiment_analyzed_at DATETIME").run().catch(() => {});
+        await db.prepare("ALTER TABLE reviews ADD COLUMN topics TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE reviews ADD COLUMN source TEXT DEFAULT 'google'").run().catch(() => {});
+
+        // Review indexes
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_reviews_business ON reviews(business_id, review_created_at DESC)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_reviews_location ON reviews(google_location_id)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_reviews_rating ON reviews(business_id, rating)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_reviews_replied ON reviews(business_id, is_replied)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_gbp_loc_biz ON gbp_locations(business_id, is_connected)").run().catch(() => {});
       } catch (err) {
         console.warn("Auto-migration notice:", err);
       }
@@ -904,6 +961,59 @@ export const onRequest = async (context: any) => {
             grid_data TEXT NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
           )`).run().catch(() => {});
+
+          await env.DB.prepare(`CREATE TABLE IF NOT EXISTS gbp_accounts (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            business_id TEXT NOT NULL,
+            account_id TEXT NOT NULL,
+            account_name TEXT NOT NULL,
+            type TEXT DEFAULT 'PERSONAL',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )`).run().catch(() => {});
+
+          await env.DB.prepare(`CREATE TABLE IF NOT EXISTS gbp_locations (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            business_id TEXT NOT NULL,
+            account_id TEXT,
+            google_location_id TEXT NOT NULL,
+            location_name TEXT NOT NULL,
+            address TEXT,
+            phone TEXT,
+            website TEXT,
+            primary_category TEXT,
+            is_connected INTEGER NOT NULL DEFAULT 1,
+            total_reviews INTEGER NOT NULL DEFAULT 0,
+            average_rating REAL NOT NULL DEFAULT 0.0,
+            last_synced_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )`).run().catch(() => {});
+
+          await env.DB.prepare("ALTER TABLE reviews ADD COLUMN business_id TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE reviews ADD COLUMN google_location_id TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE reviews ADD COLUMN google_review_id TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE reviews ADD COLUMN reviewer_profile_url TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE reviews ADD COLUMN reviewer_photo_url TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE reviews ADD COLUMN comment TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE reviews ADD COLUMN review_created_at DATETIME").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE reviews ADD COLUMN review_updated_at DATETIME").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE reviews ADD COLUMN reply_comment TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE reviews ADD COLUMN reply_updated_at DATETIME").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE reviews ADD COLUMN is_replied INTEGER NOT NULL DEFAULT 0").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE reviews ADD COLUMN sentiment TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE reviews ADD COLUMN sentiment_confidence REAL").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE reviews ADD COLUMN sentiment_analyzed_at DATETIME").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE reviews ADD COLUMN topics TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE reviews ADD COLUMN source TEXT DEFAULT 'google'").run().catch(() => {});
+
+          await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_reviews_business ON reviews(business_id, review_created_at DESC)").run().catch(() => {});
+          await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_reviews_location ON reviews(google_location_id)").run().catch(() => {});
+          await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_reviews_rating ON reviews(business_id, rating)").run().catch(() => {});
+          await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_reviews_replied ON reviews(business_id, is_replied)").run().catch(() => {});
+          await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_gbp_loc_biz ON gbp_locations(business_id, is_connected)").run().catch(() => {});
 
           await ensureAdminUser();
 
@@ -2287,11 +2397,24 @@ export const onRequest = async (context: any) => {
         ).bind(business.id as string).all();
 
         const { results: reviewResults } = await env.DB.prepare(
-          "SELECT rating FROM reviews WHERE business_id = ?"
+          "SELECT rating, is_replied, reply_comment, owner_reply, sentiment, topics, review_created_at FROM reviews WHERE business_id = ?"
         ).bind(business.id as string).all().catch(() => ({ results: [] }));
 
         const revs = reviewResults || [];
         const avgRating = revs.length > 0 ? (revs.reduce((acc: number, r: any) => acc + (r.rating || 5), 0) / revs.length).toFixed(1) : 0;
+        const unansweredCount = revs.filter((r: any) => !r.reply_comment && !r.owner_reply && r.is_replied !== 1).length;
+        const responseRate = revs.length > 0 ? Math.round(((revs.length - unansweredCount) / revs.length) * 100) : 0;
+        const negativeLast30 = revs.filter((r: any) => r.rating <= 2 || (r.sentiment || '').toUpperCase() === 'NEGATIVE').length;
+
+        const allTopicsSet = new Set<string>();
+        for (const r of revs) {
+          if (r.topics) {
+            try {
+              const parsed = typeof r.topics === 'string' ? JSON.parse(r.topics) : r.topics;
+              if (Array.isArray(parsed)) parsed.forEach(t => allTopicsSet.add(t));
+            } catch {}
+          }
+        }
 
         const { results: backlinkResults } = await env.DB.prepare(
           "SELECT id FROM backlinks WHERE business_id = ?"
@@ -2299,6 +2422,7 @@ export const onRequest = async (context: any) => {
 
         const copilotContext = {
           business: {
+            id: business.id as string,
             name: business.name as string,
             websiteUrl: business.website_url as string,
             type: business.type as string,
@@ -2332,12 +2456,20 @@ export const onRequest = async (context: any) => {
           keywords: (keywordResults || []).map((k: any) => ({
             keyword: k.keyword,
             rank: k.current_position || null,
+            previousRank: k.previous_position || null,
             change: (k.previous_position && k.current_position) ? k.previous_position - k.current_position : 0,
+            status: k.status || 'STABLE',
+            location: k.location || business.city,
+            rankingUrl: k.ranking_url || null,
             bestCompetitor: k.best_competitor || 'Top Competitor'
           })),
           reviews: {
             avgRating: Number(avgRating),
             totalReviews: revs.length,
+            unansweredReviews: unansweredCount,
+            responseRate,
+            negativeReviewsLast30Days: negativeLast30,
+            topTopics: Array.from(allTopicsSet).slice(0, 5),
             connected: revs.length > 0
           },
           authority: {
@@ -4485,17 +4617,26 @@ export const onRequest = async (context: any) => {
         });
       }
 
-      // --- GOOGLE BUSINESS PROFILE & OAUTH ---
+      // --- GOOGLE BUSINESS PROFILE & OAUTH (PHASE 7) ---
       if (url.pathname === '/api/auth/googleBusiness' && request.method === 'GET') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        if (!env.GOOGLE_CLIENT_ID) return errorResponse("Google Client ID not configured", 500);
+        if (!env.GOOGLE_CLIENT_ID) return errorResponse("Google Client ID not configured on server", 500, "CONNECTION_FAILED");
 
-        const { getGoogleOAuthUrl } = await import('./googleBusiness');
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch {
+          // Fallback to default
+        }
+
+        const { GoogleBusinessClient } = await import('./gbp/googleClient');
+        const client = new GoogleBusinessClient(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET);
         const redirectUri = `${url.origin}/api/auth/googleBusiness/callback`;
-        const state = encodeURIComponent(JSON.stringify({ userId: user.id }));
-        const authUrl = getGoogleOAuthUrl(env.GOOGLE_CLIENT_ID, redirectUri, state);
+        const state = encodeURIComponent(JSON.stringify({ userId: user.id, businessId: business?.id || null }));
+        const authUrl = client.getOAuthUrl(redirectUri, state);
 
         return Response.redirect(authUrl, 302);
       }
@@ -4503,17 +4644,19 @@ export const onRequest = async (context: any) => {
       if (url.pathname === '/api/auth/googleBusiness/callback' && request.method === 'GET') {
         const code = url.searchParams.get('code');
         const stateStr = url.searchParams.get('state');
-        if (!code || !stateStr) return errorResponse("Missing parameters", 400);
+        if (!code || !stateStr) return errorResponse("Missing required OAuth parameters", 400, "INVALID_INPUT");
 
         try {
           const state = JSON.parse(decodeURIComponent(stateStr));
           const userId = state.userId;
-          if (!userId) throw new Error("Invalid state");
+          const businessId = state.businessId;
+          if (!userId) throw new Error("Invalid state payload");
 
           const redirectUri = `${url.origin}/api/auth/googleBusiness/callback`;
-          const { exchangeGoogleCodeForTokens, fetchGoogleLocations, syncGoogleReviews } = await import('./googleBusiness');
+          const { GoogleBusinessClient } = await import('./gbp/googleClient');
+          const client = new GoogleBusinessClient(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET);
           
-          const tokens = await exchangeGoogleCodeForTokens(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, code, redirectUri);
+          const tokens = await client.exchangeCodeForTokens(code, redirectUri);
           
           const id = crypto.randomUUID();
           await env.DB.prepare(`
@@ -4526,10 +4669,35 @@ export const onRequest = async (context: any) => {
             updated_at = CURRENT_TIMESTAMP
           `).bind(id, userId, tokens.access_token, tokens.refresh_token || null).run();
 
-          // Automatically fetch locations and sync first location if available
-          const locations = await fetchGoogleLocations(tokens.access_token);
+          // Discover accounts
+          const accounts = await client.fetchAccounts(tokens.access_token).catch(() => []);
+          for (const acc of accounts) {
+            const accDbId = crypto.randomUUID();
+            await env.DB.prepare(`
+              INSERT INTO gbp_accounts (id, user_id, business_id, account_id, account_name, type)
+              VALUES (?, ?, ?, ?, ?, ?)
+              ON CONFLICT(id) DO NOTHING
+            `).bind(accDbId, userId, businessId || 'default', acc.name, acc.accountName, acc.type || 'PERSONAL').run().catch(() => {});
+          }
+
+          // Discover locations
+          const locations = await client.fetchLocations(tokens.access_token).catch(() => []);
           if (locations && locations.length > 0) {
             const firstLoc = locations[0];
+            const locDbId = crypto.randomUUID();
+
+            await env.DB.prepare(`
+              INSERT INTO gbp_locations (
+                id, user_id, business_id, account_id, google_location_id,
+                location_name, address, phone, website, primary_category, is_connected
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+              ON CONFLICT(id) DO NOTHING
+            `).bind(
+              locDbId, userId, businessId || 'default', accounts[0]?.name || null,
+              firstLoc.name, firstLoc.title, firstLoc.address || null,
+              firstLoc.phone || null, firstLoc.website || null, firstLoc.category || null
+            ).run().catch(() => {});
+
             await env.DB.prepare(`
               INSERT INTO review_connections (
                 id, user_id, provider, location_id, location_name, 
@@ -4550,13 +4718,39 @@ export const onRequest = async (context: any) => {
               firstLoc.address || null, firstLoc.phone || null, firstLoc.website || null, firstLoc.category || null
             ).run().catch(() => {});
 
-            await syncGoogleReviews(env.DB, userId, firstLoc.name, tokens.access_token).catch(() => {});
+            if (businessId) {
+              const { syncLocationReviews } = await import('./gbp/reviewSyncEngine');
+              await syncLocationReviews(env.DB, userId, businessId, firstLoc.name, tokens.access_token).catch(() => {});
+            }
           }
 
           return Response.redirect(`${url.origin}/dashboard/reviews?integration=success`, 302);
         } catch (e: any) {
-          console.error("Callback error", e);
+          console.error("GBP OAuth callback error", e);
           return Response.redirect(`${url.origin}/dashboard/reviews?integration=error&msg=${encodeURIComponent(e.message)}`, 302);
+        }
+      }
+
+      // --- GBP: GET ACCOUNTS ---
+      if (url.pathname === '/api/gbp/accounts' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const connection = await env.DB.prepare(
+          "SELECT access_token FROM integrations WHERE user_id = ? AND provider = 'google_business' AND status = 'active'"
+        ).bind(user.id as string).first();
+
+        if (!connection || !connection.access_token) {
+          return jsonResponse({ success: false, code: "CONNECTION_FAILED", message: "Google Business Profile is not connected." }, 400);
+        }
+
+        try {
+          const { GoogleBusinessClient } = await import('./gbp/googleClient');
+          const client = new GoogleBusinessClient(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET);
+          const accounts = await client.fetchAccounts(connection.access_token as string);
+          return jsonResponse({ success: true, data: accounts });
+        } catch (e: any) {
+          return errorResponse("Failed to fetch Google Business accounts: " + e.message, 500, "PROVIDER_ERROR");
         }
       }
 
@@ -4570,37 +4764,62 @@ export const onRequest = async (context: any) => {
         ).bind(user.id as string).first();
 
         if (!connection || !connection.access_token) {
-          return errorResponse("Google Business Profile not connected", 400);
+          return jsonResponse({ success: false, code: "CONNECTION_FAILED", message: "Google Business Profile is not connected." }, 400);
         }
 
         try {
-          const { fetchGoogleLocations } = await import('./googleBusiness');
-          const locations = await fetchGoogleLocations(connection.access_token as string);
+          const accountName = url.searchParams.get('account');
+          const { GoogleBusinessClient } = await import('./gbp/googleClient');
+          const client = new GoogleBusinessClient(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET);
+          const locations = await client.fetchLocations(connection.access_token as string, accountName || undefined);
           return jsonResponse({ success: true, data: locations });
         } catch (e: any) {
-          return errorResponse("Failed to fetch Google locations: " + e.message, 500);
+          return errorResponse("Failed to fetch Google locations: " + e.message, 500, "PROVIDER_ERROR");
         }
       }
 
-      // --- GBP: SELECT LOCATION ---
-      if (url.pathname === '/api/gbp/select-location' && request.method === 'POST') {
+      // --- GBP: CONNECT LOCATION ---
+      if ((url.pathname === '/api/gbp/locations/connect' || url.pathname === '/api/gbp/select-location') && request.method === 'POST') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const payload = await request.json() as any;
-        if (!payload.locationName) return errorResponse("locationName is required", 400);
+        const payload = await request.json().catch(() => ({})) as any;
+        const locationId = payload.locationId || payload.locationName;
+        if (!locationId) return errorResponse("locationId or locationName is required", 400, "INVALID_INPUT");
+
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404, "RESOURCE_NOT_FOUND");
 
         const connection = await env.DB.prepare(
           "SELECT access_token FROM integrations WHERE user_id = ? AND provider = 'google_business' AND status = 'active'"
         ).bind(user.id as string).first();
 
         if (!connection || !connection.access_token) {
-          return errorResponse("Google Business Profile not connected", 400);
+          return jsonResponse({ success: false, code: "CONNECTION_FAILED", message: "Google Business Profile is not connected." }, 400);
         }
 
         try {
-          const { syncGoogleReviews } = await import('./googleBusiness');
-          
+          const locDbId = crypto.randomUUID();
+          await env.DB.prepare(`
+            INSERT INTO gbp_locations (
+              id, user_id, business_id, account_id, google_location_id,
+              location_name, address, phone, website, primary_category, is_connected
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            ON CONFLICT(id) DO NOTHING
+          `).bind(
+            locDbId, user.id, business.id, payload.accountId || null,
+            locationId, payload.title || payload.locationName || locationId,
+            payload.address || null, payload.phone || null, payload.website || null, payload.category || null
+          ).run().catch(() => {});
+
           await env.DB.prepare(`
             INSERT INTO review_connections (
               id, user_id, provider, location_id, location_name, 
@@ -4617,16 +4836,349 @@ export const onRequest = async (context: any) => {
               location_category = excluded.location_category,
               connected_at = CURRENT_TIMESTAMP
           `).bind(
-            crypto.randomUUID(), user.id, payload.locationName, payload.title || payload.locationName,
+            crypto.randomUUID(), user.id, locationId, payload.title || payload.locationName || locationId,
             payload.address || null, payload.phone || null, payload.website || null, payload.category || null
-          ).run();
+          ).run().catch(() => {});
 
-          const syncRes = await syncGoogleReviews(env.DB, user.id as string, payload.locationName, connection.access_token as string);
+          // Trigger initial sync
+          const { syncLocationReviews } = await import('./gbp/reviewSyncEngine');
+          const syncResult = await syncLocationReviews(env.DB, user.id as string, business.id, locationId, connection.access_token as string);
 
-          return jsonResponse({ success: true, message: "Location saved and reviews synced", data: syncRes });
+          return jsonResponse({ success: true, message: "Location connected and reviews synced successfully", data: syncResult });
         } catch (e: any) {
-          return errorResponse("Failed to select location: " + e.message, 500);
+          return errorResponse("Failed to connect location: " + e.message, 500, "PROVIDER_ERROR");
         }
+      }
+
+      // --- GBP: SYNC REVIEWS (RATE LIMIT: 5/MIN) ---
+      if ((url.pathname === '/api/gbp/sync' || url.pathname === '/api/reviews/sync') && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        if (!checkRateLimit(`gbp_sync_${user.id}`, 5, 60000)) {
+          return errorResponse("Rate limit exceeded: Maximum 5 review sync requests per minute. Please try again shortly.", 429, "RATE_LIMITED");
+        }
+
+        const payload = await request.json().catch(() => ({})) as any;
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404, "RESOURCE_NOT_FOUND");
+
+        const connection = await env.DB.prepare(
+          "SELECT access_token FROM integrations WHERE user_id = ? AND provider = 'google_business' AND status = 'active'"
+        ).bind(user.id as string).first();
+
+        if (!connection || !connection.access_token) {
+          return jsonResponse({ success: false, code: "CONNECTION_FAILED", message: "Google Business Profile is not connected." }, 400);
+        }
+
+        const gbpLoc: any = await env.DB.prepare(
+          "SELECT google_location_id FROM gbp_locations WHERE business_id = ? AND is_connected = 1 LIMIT 1"
+        ).bind(business.id).first().catch(() => null);
+
+        const revConn: any = await env.DB.prepare(
+          "SELECT location_id FROM review_connections WHERE user_id = ? AND provider = 'google_business' AND status = 'connected' LIMIT 1"
+        ).bind(user.id as string).first().catch(() => null);
+
+        const locationId = payload.locationId || gbpLoc?.google_location_id || revConn?.location_id;
+        if (!locationId) {
+          return jsonResponse({ success: false, code: "CONNECTION_FAILED", message: "No Google Business Profile location selected for this business." }, 400);
+        }
+
+        try {
+          const { syncLocationReviews } = await import('./gbp/reviewSyncEngine');
+          const syncResult = await syncLocationReviews(env.DB, user.id as string, business.id, locationId, connection.access_token as string);
+          return jsonResponse({ success: true, message: "Reviews synced successfully", data: syncResult });
+        } catch (e: any) {
+          return errorResponse("Failed to sync Google reviews: " + e.message, 500, "PROVIDER_ERROR");
+        }
+      }
+
+      // --- GBP: REVIEW METRICS & TRENDS ---
+      if (url.pathname === '/api/gbp/metrics' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404, "RESOURCE_NOT_FOUND");
+
+        const { computeBusinessReviewMetrics, computeReviewTrends } = await import('./gbp/reviewAnalytics');
+        const [metrics, trend7d, trend30d, trend90d] = await Promise.all([
+          computeBusinessReviewMetrics(env.DB, business.id),
+          computeReviewTrends(env.DB, business.id, 7),
+          computeReviewTrends(env.DB, business.id, 30),
+          computeReviewTrends(env.DB, business.id, 90)
+        ]);
+
+        return jsonResponse({
+          success: true,
+          data: {
+            metrics,
+            trends: {
+              '7d': trend7d,
+              '30d': trend30d,
+              '90d': trend90d
+            }
+          }
+        });
+      }
+
+      // --- GBP: LIST REVIEWS ---
+      if (url.pathname === '/api/gbp/reviews' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404, "RESOURCE_NOT_FOUND");
+
+        const filter = url.searchParams.get('filter') || 'all'; // all | unanswered | positive | negative | neutral | 5star | 4star | 3star | 2star | 1star
+        const limit = Math.min(100, parseInt(url.searchParams.get('limit') || '50', 10));
+        const offset = parseInt(url.searchParams.get('offset') || '0', 10);
+
+        let query = "SELECT * FROM reviews WHERE business_id = ?";
+        const params: any[] = [business.id];
+
+        if (filter === 'unanswered') {
+          query += " AND (is_replied = 0 OR reply_comment IS NULL OR reply_comment = '')";
+        } else if (filter === 'positive') {
+          query += " AND (sentiment = 'POSITIVE' OR rating >= 4)";
+        } else if (filter === 'negative') {
+          query += " AND (sentiment = 'NEGATIVE' OR rating <= 2)";
+        } else if (filter === 'neutral') {
+          query += " AND (sentiment = 'NEUTRAL' OR rating = 3)";
+        } else if (['1', '2', '3', '4', '5'].includes(filter)) {
+          query += " AND rating = ?";
+          params.push(parseInt(filter, 10));
+        }
+
+        query += " ORDER BY review_created_at DESC, created_at DESC LIMIT ? OFFSET ?";
+        params.push(limit, offset);
+
+        const { results: rawReviews } = await env.DB.prepare(query).bind(...params).all();
+        const reviews = Array.isArray(rawReviews) ? rawReviews : [];
+
+        // Total count
+        const countRow = await env.DB.prepare(
+          "SELECT COUNT(*) as total FROM reviews WHERE business_id = ?"
+        ).bind(business.id).first();
+
+        return jsonResponse({
+          success: true,
+          data: {
+            reviews,
+            total: (countRow?.total as number) || reviews.length,
+            limit,
+            offset
+          }
+        });
+      }
+
+      // --- GBP: AI SENTIMENT & TOPIC ANALYSIS (RATE LIMIT: 20/MIN) ---
+      if (url.pathname === '/api/gbp/reviews/analyze' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        if (!checkRateLimit(`gbp_ana_${user.id}`, 20, 60000)) {
+          return errorResponse("Rate limit exceeded: Maximum 20 review analyses per minute.", 429, "RATE_LIMITED");
+        }
+
+        const payload = await request.json().catch(() => ({})) as any;
+        if (!payload.reviewId) return errorResponse("reviewId is required", 400, "INVALID_INPUT");
+
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404, "RESOURCE_NOT_FOUND");
+
+        const review: any = await env.DB.prepare(
+          "SELECT * FROM reviews WHERE id = ? AND business_id = ?"
+        ).bind(payload.reviewId, business.id).first();
+
+        if (!review) return errorResponse("Review not found", 404, "RESOURCE_NOT_FOUND");
+
+        const { analyzeReviewSentiment } = await import('./gbp/reviewAiEngine');
+        const analysis = await analyzeReviewSentiment(env.NVIDIA_API_KEY, review.comment || review.review_text || '', review.rating || 5);
+
+        // Update review record with AI metadata
+        await env.DB.prepare(`
+          UPDATE reviews SET
+            sentiment = ?,
+            sentiment_confidence = ?,
+            sentiment_analyzed_at = CURRENT_TIMESTAMP,
+            topics = ?,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(
+          analysis.sentiment,
+          analysis.confidence,
+          JSON.stringify(analysis.topics),
+          review.id
+        ).run().catch(() => {});
+
+        return jsonResponse({ success: true, data: { reviewId: review.id, analysis } });
+      }
+
+      // --- GBP: AI RESPONSE GENERATION (RATE LIMIT: 20/MIN) ---
+      if ((url.pathname === '/api/gbp/reviews/generate-response' || url.pathname === '/api/reviews/generate-response') && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        if (!checkRateLimit(`gbp_resp_${user.id}`, 20, 60000)) {
+          return errorResponse("Rate limit exceeded: Maximum 20 response generations per minute.", 429, "RATE_LIMITED");
+        }
+
+        const payload = await request.json().catch(() => ({})) as any;
+        if (!payload.reviewId && (!payload.reviewText && !payload.rating)) {
+          return errorResponse("reviewId or reviewText + rating is required", 400, "INVALID_INPUT");
+        }
+
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        let review: any = null;
+        if (payload.reviewId) {
+          review = await env.DB.prepare(
+            "SELECT * FROM reviews WHERE id = ? AND business_id = ?"
+          ).bind(payload.reviewId, business ? business.id : '').first().catch(() => null);
+        }
+
+        const { generateReviewReplyWithAI } = await import('./gbp/reviewAiEngine');
+        const replyText = await generateReviewReplyWithAI(env.NVIDIA_API_KEY, {
+          businessName: business?.name || 'Our Business',
+          reviewerName: payload.reviewerName || review?.reviewer_name || 'Customer',
+          rating: payload.rating || review?.rating || 5,
+          reviewText: payload.reviewText || review?.comment || review?.review_text || '',
+          tone: payload.tone || 'professional'
+        });
+
+        if (review) {
+          await env.DB.prepare(
+            "UPDATE reviews SET reply_comment = ?, reply_status = 'draft', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+          ).bind(replyText, review.id).run().catch(() => {});
+        }
+
+        return jsonResponse({
+          success: true,
+          data: {
+            reply: replyText,
+            reviewId: payload.reviewId || null,
+            tone: payload.tone || 'professional'
+          }
+        });
+      }
+
+      // --- GBP: SAVE / PUBLISH REPLY ---
+      if (url.pathname.startsWith('/api/gbp/reviews/') && url.pathname.endsWith('/reply') && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const parts = url.pathname.split('/');
+        const reviewId = parts[parts.length - 2];
+        const payload = await request.json().catch(() => ({})) as any;
+        const replyText = payload.reply || payload.comment;
+
+        if (!replyText || !replyText.trim()) {
+          return errorResponse("Reply text is required", 400, "INVALID_INPUT");
+        }
+
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404, "RESOURCE_NOT_FOUND");
+
+        const review: any = await env.DB.prepare(
+          "SELECT * FROM reviews WHERE id = ? AND business_id = ?"
+        ).bind(reviewId, business.id).first();
+
+        if (!review) return errorResponse("Review not found", 404, "RESOURCE_NOT_FOUND");
+
+        let publishedToGoogle = false;
+
+        // Attempt publish to Google API if action === 'publish'
+        if (payload.action === 'publish') {
+          const connection = await env.DB.prepare(
+            "SELECT access_token FROM integrations WHERE user_id = ? AND provider = 'google_business' AND status = 'active'"
+          ).bind(user.id as string).first();
+
+          if (connection && connection.access_token && review.google_location_id && review.google_review_id) {
+            try {
+              const { GoogleBusinessClient } = await import('./gbp/googleClient');
+              const client = new GoogleBusinessClient(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET);
+              await client.publishReply(connection.access_token as string, review.google_location_id, review.google_review_id, replyText);
+              publishedToGoogle = true;
+            } catch (err: any) {
+              console.warn("Google API reply publishing notice:", err.message);
+            }
+          }
+        }
+
+        await env.DB.prepare(`
+          UPDATE reviews SET
+            reply_comment = ?,
+            owner_reply = ?,
+            reply_status = ?,
+            is_replied = 1,
+            reply_updated_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(
+          replyText.trim(),
+          replyText.trim(),
+          publishedToGoogle ? 'published' : 'saved',
+          review.id
+        ).run();
+
+        return jsonResponse({
+          success: true,
+          message: publishedToGoogle ? "Reply published to Google Business Profile" : "Reply saved as draft",
+          data: {
+            reviewId: review.id,
+            reply: replyText.trim(),
+            isReplied: true,
+            publishedToGoogle
+          }
+        });
       }
 
       // --- GBP: HEALTH EVALUATION ---
@@ -4634,17 +5186,25 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch {
+          // Fallback
+        }
+
         const connection = await env.DB.prepare(
           "SELECT * FROM review_connections WHERE user_id = ? AND provider = 'google_business' LIMIT 1"
         ).bind(user.id as string).first();
 
         const { results: reviews } = await env.DB.prepare(
-          "SELECT rating, owner_reply FROM reviews WHERE user_id = ?"
-        ).bind(user.id as string).all();
+          "SELECT rating, reply_comment, owner_reply, is_replied FROM reviews WHERE business_id = ? OR user_id = ?"
+        ).bind(business ? business.id : '', user.id as string).all();
 
         const total = (reviews || []).length;
         const avgRating = total > 0 ? (reviews || []).reduce((a: number, b: any) => a + (b.rating || 0), 0) / total : 0;
-        const unanswered = (reviews || []).filter((r: any) => !r.owner_reply).length;
+        const unanswered = (reviews || []).filter((r: any) => !r.reply_comment && !r.owner_reply && r.is_replied !== 1).length;
 
         const { computeGbpHealth } = await import('./googleBusiness');
         

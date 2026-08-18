@@ -299,47 +299,47 @@ export function Keywords() {
 
         {/* KPI Metrics Overview Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="p-4 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
-            <span className="text-[10px] font-mono text-[#8e8b82] uppercase tracking-wider block mb-1">Tracked</span>
-            <div className="text-2xl font-serif font-bold text-[#141413]">{kpis.totalKeywords || keywords.length}</div>
-            <span className="text-[10px] text-[#6c6a64] font-mono">Active Queries</span>
+          <div className="p-3.5 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
+            <span className="text-[10px] font-mono text-[#8e8b82] uppercase tracking-wider block mb-0.5">Tracked</span>
+            <div className="text-2xl font-semibold text-[#141413] tracking-tight">{kpis.totalKeywords || keywords.length}</div>
+            <span className="text-[10px] text-[#6c6a64]">Active Queries</span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
-            <span className="text-[10px] font-mono text-emerald-700 font-bold uppercase tracking-wider block mb-1">Top 3 (Gold)</span>
-            <div className="text-2xl font-serif font-bold text-emerald-700">{kpis.top3}</div>
-            <span className="text-[10px] text-emerald-600 font-mono">Prime Visibility</span>
+          <div className="p-3.5 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
+            <span className="text-[10px] font-mono text-emerald-700 font-semibold uppercase tracking-wider block mb-0.5">Top 3</span>
+            <div className="text-2xl font-semibold text-emerald-700 tracking-tight">{kpis.top3}</div>
+            <span className="text-[10px] text-emerald-600">Prime Visibility</span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
-            <span className="text-[10px] font-mono text-[#141413] font-bold uppercase tracking-wider block mb-1">Top 10 (Page 1)</span>
-            <div className="text-2xl font-serif font-bold text-[#141413]">{kpis.top10}</div>
-            <span className="text-[10px] text-[#6c6a64] font-mono">First Page Rank</span>
+          <div className="p-3.5 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
+            <span className="text-[10px] font-mono text-[#141413] font-semibold uppercase tracking-wider block mb-0.5">Top 10</span>
+            <div className="text-2xl font-semibold text-[#141413] tracking-tight">{kpis.top10}</div>
+            <span className="text-[10px] text-[#6c6a64]">Page 1 Rank</span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
-            <span className="text-[10px] font-mono text-[#8e8b82] uppercase tracking-wider block mb-1">Top 20</span>
-            <div className="text-2xl font-serif font-bold text-[#141413]">{kpis.top20}</div>
-            <span className="text-[10px] text-[#8e8b82] font-mono">Striking Distance</span>
+          <div className="p-3.5 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
+            <span className="text-[10px] font-mono text-[#8e8b82] uppercase tracking-wider block mb-0.5">Top 20</span>
+            <div className="text-2xl font-semibold text-[#141413] tracking-tight">{kpis.top20}</div>
+            <span className="text-[10px] text-[#8e8b82]">Striking Range</span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
-            <span className="text-[10px] font-mono text-amber-700 uppercase tracking-wider block mb-1">Not Ranking</span>
-            <div className="text-2xl font-serif font-bold text-amber-700">{kpis.notRanking}</div>
-            <span className="text-[10px] text-amber-600 font-mono">Position &gt; 100</span>
+          <div className="p-3.5 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
+            <span className="text-[10px] font-mono text-amber-700 uppercase tracking-wider block mb-0.5">Unranked</span>
+            <div className="text-2xl font-semibold text-amber-700 tracking-tight">{kpis.notRanking}</div>
+            <span className="text-[10px] text-amber-600">Pos &gt; 100</span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
-            <span className="text-[10px] font-mono text-[#cc785c] font-bold uppercase tracking-wider block mb-1">Avg Position</span>
-            <div className="text-2xl font-serif font-bold text-[#141413]">
+          <div className="p-3.5 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
+            <span className="text-[10px] font-mono text-[#cc785c] font-semibold uppercase tracking-wider block mb-0.5">Avg Pos</span>
+            <div className="text-2xl font-semibold text-[#141413] tracking-tight">
               {kpis.averagePosition ? `#${kpis.averagePosition}` : '—'}
             </div>
-            <span className="text-[10px] text-[#6c6a64] font-mono">Across Ranked</span>
+            <span className="text-[10px] text-[#6c6a64]">Across Ranked</span>
           </div>
         </div>
 
         {/* Filter Pills & Search */}
-        <div className="p-3 bg-white rounded-2xl border border-[#e6dfd8] shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="p-2.5 bg-white rounded-2xl border border-[#e6dfd8] shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-2.5">
           <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
             {[
               { id: 'all', label: `All (${keywords.length})` },
@@ -370,7 +370,7 @@ export function Keywords() {
               type="text"
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="Search tracked queries..."
+              placeholder="Search queries..."
               className="w-full h-8 pl-8 pr-3 text-xs font-mono rounded-xl border border-[#e6dfd8] bg-[#faf9f5]"
             />
           </div>
@@ -378,19 +378,19 @@ export function Keywords() {
 
         {/* Keywords Table */}
         {loading ? (
-          <div className="py-20 text-center text-xs font-mono text-[#6c6a64]">
-            <RefreshCw size={28} className="animate-spin text-[#cc785c] mx-auto mb-3" />
-            <span>Loading live SERP ranking telemetry...</span>
+          <div className="py-16 text-center text-xs font-mono text-[#6c6a64]">
+            <RefreshCw size={24} className="animate-spin text-[#cc785c] mx-auto mb-2.5" />
+            <span>Loading ranking data...</span>
           </div>
         ) : filteredKeywords.length === 0 ? (
-          <div className="text-center py-16 bg-[#efe9de]/30 rounded-3xl border border-[#e6dfd8] p-8 space-y-3">
-            <Search size={36} className="text-[#8e8b82] mx-auto" />
-            <h3 className="font-serif text-base font-bold text-[#141413]">No Keywords Match Filter</h3>
-            <p className="text-xs text-[#6c6a64] max-w-md mx-auto">
-              Track strategic local and organic keywords to monitor your Google rankings in real time.
+          <div className="text-center py-12 bg-white rounded-2xl border border-[#e6dfd8] p-6 space-y-2">
+            <Search size={28} className="text-[#8e8b82] mx-auto mb-2" />
+            <h3 className="text-sm font-semibold text-[#141413]">No keywords found</h3>
+            <p className="text-xs text-[#6c6a64] max-w-sm mx-auto mb-3">
+              Add your first keyword to start tracking rankings.
             </p>
             <Button size="sm" onClick={() => setShowAddModal(true)} className="bg-[#141413] text-[#faf9f5]">
-              Track Your First Keyword
+              Add Keyword
             </Button>
           </div>
         ) : (
@@ -399,14 +399,14 @@ export function Keywords() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-[#efe9de] border-b border-[#e6dfd8] text-[10px] font-mono uppercase text-[#6c6a64] tracking-wider">
-                    <th className="p-4 font-bold">Tracked Keyword</th>
-                    <th className="p-4 font-bold">Search Location & Device</th>
-                    <th className="p-4 font-bold">Position</th>
-                    <th className="p-4 font-bold">Movement</th>
-                    <th className="p-4 font-bold">Status</th>
-                    <th className="p-4 font-bold">Ranking URL</th>
-                    <th className="p-4 font-bold">Last Checked</th>
-                    <th className="p-4 font-bold text-right">Actions</th>
+                    <th className="p-3 font-semibold">Keyword</th>
+                    <th className="p-3 font-semibold">Location</th>
+                    <th className="p-3 font-semibold">Position</th>
+                    <th className="p-3 font-semibold">Change</th>
+                    <th className="p-3 font-semibold">Status</th>
+                    <th className="p-3 font-semibold">URL</th>
+                    <th className="p-3 font-semibold">Updated</th>
+                    <th className="p-3 font-semibold text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#e6dfd8]">

@@ -245,8 +245,8 @@ export function FixWithAIModal({
                 <span className="text-[10px] font-mono uppercase tracking-wider text-[#cc785c] font-bold">Universal SEO Execution Engine</span>
                 <span className="text-[10px] font-mono text-[#8e8b82]">&bull; {normalizedChangeType}</span>
               </div>
-              <h2 className="font-serif text-base text-[#141413] font-medium mt-0.5">
-                {title || 'Verified Solution Generator'}
+              <h2 className="text-base font-semibold text-[#141413] tracking-tight mt-0.5">
+                {title || 'SEO Fix Generator'}
               </h2>
             </div>
           </div>

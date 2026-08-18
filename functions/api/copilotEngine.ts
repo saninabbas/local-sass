@@ -73,6 +73,10 @@ export interface CopilotFullContext {
   reviews?: {
     avgRating: number;
     totalReviews: number;
+    unansweredReviews?: number;
+    responseRate?: number;
+    negativeReviewsLast30Days?: number;
+    topTopics?: string[];
     connected: boolean;
   };
   authority?: {
@@ -173,7 +177,10 @@ ${context.competitors.map(c => `- ${c.name} (${c.domain}): Score ${c.score}/100`
 TRACKED KEYWORDS & SERP INTELLIGENCE:
 ${context.keywords.map(k => `- "${k.keyword}" (${k.location || 'Local'}): Position ${k.rank ? '#' + k.rank : 'NOT_RANKING'} (Prev: ${k.previousRank ? '#' + k.previousRank : 'None'}, Movement: ${k.change ? (k.change > 0 ? '+' + k.change : k.change) : '0'}, Status: ${k.status || 'STABLE'})`).join('\n') || 'No keywords tracked.'}
 
-REVIEWS: ${context.reviews?.connected ? `${context.reviews.avgRating} ★ (${context.reviews.totalReviews} reviews)` : 'NOT_CONNECTED'}
+GOOGLE BUSINESS PROFILE & REVIEWS:
+${context.reviews?.connected 
+  ? `- Rating: ${context.reviews.avgRating} ★ across ${context.reviews.totalReviews} reviews. Unanswered: ${context.reviews.unansweredReviews ?? 0}, Response Rate: ${context.reviews.responseRate ?? 0}%, 30D Negative Reviews: ${context.reviews.negativeReviewsLast30Days ?? 0}${context.reviews.topTopics && context.reviews.topTopics.length > 0 ? `, Key Topics: ${context.reviews.topTopics.join(', ')}` : ''}`
+  : 'NOT_CONNECTED / UNAVAILABLE'}
 BACKLINKS: ${context.authority?.connected ? `${context.authority.totalBacklinks} backlinks` : 'NOT_CONNECTED / UNAVAILABLE'}
 
 ZERO FABRICATION RULE: Never invent rankings, backlinks, domain authority, search volume, or health scores. Use UNAVAILABLE or NOT_CONNECTED if data is missing.`;

@@ -2,63 +2,85 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
-  fetchApi, 
   connectGoogleBusiness, 
+  fetchGbpAccounts,
   fetchGbpLocations, 
   selectGbpLocation, 
-  fetchGbpHealth 
+  syncGbpReviews,
+  fetchGbpMetrics,
+  fetchGbpReviews,
+  analyzeReviewSentiment,
+  generateGbpReviewReply,
+  saveOrPublishGbpReply,
+  fetchGbpHealth,
+  getBusinesses
 } from '../../lib/api';
 import { 
   Star, 
-  MessageSquare, 
-  TrendingUp, 
-  MessageCircle, 
   Sparkles, 
   RefreshCw, 
   Check, 
-  Link2, 
   Edit3, 
-  Save, 
   AlertCircle,
   Copy,
   CheckCircle2,
   Filter,
-  ExternalLink,
-  ShieldCheck,
   Building,
+  AlertTriangle,
+  Layers,
+  X,
+  TrendingUp,
+  MessageCircle,
+  Send,
+  SlidersHorizontal,
+  ChevronRight,
   MapPin,
   Phone,
   Globe,
-  Clock,
-  ChevronRight,
-  AlertTriangle,
-  Layers,
-  X
+  Clock
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useSearchParams } from 'react-router-dom';
 
 interface Review {
   id: string;
+  business_id?: string;
+  google_location_id?: string;
+  google_review_id?: string;
   reviewer_name: string;
+  reviewer_profile_url?: string;
+  reviewer_photo_url?: string;
   rating: number;
-  review_text: string;
-  review_date: string;
-  owner_reply: string | null;
-  reply_status: string;
-  source: string;
+  comment?: string;
+  review_text?: string;
+  review_created_at?: string;
+  review_date?: string;
+  reply_comment?: string | null;
+  owner_reply?: string | null;
+  reply_status?: string;
+  is_replied?: number | boolean;
+  sentiment?: 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE';
+  sentiment_confidence?: number;
+  topics?: string | string[];
+  source?: string;
   created_at: string;
 }
 
-interface ReviewStats {
-  avgRating: number;
+interface ReviewMetrics {
   totalReviews: number;
+  averageRating: number;
+  starsBreakdown: {
+    star5: number;
+    star4: number;
+    star3: number;
+    star2: number;
+    star1: number;
+  };
+  unansweredReviews: number;
   responseRate: number;
-}
-
-interface ConnectionStatus {
-  connected: boolean;
-  connection: any | null;
+  positiveCount: number;
+  neutralCount: number;
+  negativeCount: number;
 }
 
 export function Reviews() {
@@ -67,46 +89,106 @@ export function Reviews() {
   const integrationQuery = searchParams.get('integration');
   const queryErrorMsg = searchParams.get('msg');
 
+  const [activeBusiness, setActiveBusiness] = useState<any | null>(null);
   const [activeMainTab, setActiveMainTab] = useState<'reviews' | 'health' | 'profile'>('reviews');
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [stats, setStats] = useState<ReviewStats>({ avgRating: 0, totalReviews: 0, responseRate: 0 });
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({ connected: false, connection: null });
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [metrics, setMetrics] = useState<ReviewMetrics>({
+    totalReviews: 0,
+    averageRating: 0,
+    starsBreakdown: { star5: 0, star4: 0, star3: 0, star2: 0, star1: 0 },
+    unansweredReviews: 0,
+    responseRate: 0,
+    positiveCount: 0,
+    neutralCount: 0,
+    negativeCount: 0
+  });
+  const [trends, setTrends] = useState<any>({
+    '7d': null,
+    '30d': null,
+    '90d': null
+  });
+  const [activeTrendPeriod, setActiveTrendPeriod] = useState<'7d' | '30d' | '90d'>('30d');
   const [gbpHealth, setGbpHealth] = useState<any | null>(null);
-  
-  // Locations picker modal
+  const [connectionData, setConnectionData] = useState<any | null>(null);
+
+  // Accounts & Locations discovery modal
+  const [availableAccounts, setAvailableAccounts] = useState<any[]>([]);
   const [availableLocations, setAvailableLocations] = useState<any[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<string>('');
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [loadingDiscovery, setLoadingDiscovery] = useState(false);
   const [selectingLoc, setSelectingLoc] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(queryErrorMsg || null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(
+    integrationQuery === 'success' ? 'Google Business Profile connected and reviews synced successfully.' : null
+  );
 
-  // Filters & AI Reply State
-  const [activeFilter, setActiveFilter] = useState<'all' | 'positive' | 'neutral' | 'negative' | 'unanswered'>('all');
-  const [selectedTone, setSelectedTone] = useState<string>('professional');
+  // Filters & Search
+  const [activeFilter, setActiveFilter] = useState<string>('all'); // all | unanswered | positive | negative | 5 | 4 | 3 | 2 | 1
+  const [selectedReview, setSelectedReview] = useState<Review | null>(null);
+
+  // AI Reply & Sentiment
+  const [selectedTone, setSelectedTone] = useState<'professional' | 'friendly' | 'empathetic' | 'concise'>('professional');
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
-  const [editingReply, setEditingReply] = useState<string | null>(null);
-  const [editedReplyText, setEditedReplyText] = useState('');
+  const [analyzingFor, setAnalyzingFor] = useState<string | null>(null);
+  const [draftReply, setDraftReply] = useState<string>('');
+  const [savingReply, setSavingReply] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const loadData = async () => {
+  const loadData = async (bizId?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const [statusRes, reviewsRes, healthRes] = await Promise.all([
-        fetchApi('/api/reviews/status').catch(() => ({ connected: false, connection: null })),
-        fetchApi('/api/reviews').catch(() => ({ reviews: [], stats: { avgRating: 0, totalReviews: 0, responseRate: 0 } })),
+      // 1. Resolve business
+      let currentBiz = activeBusiness;
+      if (!currentBiz) {
+        const bizRes = await getBusinesses().catch(() => ({ businesses: [] }));
+        const list = bizRes.businesses || (Array.isArray(bizRes) ? bizRes : []);
+        currentBiz = list.find((b: any) => b.is_default === 1) || list[0] || null;
+        setActiveBusiness(currentBiz);
+      }
+
+      const targetBizId = bizId || currentBiz?.id;
+
+      // 2. Fetch metrics, reviews, health in parallel
+      const [metricsRes, reviewsRes, healthRes] = await Promise.all([
+        fetchGbpMetrics(targetBizId).catch(() => ({
+          metrics: {
+            totalReviews: 0,
+            averageRating: 0,
+            starsBreakdown: { star5: 0, star4: 0, star3: 0, star2: 0, star1: 0 },
+            unansweredReviews: 0,
+            responseRate: 0,
+            positiveCount: 0,
+            neutralCount: 0,
+            negativeCount: 0
+          },
+          trends: { '7d': null, '30d': null, '90d': null }
+        })),
+        fetchGbpReviews({ filter: activeFilter, businessId: targetBizId, limit: 50 }).catch(() => ({
+          reviews: [],
+          total: 0
+        })),
         fetchGbpHealth().catch(() => null)
       ]);
 
-      setConnectionStatus(statusRes || { connected: false, connection: null });
-      if (reviewsRes) {
-        setReviews(reviewsRes.reviews || []);
-        setStats(reviewsRes.stats || { avgRating: 0, totalReviews: 0, responseRate: 0 });
+      if (metricsRes?.metrics) {
+        setMetrics(metricsRes.metrics);
+        setTrends(metricsRes.trends || {});
       }
+
+      if (reviewsRes?.reviews) {
+        setReviews(reviewsRes.reviews);
+        setTotalCount(reviewsRes.total || reviewsRes.reviews.length);
+      }
+
       if (healthRes) {
-        setGbpHealth(healthRes);
+        setGbpHealth(healthRes.data || healthRes);
+        setConnectionData(healthRes.connection || null);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load reviews data.');
@@ -117,13 +199,17 @@ export function Reviews() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [activeFilter]);
 
   const handleSyncReviews = async () => {
     setSyncing(true);
     setError(null);
+    setSuccessNotice(null);
     try {
-      await fetchApi('/api/reviews/sync', { method: 'POST' });
+      const res = await syncGbpReviews(activeBusiness?.id);
+      if (res?.success) {
+        setSuccessNotice(`Synced ${res.data?.syncedCount || 0} reviews (${res.data?.newCount || 0} new, ${res.data?.updatedCount || 0} updated).`);
+      }
       await loadData();
     } catch (err: any) {
       setError(err.message || 'Failed to sync Google reviews.');
@@ -132,18 +218,24 @@ export function Reviews() {
     }
   };
 
-  const handleFetchLocations = async () => {
+  const handleOpenLocationPicker = async () => {
+    setLoadingDiscovery(true);
+    setShowLocationPicker(true);
     try {
-      const locs = await fetchGbpLocations();
+      const accounts = await fetchGbpAccounts().catch(() => []);
+      setAvailableAccounts(accounts || []);
+      const locs = await fetchGbpLocations().catch(() => []);
       setAvailableLocations(locs || []);
-      setShowLocationPicker(true);
     } catch (err: any) {
-      alert("Failed to load Google locations: " + (err.message || 'Please reconnect Google account.'));
+      setError(err.message || 'Failed to fetch GBP locations.');
+    } finally {
+      setLoadingDiscovery(false);
     }
   };
 
   const handleSelectLocation = async (loc: any) => {
     setSelectingLoc(true);
+    setError(null);
     try {
       await selectGbpLocation({
         locationName: loc.name,
@@ -151,428 +243,719 @@ export function Reviews() {
         address: loc.address,
         phone: loc.phone,
         website: loc.website,
-        category: loc.category
+        category: loc.category,
+        business_id: activeBusiness?.id
       });
       setShowLocationPicker(false);
+      setSuccessNotice(`Connected location "${loc.title}" and initiated review sync.`);
       await loadData();
     } catch (err: any) {
-      alert("Failed to select location: " + err.message);
+      setError(err.message || 'Failed to connect location.');
     } finally {
       setSelectingLoc(false);
     }
   };
 
-  const handleGenerateReply = async (review: Review, tone: string = selectedTone) => {
+  const handleGenerateReply = async (review: Review) => {
     setGeneratingFor(review.id);
+    setSelectedReview(review);
     try {
-      const data = await fetchApi('/api/reviews/reply', {
-        method: 'POST',
-        body: JSON.stringify({
-          reviewId: review.id,
-          reviewerName: review.reviewer_name,
-          rating: review.rating,
-          reviewText: review.review_text,
-          tone
-        })
+      const res = await generateGbpReviewReply({
+        reviewId: review.id,
+        reviewerName: review.reviewer_name,
+        rating: review.rating,
+        reviewText: review.comment || review.review_text || '',
+        tone: selectedTone,
+        businessId: activeBusiness?.id
       });
 
-      if (data && data.reply) {
-        setReviews(prev => prev.map(r => r.id === review.id ? { ...r, owner_reply: data.reply, reply_status: 'draft' } : r));
-        setEditingReply(review.id);
-        setEditedReplyText(data.reply);
+      if (res?.reply) {
+        setDraftReply(res.reply);
       }
     } catch (err: any) {
-      alert("Failed to generate AI reply: " + (err.message || 'Unknown error'));
+      setError(err.message || 'Failed to generate AI reply.');
     } finally {
       setGeneratingFor(null);
     }
   };
 
-  const handleSaveReply = async (reviewId: string, replyText: string) => {
+  const handleAnalyzeSentiment = async (review: Review) => {
+    setAnalyzingFor(review.id);
     try {
-      await fetchApi('/api/reviews/save-reply', {
-        method: 'POST',
-        body: JSON.stringify({ reviewId, reply: replyText })
-      });
-      setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, owner_reply: replyText, reply_status: 'replied' } : r));
-      setEditingReply(null);
+      const res = await analyzeReviewSentiment(review.id, activeBusiness?.id);
+      if (res?.success && res.data?.analysis) {
+        setReviews(prev => prev.map(r => {
+          if (r.id === review.id) {
+            return {
+              ...r,
+              sentiment: res.data.analysis.sentiment,
+              sentiment_confidence: res.data.analysis.confidence,
+              topics: res.data.analysis.topics
+            };
+          }
+          return r;
+        }));
+        if (selectedReview?.id === review.id) {
+          setSelectedReview({
+            ...selectedReview,
+            sentiment: res.data.analysis.sentiment,
+            sentiment_confidence: res.data.analysis.confidence,
+            topics: res.data.analysis.topics
+          });
+        }
+      }
     } catch (err: any) {
-      alert("Failed to save reply: " + (err.message || 'Unknown error'));
+      setError(err.message || 'Failed to analyze sentiment.');
+    } finally {
+      setAnalyzingFor(null);
     }
   };
 
-  const handleCopyReply = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2500);
+  const handleSaveReply = async (reviewId: string, action: 'save' | 'publish' = 'save') => {
+    if (!draftReply.trim()) return;
+    setSavingReply(true);
+    try {
+      await saveOrPublishGbpReply(reviewId, {
+        reply: draftReply,
+        action,
+        businessId: activeBusiness?.id
+      });
+
+      setReviews(prev => prev.map(r => {
+        if (r.id === reviewId) {
+          return {
+            ...r,
+            reply_comment: draftReply,
+            owner_reply: draftReply,
+            is_replied: 1,
+            reply_status: action === 'publish' ? 'published' : 'saved'
+          };
+        }
+        return r;
+      }));
+
+      if (selectedReview?.id === reviewId) {
+        setSelectedReview({
+          ...selectedReview,
+          reply_comment: draftReply,
+          owner_reply: draftReply,
+          is_replied: 1,
+          reply_status: action === 'publish' ? 'published' : 'saved'
+        });
+      }
+
+      setSuccessNotice(action === 'publish' ? 'Response published to Google Business Profile.' : 'Response saved as draft.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to save reply.');
+    } finally {
+      setSavingReply(false);
+    }
   };
 
-  // Filter calculations
-  const positiveReviews = reviews.filter(r => r.rating >= 4);
-  const neutralReviews = reviews.filter(r => r.rating === 3);
-  const negativeReviews = reviews.filter(r => r.rating <= 2);
-  const unansweredReviews = reviews.filter(r => !r.owner_reply);
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
-  const filteredReviews = reviews.filter(r => {
-    if (activeFilter === 'positive') return r.rating >= 4;
-    if (activeFilter === 'neutral') return r.rating === 3;
-    if (activeFilter === 'negative') return r.rating <= 2;
-    if (activeFilter === 'unanswered') return !r.owner_reply;
-    return true;
-  });
-
-  const isConnected = connectionStatus.connected;
-  const conn = connectionStatus.connection;
+  const isConnected = !!connectionData && connectionData.status === 'connected';
+  const currentTrend = trends[activeTrendPeriod];
 
   return (
     <DashboardLayout>
-      {/* Header */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl sm:text-3xl font-bold text-primary tracking-tight flex items-center gap-2.5">
-              <Star className="text-amber-500 fill-amber-500" size={26} />
-              Google Business & Reviews Engine
-            </h1>
-            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase border ${
-              isConnected 
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                : 'bg-amber-50 text-amber-700 border-amber-200'
-            }`}>
-              {isConnected ? 'CONNECTED' : 'NOT CONNECTED'}
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-gray-900 tracking-tight">Google Business Reviews</h1>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 uppercase border border-amber-500/20">
+              Phase 7 Live
             </span>
           </div>
-          <p className="text-xs text-secondary mt-1">
-            Real Google Business Profile management, live customer review synchronization, and GBP Health scoring.
+          <p className="text-xs text-gray-500 mt-1">
+            Real-time reputation intelligence, unanswered review triage, and AI review responses for {activeBusiness?.name || 'your business'}.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {isConnected ? (
             <>
               <Button
                 variant="outline"
                 size="sm"
+                onClick={handleOpenLocationPicker}
+                className="text-xs h-8 px-3 border-gray-200 text-gray-700 hover:bg-gray-50"
+              >
+                <Building size={13} className="mr-1.5 text-gray-500" />
+                Change Location
+              </Button>
+
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={handleSyncReviews}
                 disabled={syncing}
-                className="border-gray-200 bg-white text-primary hover:bg-gray-50 flex items-center gap-2 text-xs font-semibold h-9 shadow-xs"
+                className="text-xs h-8 px-3.5 bg-gray-900 hover:bg-black text-white font-medium shadow-xs"
               >
-                <RefreshCw size={13} className={syncing ? "animate-spin text-primary-accent" : "text-secondary"} />
-                {syncing ? 'Syncing Google API...' : 'Sync Reviews'}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleFetchLocations}
-                className="border-gray-200 bg-white text-primary hover:bg-gray-50 text-xs font-semibold h-9 shadow-xs"
-              >
-                Switch Location
+                <RefreshCw size={13} className={`mr-1.5 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing...' : 'Sync Reviews'}
               </Button>
             </>
           ) : (
             <Button
               variant="primary"
               size="sm"
-              onClick={connectGoogleBusiness}
-              className="bg-primary-accent hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 h-9 shadow-xs"
+              onClick={() => connectGoogleBusiness(activeBusiness?.id)}
+              className="text-xs h-8 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-xs"
             >
-              <Building size={14} />
-              <span>CONNECT GOOGLE BUSINESS</span>
+              <Globe size={13} className="mr-1.5" />
+              Connect Google Business Profile
             </Button>
           )}
         </div>
       </div>
 
+      {/* Notifications */}
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center justify-between font-medium">
+        <div className="mb-6 p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <AlertCircle size={16} />
+            <AlertCircle size={15} className="shrink-0" />
             <span>{error}</span>
           </div>
-          <button 
-            onClick={connectGoogleBusiness}
-            className="underline font-bold hover:text-red-900"
-          >
-            Reconnect Google
-          </button>
+          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700"><X size={14} /></button>
         </div>
       )}
 
-      {/* Main Navigation Tabs */}
-      <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
-        {[
-          { id: 'reviews', label: `Reviews Manager (${reviews.length})` },
-          { id: 'health', label: `GBP Health Score (${gbpHealth?.score || 0}/100)` },
-          { id: 'profile', label: 'Connected Business Profile' }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveMainTab(tab.id as any)}
-            className={`py-3 px-5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
-              activeMainTab === tab.id
-                ? 'border-primary-accent text-primary-accent'
-                : 'border-transparent text-secondary hover:text-primary'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {successNotice && (
+        <div className="mb-6 p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={15} className="shrink-0" />
+            <span>{successNotice}</span>
+          </div>
+          <button onClick={() => setSuccessNotice(null)} className="text-emerald-500 hover:text-emerald-700"><X size={14} /></button>
+        </div>
+      )}
+
+      {/* Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-gray-200 mb-6 text-xs font-semibold">
+        <button
+          onClick={() => setActiveMainTab('reviews')}
+          className={`pb-2.5 px-3 border-b-2 transition-all cursor-pointer ${
+            activeMainTab === 'reviews'
+              ? 'border-gray-900 text-gray-900'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Review Intelligence ({metrics.totalReviews})
+        </button>
+        <button
+          onClick={() => setActiveMainTab('health')}
+          className={`pb-2.5 px-3 border-b-2 transition-all cursor-pointer ${
+            activeMainTab === 'health'
+              ? 'border-gray-900 text-gray-900'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          GBP Entity Health ({gbpHealth?.score ?? 0}/100)
+        </button>
+        <button
+          onClick={() => setActiveMainTab('profile')}
+          className={`pb-2.5 px-3 border-b-2 transition-all cursor-pointer ${
+            activeMainTab === 'profile'
+              ? 'border-gray-900 text-gray-900'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Connected Profile
+        </button>
       </div>
 
-      {/* 1. REVIEWS MANAGER TAB */}
+      {/* TAB 1: REVIEWS & REPUTATION INTELLIGENCE */}
       {activeMainTab === 'reviews' && (
         <>
-          {/* KPI Stats Strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
-            <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
-              <span className="text-xs font-semibold text-secondary">Total Reviews</span>
-              <div className="mt-2 text-2xl font-black text-primary">{reviews.length}</div>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
-              <span className="text-xs font-semibold text-secondary">Average Rating</span>
-              <div className="mt-2 text-2xl font-black text-amber-600 flex items-center gap-1">
-                <span>{stats.avgRating ? stats.avgRating.toFixed(1) : (reviews.length > 0 ? (reviews.reduce((a,b)=>a+b.rating,0)/reviews.length).toFixed(1) : '—')}</span>
-                <Star size={16} className="fill-amber-500 text-amber-500" />
+          {/* 4 Top KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6">
+            {/* KPI 1: Total Reviews */}
+            <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-xs">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">Total Reviews</span>
+              <div className="flex items-baseline justify-between">
+                <span className="text-2xl font-black text-gray-900">{metrics.totalReviews}</span>
+                <span className="text-[11px] font-bold text-gray-400">Google Verified</span>
               </div>
+              <p className="text-[10px] text-gray-400 mt-1">D1 persisted customer feedback</p>
             </div>
-            <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
-              <span className="text-xs font-semibold text-secondary">Positive (4-5★)</span>
-              <div className="mt-2 text-2xl font-black text-emerald-600">{positiveReviews.length}</div>
+
+            {/* KPI 2: Average Rating */}
+            <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-xs">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">Average Rating</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-2xl font-black text-gray-900">{metrics.averageRating || '0.0'}</span>
+                  <Star size={18} className="fill-amber-400 text-amber-400" />
+                </div>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                  metrics.averageRating >= 4.5 ? 'bg-emerald-50 text-emerald-700' :
+                  metrics.averageRating >= 4.0 ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'
+                }`}>
+                  {metrics.averageRating >= 4.5 ? 'EXCELLENT' : metrics.averageRating >= 4.0 ? 'GOOD' : 'FAIR'}
+                </span>
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1">Calculated across verified ratings</p>
             </div>
-            <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
-              <span className="text-xs font-semibold text-secondary">Negative (1-2★)</span>
-              <div className="mt-2 text-2xl font-black text-red-600">{negativeReviews.length}</div>
+
+            {/* KPI 3: Unanswered Reviews */}
+            <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-xs">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">Unanswered Reviews</span>
+              <div className="flex items-baseline justify-between">
+                <span className={`text-2xl font-black ${metrics.unansweredReviews > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  {metrics.unansweredReviews}
+                </span>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                  metrics.unansweredReviews > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                }`}>
+                  {metrics.unansweredReviews > 0 ? 'Needs Action' : 'All Clear'}
+                </span>
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1">Direct owner response required</p>
             </div>
-            <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
-              <span className="text-xs font-semibold text-secondary">Unanswered</span>
-              <div className="mt-2 text-2xl font-black text-primary-accent">{unansweredReviews.length}</div>
+
+            {/* KPI 4: Response Rate */}
+            <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-xs">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">Response Rate</span>
+              <div className="flex items-baseline justify-between">
+                <span className="text-2xl font-black text-gray-900">{metrics.responseRate}%</span>
+                <span className="text-[11px] font-bold text-gray-400">Target 95%+</span>
+              </div>
+              <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden mt-2">
+                <div 
+                  className={`h-full rounded-full ${
+                    metrics.responseRate >= 90 ? 'bg-emerald-500' :
+                    metrics.responseRate >= 70 ? 'bg-blue-500' : 'bg-amber-500'
+                  }`}
+                  style={{ width: `${Math.min(100, metrics.responseRate)}%` }}
+                />
+              </div>
             </div>
           </div>
 
-          {!isConnected && reviews.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-xs mb-8">
-              <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 mx-auto mb-4">
-                <AlertCircle size={28} />
+          {/* Star Breakdown & Trend Telemetry Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+            {/* Star Distribution */}
+            <div className="bg-white p-4.5 rounded-xl border border-gray-200/80 shadow-xs">
+              <h3 className="text-xs font-bold text-gray-900 mb-3 flex items-center justify-between">
+                <span>Rating Breakdown</span>
+                <span className="text-[10px] font-normal text-gray-400">{metrics.totalReviews} Total</span>
+              </h3>
+              <div className="space-y-1.5">
+                {[5, 4, 3, 2, 1].map((stars) => {
+                  const count = metrics.starsBreakdown[`star${stars}` as keyof typeof metrics.starsBreakdown] || 0;
+                  const pct = metrics.totalReviews > 0 ? Math.round((count / metrics.totalReviews) * 100) : 0;
+                  return (
+                    <div key={stars} className="flex items-center gap-2 text-xs">
+                      <span className="w-6 font-semibold text-gray-600 flex items-center gap-0.5">
+                        {stars}<Star size={10} className="fill-amber-400 text-amber-400" />
+                      </span>
+                      <div className="flex-1 bg-gray-100 h-2 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-amber-400 rounded-full"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="w-12 text-right text-[11px] font-medium text-gray-500">{count} ({pct}%)</span>
+                    </div>
+                  );
+                })}
               </div>
-              <h2 className="text-lg font-bold text-primary mb-1">Google Business Profile Not Connected</h2>
-              <p className="text-xs text-secondary max-w-md mx-auto mb-6 leading-relaxed">
-                Connect your Google Business Profile via OAuth to import live customer reviews, unlock response automation, and sync rating signals.
-              </p>
-              <Button
-                variant="primary"
-                size="lg"
-                onClick={connectGoogleBusiness}
-                className="bg-primary-accent hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-2 shadow-xs h-10 px-6"
-              >
-                <Building size={15} />
-                <span>CONNECT GOOGLE BUSINESS PROFILE</span>
-              </Button>
             </div>
-          ) : (
-            <>
-              {/* Sentiment Filter Tabs & Tone Selector */}
-              <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs mb-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
-                  {[
-                    { id: 'all', label: `All (${reviews.length})` },
-                    { id: 'positive', label: `Positive (${positiveReviews.length})` },
-                    { id: 'neutral', label: `Neutral (${neutralReviews.length})` },
-                    { id: 'negative', label: `Negative (${negativeReviews.length})` },
-                    { id: 'unanswered', label: `Unanswered (${unansweredReviews.length})` }
-                  ].map(f => (
+
+            {/* Historical Trend Telemetry */}
+            <div className="lg:col-span-2 bg-white p-4.5 rounded-xl border border-gray-200/80 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp size={15} className="text-gray-900" />
+                  <h3 className="text-xs font-bold text-gray-900">Review Trajectory & Reputation Trend</h3>
+                </div>
+                <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg text-[11px]">
+                  {(['7d', '30d', '90d'] as const).map(p => (
                     <button
-                      key={f.id}
-                      onClick={() => setActiveFilter(f.id as any)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                        activeFilter === f.id
-                          ? 'bg-primary-accent text-white shadow-xs'
-                          : 'bg-gray-50 hover:bg-gray-100 text-secondary hover:text-primary border border-gray-200'
+                      key={p}
+                      onClick={() => setActiveTrendPeriod(p)}
+                      className={`px-2 py-0.5 rounded font-semibold transition-all cursor-pointer uppercase ${
+                        activeTrendPeriod === p ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-900'
                       }`}
                     >
-                      {f.label}
+                      {p}
                     </button>
                   ))}
                 </div>
-
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                  <span className="text-xs text-secondary font-medium whitespace-nowrap">AI Tone:</span>
-                  <select
-                    value={selectedTone}
-                    onChange={(e) => setSelectedTone(e.target.value)}
-                    className="px-3 py-1 text-xs rounded-xl border border-gray-200 bg-gray-50 text-primary font-medium focus:outline-none focus:ring-1 focus:ring-primary-accent"
-                  >
-                    <option value="professional">Professional & Courteous</option>
-                    <option value="warm">Warm & Appreciative</option>
-                    <option value="apologetic">Empathetic & Solution-Oriented</option>
-                    <option value="direct">Direct & Concise</option>
-                  </select>
-                </div>
               </div>
 
-              {/* Reviews Feed */}
-              <div className="space-y-4 mb-8">
-                {filteredReviews.length === 0 ? (
-                  <div className="bg-white p-12 rounded-2xl border border-gray-200 text-center shadow-xs">
-                    <Star className="mx-auto h-10 w-10 text-gray-300 mb-2" />
-                    <h3 className="text-sm font-bold text-primary">No Reviews Found for this Filter</h3>
-                    <p className="text-xs text-secondary mt-1">Select another filter tab or sync live reviews from Google.</p>
+              {currentTrend ? (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <span className="text-[10px] font-semibold text-gray-400 block uppercase">New Reviews</span>
+                    <span className="text-lg font-black text-gray-900">{currentTrend.newReviewsCount}</span>
                   </div>
-                ) : (
-                  filteredReviews.map((review) => (
-                    <div 
-                      key={review.id}
-                      className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-4"
-                    >
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center font-bold text-primary-accent text-sm">
-                            {review.reviewer_name?.charAt(0) || 'C'}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-xs font-bold text-primary">{review.reviewer_name}</h3>
-                              <div className="flex items-center text-amber-500">
-                                {Array.from({ length: 5 }).map((_, i) => (
-                                  <Star 
-                                    key={i} 
-                                    size={12} 
-                                    className={i < review.rating ? 'fill-amber-500 text-amber-500' : 'text-gray-300'} 
-                                  />
-                                ))}
-                              </div>
-                            </div>
-                            <span className="text-[10px] text-secondary font-mono">
-                              {new Date(review.review_date || review.created_at).toLocaleDateString()} via {review.source || 'Google Business'}
-                            </span>
-                          </div>
-                        </div>
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <span className="text-[10px] font-semibold text-gray-400 block uppercase">Period Avg</span>
+                    <span className="text-lg font-black text-gray-900">{currentTrend.averageRating || '0.0'} ★</span>
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <span className="text-[10px] font-semibold text-gray-400 block uppercase">Response Rate</span>
+                    <span className="text-lg font-black text-gray-900">{currentTrend.responseRate}%</span>
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <span className="text-[10px] font-semibold text-gray-400 block uppercase">Critical / Neg</span>
+                    <span className={`text-lg font-black ${currentTrend.negativeReviewsCount > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                      {currentTrend.negativeReviewsCount}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-6 text-center text-xs text-gray-400">
+                  Insufficient historical trend observations in this window.
+                </div>
+              )}
 
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                          review.owner_reply ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}>
-                          {review.owner_reply ? 'Responded' : 'Awaiting Response'}
-                        </span>
-                      </div>
-
-                      {/* Review Text */}
-                      <p className="text-xs text-secondary leading-relaxed bg-gray-50/70 p-3.5 rounded-xl border border-gray-100">
-                        "{review.review_text || 'Rating only provided without text comment.'}"
-                      </p>
-
-                      {/* Owner Reply Box */}
-                      {review.owner_reply && editingReply !== review.id && (
-                        <div className="p-4 rounded-xl bg-blue-50/40 border border-blue-100 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold text-primary flex items-center gap-1.5">
-                              <Sparkles size={12} className="text-primary-accent" />
-                              Your Business Reply:
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleCopyReply(review.id, review.owner_reply!)}
-                                className="text-[11px] text-secondary hover:text-primary flex items-center gap-1 cursor-pointer"
-                              >
-                                {copiedId === review.id ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                                <span>{copiedId === review.id ? 'Copied' : 'Copy'}</span>
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setEditingReply(review.id);
-                                  setEditedReplyText(review.owner_reply!);
-                                }}
-                                className="text-[11px] text-primary-accent hover:underline flex items-center gap-1 cursor-pointer"
-                              >
-                                <Edit3 size={12} />
-                                <span>Edit</span>
-                              </button>
-                            </div>
-                          </div>
-                          <p className="text-xs text-primary leading-relaxed">{review.owner_reply}</p>
-                        </div>
-                      )}
-
-                      {/* Editing Reply Box */}
-                      {editingReply === review.id && (
-                        <div className="space-y-2">
-                          <label className="block text-xs font-bold text-secondary uppercase tracking-wider">
-                            Edit Business Response:
-                          </label>
-                          <textarea
-                            value={editedReplyText}
-                            onChange={(e) => setEditedReplyText(e.target.value)}
-                            className="w-full p-3 text-xs rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-primary-accent min-h-[80px]"
-                          />
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setEditingReply(null)}
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={() => handleSaveReply(review.id, editedReplyText)}
-                              className="bg-primary-accent hover:bg-blue-700 text-white font-semibold"
-                            >
-                              Save & Mark Responded
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* AI Generate Reply Trigger */}
-                      {!review.owner_reply && editingReply !== review.id && (
-                        <div className="pt-2 flex justify-end">
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleGenerateReply(review)}
-                            disabled={generatingFor === review.id}
-                            className="bg-primary-accent hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1.5"
-                          >
-                            <Sparkles size={13} className={generatingFor === review.id ? "animate-spin" : ""} />
-                            <span>{generatingFor === review.id ? 'Generating tailored AI reply...' : 'GENERATE RESPONSE'}</span>
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
-          )}
-        </>
-      )}
-
-      {/* 2. GBP HEALTH SCORE TAB */}
-      {activeMainTab === 'health' && (
-        <div className="space-y-6 mb-8">
-          <div className="bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-1">
-              <h2 className="text-xl font-bold text-primary">Google Business Profile Health Score</h2>
-              <p className="text-xs text-secondary max-w-xl leading-relaxed">
-                Deterministic audit of your Google Business Profile entity signals, NAP completeness, categories, and customer review velocity.
+              <p className="text-[10px] text-gray-400 mt-2">
+                Honest historical data aggregated strictly from verified timestamps in D1.
               </p>
-            </div>
-            <div className="flex items-center gap-4 shrink-0">
-              <div className="text-right">
-                <span className="text-4xl font-black text-primary">{gbpHealth?.score || 0}/100</span>
-                <span className={`block text-xs font-bold uppercase ${
-                  (gbpHealth?.score || 0) >= 80 ? 'text-emerald-600' :
-                  (gbpHealth?.score || 0) >= 60 ? 'text-blue-600' : 'text-amber-600'
-                }`}>
-                  {gbpHealth?.status || 'NOT CONNECTED'}
-                </span>
-              </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold text-primary flex items-center gap-2">
-              <Layers size={18} className="text-primary-accent" />
-              What's Complete vs What's Missing
+          {/* Filter Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded-xl border border-gray-200/80 shadow-xs">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-bold text-gray-400 mr-1 flex items-center gap-1">
+                <Filter size={12} /> Filters:
+              </span>
+              {[
+                { id: 'all', label: `All (${metrics.totalReviews})` },
+                { id: 'unanswered', label: `Unanswered (${metrics.unansweredReviews})` },
+                { id: 'positive', label: `Positive 4-5★ (${metrics.positiveCount})` },
+                { id: 'negative', label: `Negative 1-2★ (${metrics.negativeCount})` },
+                { id: '5', label: '5★' },
+                { id: '4', label: '4★' },
+                { id: '3', label: '3★' },
+                { id: '2', label: '2★' },
+                { id: '1', label: '1★' }
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setActiveFilter(f.id)}
+                  className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                    activeFilter === f.id
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="text-[11px] text-gray-500 font-medium">
+              Showing {reviews.length} of {totalCount} reviews
+            </div>
+          </div>
+
+          {/* Reviews List & Detail Drawer Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Reviews Column */}
+            <div className={`${selectedReview ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-3`}>
+              {loading ? (
+                <div className="p-12 text-center text-xs text-gray-400 bg-white rounded-xl border border-gray-200">
+                  <RefreshCw size={20} className="animate-spin mx-auto mb-2 text-gray-400" />
+                  Loading verified customer reviews...
+                </div>
+              ) : reviews.length === 0 ? (
+                <div className="p-12 text-center bg-white rounded-xl border border-gray-200 space-y-2">
+                  <MessageCircle size={28} className="mx-auto text-gray-300" />
+                  <h4 className="text-xs font-bold text-gray-900">No Reviews Found</h4>
+                  <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                    {isConnected
+                      ? 'No reviews match the selected filter, or no customer reviews exist on Google for this location.'
+                      : 'Connect your Google Business Profile to sync live customer reviews.'}
+                  </p>
+                  {!isConnected && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => connectGoogleBusiness(activeBusiness?.id)}
+                      className="mt-2 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      Connect Google Profile
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                reviews.map(review => {
+                  const isReplied = review.is_replied === 1 || !!review.reply_comment || !!review.owner_reply;
+                  const replyText = review.reply_comment || review.owner_reply;
+                  const text = review.comment || review.review_text || '';
+                  const topicsList = typeof review.topics === 'string' ? JSON.parse(review.topics || '[]') : (review.topics || []);
+
+                  return (
+                    <div
+                      key={review.id}
+                      onClick={() => setSelectedReview(review)}
+                      className={`p-4 rounded-xl border transition-all cursor-pointer bg-white ${
+                        selectedReview?.id === review.id
+                          ? 'border-gray-900 shadow-sm ring-1 ring-gray-900'
+                          : 'border-gray-200/80 hover:border-gray-400'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-bold text-xs text-gray-700 shrink-0">
+                            {review.reviewer_name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-gray-900 leading-none">{review.reviewer_name}</h4>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <div className="flex items-center">
+                                {[...Array(5)].map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    size={11}
+                                    className={i < review.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-[10px] text-gray-400">
+                                {new Date(review.review_created_at || review.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          {/* Sentiment Badge */}
+                          {review.sentiment && (
+                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${
+                              review.sentiment === 'POSITIVE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                              review.sentiment === 'NEGATIVE' ? 'bg-red-50 text-red-700 border border-red-200' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {review.sentiment}
+                            </span>
+                          )}
+
+                          {/* Replied Status */}
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${
+                            isReplied
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}>
+                            {isReplied ? 'Replied' : 'Needs Reply'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Review Text */}
+                      <p className="text-xs text-gray-700 leading-relaxed mb-2.5 line-clamp-3">
+                        {text || <em className="text-gray-400">Customer left rating without review text.</em>}
+                      </p>
+
+                      {/* Topic Tags */}
+                      {topicsList && topicsList.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-2.5">
+                          {topicsList.map((t: string, idx: number) => (
+                            <span key={idx} className="text-[10px] font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                              #{t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Reply preview if exists */}
+                      {replyText && (
+                        <div className="p-2.5 bg-gray-50 rounded-lg border border-gray-200/60 text-[11px] text-gray-600 mb-2">
+                          <span className="font-bold text-gray-800 block text-[10px] mb-0.5">Owner Response:</span>
+                          <p className="line-clamp-2">{replyText}</p>
+                        </div>
+                      )}
+
+                      {/* Quick Actions */}
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-[11px]">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAnalyzeSentiment(review);
+                          }}
+                          disabled={analyzingFor === review.id}
+                          className="text-gray-500 hover:text-gray-900 font-medium flex items-center gap-1 cursor-pointer"
+                        >
+                          <SlidersHorizontal size={11} className={analyzingFor === review.id ? 'animate-spin' : ''} />
+                          {analyzingFor === review.id ? 'Analyzing...' : 'Analyze AI Topics'}
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleGenerateReply(review);
+                          }}
+                          disabled={generatingFor === review.id}
+                          className="text-primary-accent hover:text-blue-700 font-bold flex items-center gap-1 cursor-pointer"
+                        >
+                          <Sparkles size={12} className={generatingFor === review.id ? 'animate-spin' : ''} />
+                          {generatingFor === review.id ? 'Writing...' : isReplied ? 'Regenerate Reply' : 'Generate AI Reply'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Detail & AI Response Drawer Column */}
+            {selectedReview && (
+              <div className="bg-white p-5 rounded-xl border border-gray-900 shadow-sm space-y-4 self-start sticky top-6">
+                <div className="flex items-start justify-between border-b border-gray-100 pb-3">
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-900">Review & AI Response Studio</h3>
+                    <p className="text-[11px] text-gray-500">{selectedReview.reviewer_name} • {selectedReview.rating}★</p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedReview(null)}
+                    className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+
+                {/* Full Review Text */}
+                <div className="p-3 bg-gray-50 rounded-lg text-xs text-gray-700 leading-relaxed border border-gray-200">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-bold text-gray-900 text-[11px]">Customer Review</span>
+                    <div className="flex items-center">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          size={11}
+                          className={i < selectedReview.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <p>{selectedReview.comment || selectedReview.review_text || 'No comment provided.'}</p>
+                </div>
+
+                {/* AI Response Settings */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-gray-700 block">Response Tone</label>
+                  <div className="grid grid-cols-2 gap-1.5 text-xs">
+                    {(['professional', 'friendly', 'empathetic', 'concise'] as const).map(t => (
+                      <button
+                        key={t}
+                        onClick={() => setSelectedTone(t)}
+                        className={`p-2 rounded-lg border text-center font-medium capitalize transition-all cursor-pointer ${
+                          selectedTone === t
+                            ? 'border-gray-900 bg-gray-900 text-white shadow-xs'
+                            : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Response Textarea */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-gray-700">Response Draft</label>
+                    <button
+                      onClick={() => handleGenerateReply(selectedReview)}
+                      disabled={generatingFor === selectedReview.id}
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles size={11} className={generatingFor === selectedReview.id ? 'animate-spin' : ''} />
+                      Generate AI
+                    </button>
+                  </div>
+                  <textarea
+                    value={draftReply || selectedReview.reply_comment || selectedReview.owner_reply || ''}
+                    onChange={(e) => setDraftReply(e.target.value)}
+                    placeholder="Enter or generate response text..."
+                    className="w-full p-3 text-xs rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-1 focus:ring-gray-900 min-h-[110px]"
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-2 pt-2 border-t border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopy(draftReply || selectedReview.reply_comment || selectedReview.owner_reply || '', selectedReview.id)}
+                      className="flex-1 text-xs h-8"
+                    >
+                      {copiedId === selectedReview.id ? (
+                        <>
+                          <Check size={12} className="mr-1 text-emerald-600" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={12} className="mr-1" />
+                          Copy Text
+                        </>
+                      )}
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSaveReply(selectedReview.id, 'save')}
+                      disabled={savingReply}
+                      className="flex-1 text-xs h-8"
+                    >
+                      Save Draft
+                    </Button>
+                  </div>
+
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleSaveReply(selectedReview.id, 'publish')}
+                    disabled={savingReply || !(draftReply || selectedReview.reply_comment || selectedReview.owner_reply)}
+                    className="w-full text-xs h-8 bg-gray-900 hover:bg-black text-white font-bold"
+                  >
+                    {savingReply ? 'Saving...' : 'Approve & Mark Responded'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* TAB 2: GBP HEALTH AUDIT */}
+      {activeMainTab === 'health' && (
+        <div className="space-y-6 mb-8">
+          <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-1">
+              <h2 className="text-lg font-bold text-gray-900">Google Business Profile Entity Health</h2>
+              <p className="text-xs text-gray-500 max-w-xl leading-relaxed">
+                Deterministic audit of your Google Business Profile entity signals, NAP completeness, categories, and customer review velocity.
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <span className="text-3xl font-black text-gray-900">{gbpHealth?.score || 0}/100</span>
+              <span className={`block text-xs font-bold uppercase ${
+                (gbpHealth?.score || 0) >= 80 ? 'text-emerald-600' :
+                (gbpHealth?.score || 0) >= 60 ? 'text-blue-600' : 'text-amber-600'
+              }`}>
+                {gbpHealth?.status || 'NOT CONNECTED'}
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs space-y-4">
+            <h3 className="text-xs font-bold text-gray-900 flex items-center gap-2">
+              <Layers size={16} className="text-gray-900" />
+              Verified Entity Checks
             </h3>
 
             <div className="space-y-3">
@@ -582,7 +965,7 @@ export function Reviews() {
                   <div 
                     key={idx}
                     className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-start justify-between gap-3 ${
-                      isDone ? 'bg-emerald-50/40 border-emerald-200' : 'bg-gray-50 border-gray-200'
+                      isDone ? 'bg-emerald-50/30 border-emerald-200' : 'bg-gray-50 border-gray-200'
                     }`}
                   >
                     <div className="space-y-1 flex-1">
@@ -592,18 +975,18 @@ export function Reviews() {
                         ) : (
                           <AlertTriangle size={16} className="text-amber-500 shrink-0" />
                         )}
-                        <h4 className="text-xs font-bold text-primary">{item.factor}</h4>
+                        <h4 className="text-xs font-bold text-gray-900">{item.factor}</h4>
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
                           isDone ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                         }`}>
                           {item.status}
                         </span>
                       </div>
-                      <p className="text-xs text-secondary leading-relaxed">
-                        <strong className="text-primary">Why it matters:</strong> {item.whyItMatters}
+                      <p className="text-xs text-gray-600 leading-relaxed">
+                        <strong className="text-gray-900">Why it matters:</strong> {item.whyItMatters}
                       </p>
                       {!isDone && (
-                        <p className="text-xs text-primary-accent font-medium pt-1">
+                        <p className="text-xs text-blue-700 font-medium pt-1">
                           👉 <strong>Recommended Action:</strong> {item.recommendedAction}
                         </p>
                       )}
@@ -616,13 +999,13 @@ export function Reviews() {
         </div>
       )}
 
-      {/* 3. CONNECTED PROFILE TAB */}
+      {/* TAB 3: CONNECTED PROFILE INFO */}
       {activeMainTab === 'profile' && (
-        <div className="bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 shadow-xs mb-8 space-y-6">
+        <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs mb-8 space-y-6">
           <div className="flex items-center justify-between pb-4 border-b border-gray-100">
             <div>
-              <h2 className="text-lg font-bold text-primary">Connected Google Business Information</h2>
-              <p className="text-xs text-secondary">Verified entity data retrieved from your authorized Google account.</p>
+              <h2 className="text-base font-bold text-gray-900">Connected Google Business Information</h2>
+              <p className="text-xs text-gray-500">Verified entity data retrieved from your authorized Google account.</p>
             </div>
             <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${
               isConnected ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-700'
@@ -631,45 +1014,45 @@ export function Reviews() {
             </span>
           </div>
 
-          {isConnected && conn ? (
+          {isConnected && connectionData ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-1">
-                <span className="text-secondary font-semibold">Business Name:</span>
-                <p className="text-sm font-bold text-primary">{conn.location_name || 'Your Business'}</p>
+                <span className="text-gray-500 font-semibold">Business Name:</span>
+                <p className="text-sm font-bold text-gray-900">{connectionData.location_name || activeBusiness?.name}</p>
               </div>
               <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-1">
-                <span className="text-secondary font-semibold">Primary Category:</span>
-                <p className="text-sm font-bold text-primary">{conn.location_category || 'Local Service'}</p>
+                <span className="text-gray-500 font-semibold">Primary Category:</span>
+                <p className="text-sm font-bold text-gray-900">{connectionData.location_category || 'Local Service'}</p>
               </div>
               <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-1">
-                <span className="text-secondary font-semibold">Storefront Address:</span>
-                <p className="text-sm font-bold text-primary">{conn.location_address || 'Service Area Business'}</p>
+                <span className="text-gray-500 font-semibold">Storefront Address:</span>
+                <p className="text-sm font-bold text-gray-900">{connectionData.location_address || `${activeBusiness?.city}, ${activeBusiness?.country}`}</p>
               </div>
               <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-1">
-                <span className="text-secondary font-semibold">Phone Number:</span>
-                <p className="text-sm font-bold text-primary">{conn.location_phone || 'Not configured'}</p>
+                <span className="text-gray-500 font-semibold">Phone Number:</span>
+                <p className="text-sm font-bold text-gray-900">{connectionData.location_phone || 'Not configured'}</p>
               </div>
               <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-1">
-                <span className="text-secondary font-semibold">Website URI:</span>
-                <p className="text-sm font-bold text-primary">{conn.location_website || 'Linked'}</p>
+                <span className="text-gray-500 font-semibold">Website URI:</span>
+                <p className="text-sm font-bold text-gray-900">{connectionData.location_website || activeBusiness?.website_url}</p>
               </div>
               <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-1">
-                <span className="text-secondary font-semibold">Connected At:</span>
-                <p className="text-sm font-bold text-primary">{new Date(conn.connected_at).toLocaleString()}</p>
+                <span className="text-gray-500 font-semibold">Connected At:</span>
+                <p className="text-sm font-bold text-gray-900">{new Date(connectionData.connected_at).toLocaleString()}</p>
               </div>
             </div>
           ) : (
             <div className="py-12 text-center space-y-3">
               <Building className="mx-auto h-10 w-10 text-gray-300" />
-              <h3 className="text-sm font-bold text-primary">No Google Business Profile Connected</h3>
-              <p className="text-xs text-secondary max-w-sm mx-auto">
+              <h3 className="text-sm font-bold text-gray-900">No Google Business Profile Connected</h3>
+              <p className="text-xs text-gray-500 max-w-sm mx-auto">
                 Authorize your Google account to automatically import your verified address, hours, category, and review telemetry.
               </p>
               <Button
                 variant="primary"
                 size="sm"
-                onClick={connectGoogleBusiness}
-                className="bg-primary-accent hover:bg-blue-700 text-white font-semibold"
+                onClick={() => connectGoogleBusiness(activeBusiness?.id)}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold"
               >
                 Connect Google Account
               </Button>
@@ -680,12 +1063,12 @@ export function Reviews() {
 
       {/* LOCATION PICKER MODAL */}
       {showLocationPicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary/40 backdrop-blur-sm animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
-                <Building size={18} className="text-primary-accent" />
-                <h3 className="text-sm font-bold text-primary">Select Google Business Location</h3>
+                <Building size={18} className="text-gray-900" />
+                <h3 className="text-sm font-bold text-gray-900">Select Google Business Location</h3>
               </div>
               <button
                 onClick={() => setShowLocationPicker(false)}
@@ -695,33 +1078,42 @@ export function Reviews() {
               </button>
             </div>
 
-            <div className="max-h-72 overflow-y-auto space-y-2.5">
-              {availableLocations.length === 0 ? (
-                <p className="text-xs text-secondary text-center py-6">No authorized locations returned from Google API.</p>
-              ) : (
-                availableLocations.map((loc, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => handleSelectLocation(loc)}
-                    className="p-3.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-blue-50/50 hover:border-primary-accent transition-all cursor-pointer flex items-center justify-between"
-                  >
-                    <div>
-                      <h4 className="text-xs font-bold text-primary">{loc.title}</h4>
-                      <p className="text-[11px] text-secondary">{loc.address || 'Service Area'}</p>
-                      {loc.category && <span className="text-[10px] text-primary-accent font-medium">{loc.category}</span>}
-                    </div>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      disabled={selectingLoc}
-                      className="text-xs h-7 px-3 bg-primary-accent text-white"
+            {loadingDiscovery ? (
+              <div className="py-8 text-center text-xs text-gray-500">
+                <RefreshCw size={18} className="animate-spin mx-auto mb-2 text-gray-400" />
+                Discovering accessible Google accounts and locations...
+              </div>
+            ) : (
+              <div className="max-h-72 overflow-y-auto space-y-2.5">
+                {availableLocations.length === 0 ? (
+                  <p className="text-xs text-gray-500 text-center py-6">
+                    No authorized locations found. Please ensure your Google account has verified Business Profile management permissions.
+                  </p>
+                ) : (
+                  availableLocations.map((loc, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => handleSelectLocation(loc)}
+                      className="p-3.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-blue-50/50 hover:border-gray-900 transition-all cursor-pointer flex items-center justify-between"
                     >
-                      {selectingLoc ? 'Saving...' : 'Select'}
-                    </Button>
-                  </div>
-                ))
-              )}
-            </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-gray-900">{loc.title}</h4>
+                        <p className="text-[11px] text-gray-500">{loc.address || 'Service Area Business'}</p>
+                        {loc.category && <span className="text-[10px] text-blue-600 font-medium">{loc.category}</span>}
+                      </div>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        disabled={selectingLoc}
+                        className="text-xs h-7 px-3 bg-gray-900 text-white"
+                      >
+                        {selectingLoc ? 'Connecting...' : 'Connect'}
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
 
             <div className="pt-2 border-t border-gray-100 flex justify-end">
               <Button

@@ -332,11 +332,11 @@ export function Score() {
         {/* Executive Header Title & Calculation Modal Button */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-serif font-normal text-[#141413]">
-              Deterministic Growth Score
+            <h1 className="text-2xl sm:text-3xl font-semibold text-[#141413] tracking-tight">
+              Growth Score
             </h1>
             <p className="text-xs text-[#6c6a64] mt-1 font-sans">
-              Mathematical scoring calculated strictly from verified DOM crawling, schema inspection, and SERP telemetry.
+              Multi-vector SEO performance breakdown.
             </p>
           </div>
 
@@ -346,7 +346,7 @@ export function Score() {
             className="bg-[#141413] hover:bg-[#252320] text-[#faf9f5] flex items-center gap-1.5 text-xs font-semibold self-start sm:self-auto"
           >
             <ShieldCheck size={14} className="text-[#cc785c]" />
-            <span>[View Score Calculation]</span>
+            <span>View Calculation</span>
           </Button>
         </div>
 

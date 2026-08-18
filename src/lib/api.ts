@@ -169,18 +169,108 @@ export async function refreshKeywords(): Promise<any> {
 }
 
 // -----------------------------------------------------------------------------
-// GOOGLE BUSINESS PROFILE & REPUTATION
+// GOOGLE BUSINESS PROFILE & REPUTATION (PHASE 7)
 // -----------------------------------------------------------------------------
-export async function connectGoogleBusiness(): Promise<void> {
-  window.location.href = (import.meta.env.VITE_API_BASE_URL || '') + '/api/auth/googleBusiness';
+export async function connectGoogleBusiness(businessId?: string): Promise<void> {
+  const query = businessId ? `?business_id=${encodeURIComponent(businessId)}` : '';
+  window.location.href = (import.meta.env.VITE_API_BASE_URL || '') + `/api/auth/googleBusiness${query}`;
 }
 
-export async function fetchGbpLocations(): Promise<any[]> {
-  return fetchApi('/api/gbp/locations');
+export async function fetchGbpAccounts(): Promise<any[]> {
+  return fetchApi('/api/gbp/accounts');
 }
 
-export async function selectGbpLocation(locationData: { locationName: string; title?: string; address?: string; phone?: string; website?: string; category?: string }): Promise<any> {
-  return fetchApi('/api/gbp/select-location', { method: 'POST', body: JSON.stringify(locationData) });
+export async function fetchGbpLocations(account?: string): Promise<any[]> {
+  const query = account ? `?account=${encodeURIComponent(account)}` : '';
+  return fetchApi(`/api/gbp/locations${query}`);
+}
+
+export async function selectGbpLocation(locationData: { 
+  locationName: string; 
+  title?: string; 
+  address?: string; 
+  phone?: string; 
+  website?: string; 
+  category?: string;
+  accountId?: string;
+  business_id?: string;
+}): Promise<any> {
+  return fetchApi('/api/gbp/locations/connect', { method: 'POST', body: JSON.stringify(locationData) });
+}
+
+export async function syncGbpReviews(businessId?: string, locationId?: string): Promise<any> {
+  return fetchApi('/api/gbp/sync', { 
+    method: 'POST', 
+    body: JSON.stringify({ business_id: businessId, locationId }) 
+  });
+}
+
+export async function fetchGbpMetrics(businessId?: string): Promise<{
+  metrics: {
+    totalReviews: number;
+    averageRating: number;
+    starsBreakdown: { star5: number; star4: number; star3: number; star2: number; star1: number };
+    unansweredReviews: number;
+    responseRate: number;
+    positiveCount: number;
+    neutralCount: number;
+    negativeCount: number;
+  };
+  trends: {
+    '7d': { periodDays: number; newReviewsCount: number; averageRating: number; responseRate: number; negativeReviewsCount: number };
+    '30d': { periodDays: number; newReviewsCount: number; averageRating: number; responseRate: number; negativeReviewsCount: number };
+    '90d': { periodDays: number; newReviewsCount: number; averageRating: number; responseRate: number; negativeReviewsCount: number };
+  };
+}> {
+  const query = businessId ? `?business_id=${encodeURIComponent(businessId)}` : '';
+  return fetchApi(`/api/gbp/metrics${query}`);
+}
+
+export async function fetchGbpReviews(params?: { 
+  filter?: string; 
+  limit?: number; 
+  offset?: number; 
+  businessId?: string;
+}): Promise<{ reviews: any[]; total: number; limit: number; offset: number }> {
+  const q = new URLSearchParams();
+  if (params?.filter) q.append('filter', params.filter);
+  if (params?.limit) q.append('limit', String(params.limit));
+  if (params?.offset) q.append('offset', String(params.offset));
+  if (params?.businessId) q.append('business_id', params.businessId);
+  const qs = q.toString() ? `?${q.toString()}` : '';
+  return fetchApi(`/api/gbp/reviews${qs}`);
+}
+
+export async function analyzeReviewSentiment(reviewId: string, businessId?: string): Promise<any> {
+  return fetchApi('/api/gbp/reviews/analyze', {
+    method: 'POST',
+    body: JSON.stringify({ reviewId, business_id: businessId })
+  });
+}
+
+export async function generateGbpReviewReply(payload: {
+  reviewId?: string;
+  reviewerName?: string;
+  rating?: number;
+  reviewText?: string;
+  tone?: 'professional' | 'friendly' | 'empathetic' | 'concise';
+  businessId?: string;
+}): Promise<{ reply: string; reviewId?: string; tone?: string }> {
+  return fetchApi('/api/gbp/reviews/generate-response', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function saveOrPublishGbpReply(reviewId: string, payload: {
+  reply: string;
+  action?: 'save' | 'publish';
+  businessId?: string;
+}): Promise<any> {
+  return fetchApi(`/api/gbp/reviews/${encodeURIComponent(reviewId)}/reply`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
 }
 
 export async function fetchGbpHealth(): Promise<any> {
