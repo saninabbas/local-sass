@@ -86,6 +86,8 @@ function parseCookies(cookieHeader: string | null) {
   );
 }
 
+let isD1SchemaEnsured = false;
+
 // -----------------------------------------------------------------------------
 // MAIN WORKER
 // -----------------------------------------------------------------------------
@@ -506,6 +508,7 @@ export const onRequest = async (context: any) => {
 
     // Auto-migrate schema columns on startup
     const ensureD1Schema = async (db: any) => {
+      if (isD1SchemaEnsured) return;
       try {
         await db.prepare("ALTER TABLE users ADD COLUMN password_hash TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN polar_customer_id TEXT").run().catch(() => {});
@@ -836,6 +839,7 @@ export const onRequest = async (context: any) => {
         await db.prepare("CREATE INDEX IF NOT EXISTS idx_reviews_rating ON reviews(business_id, rating)").run().catch(() => {});
         await db.prepare("CREATE INDEX IF NOT EXISTS idx_reviews_replied ON reviews(business_id, is_replied)").run().catch(() => {});
         await db.prepare("CREATE INDEX IF NOT EXISTS idx_gbp_loc_biz ON gbp_locations(business_id, is_connected)").run().catch(() => {});
+        isD1SchemaEnsured = true;
       } catch (err) {
         console.warn("Auto-migration notice:", err);
       }
