@@ -20,7 +20,13 @@ export class GitHubProvider implements WebsiteProvider {
       throw new Error('UNAUTHORIZED: Invalid or expired GitHub token');
     }
     if (response.status === 404) {
-      throw new Error('REPOSITORY_NOT_FOUND: GitHub repository or resource not found');
+      if (url.includes('/contents/')) {
+        const filePath = url.split('/contents/')[1]?.split('?')[0] || 'file';
+        throw new Error(`FILE_NOT_FOUND: File '${decodeURIComponent(filePath)}' does not exist in this repository.`);
+      }
+      const repoMatch = url.match(/repos\/([^/]+\/[^/]+)/);
+      const repoName = repoMatch ? repoMatch[1] : 'repository';
+      throw new Error(`REPOSITORY_NOT_FOUND: GitHub repository '${repoName}' was not found on your GitHub account or is inaccessible with your token.`);
     }
     if (!response.ok) {
       const errJson: any = await response.json().catch(() => ({}));
@@ -237,7 +243,7 @@ export class GitHubProvider implements WebsiteProvider {
           message: commitMessage,
           content: base64Content,
           branch: branch,
-          sha: fileSha
+          ...(fileSha ? { sha: fileSha } : {})
         })
       }
     );

@@ -20,7 +20,8 @@ import {
   CheckCheck,
   Layout,
   ShoppingBag,
-  AlertTriangle
+  AlertTriangle,
+  AlertCircle
 } from 'lucide-react';
 import { 
   fetchApi, 
@@ -517,8 +518,42 @@ export function FixWithAIModal({
           )}
 
           {errorMessage && (
-            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-sans">
-              {errorMessage}
+            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-900 text-xs font-sans space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertCircle size={15} className="text-red-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-semibold block">{errorMessage}</span>
+                  {(errorMessage.includes('REPOSITORY_NOT_FOUND') || errorMessage.includes('GitHub') || errorMessage.includes('PROVIDER_ERROR')) && (
+                    <p className="text-[11px] text-red-700 leading-relaxed">
+                      The connected GitHub repository was not found on your GitHub account or is inaccessible. You can select an active repository in Connections or apply this fix manually.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {(errorMessage.includes('REPOSITORY_NOT_FOUND') || errorMessage.includes('GitHub') || errorMessage.includes('PROVIDER_ERROR')) && (
+                <div className="flex items-center gap-2 pt-1 border-t border-red-200/60">
+                  <a
+                    href="/dashboard/connections"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-red-200 text-red-900 font-semibold text-[11px] hover:bg-red-50"
+                  >
+                    <span>Manage Connections</span>
+                    <ExternalLink size={10} />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErrorMessage(null);
+                      setStep('APPLY_MANUAL');
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-red-800 hover:bg-red-900 text-white font-semibold text-[11px] cursor-pointer"
+                  >
+                    Apply Fix Manually
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

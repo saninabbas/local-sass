@@ -188,10 +188,19 @@ export async function executeGitHubSeoFix(
   const targetFilePath = options.targetFilePath || change.file_path || 'index.html';
 
   // 3. Read current file to verify freshness (STALE_CHANGE guard)
-  const currentFile = await githubProvider.getFile(token, owner, repo, baseBranch, targetFilePath);
+  let currentFile = { path: targetFilePath, content: '', sha: '' };
+  try {
+    currentFile = await githubProvider.getFile(token, owner, repo, baseBranch, targetFilePath);
+  } catch (err: any) {
+    if (err.message?.includes('FILE_NOT_FOUND')) {
+      currentFile = { path: targetFilePath, content: '<!DOCTYPE html>\n<html lang="en">\n<head>\n</head>\n<body>\n</body>\n</html>', sha: '' };
+    } else {
+      throw err;
+    }
+  }
   
   // Stale check if initial_file_sha was stored
-  if (change.initial_file_sha && change.initial_file_sha !== currentFile.sha) {
+  if (change.initial_file_sha && currentFile.sha && change.initial_file_sha !== currentFile.sha) {
     await db.prepare("UPDATE seo_changes SET execution_status = 'STALE_CHANGE', updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(changeId).run();
     throw new Error("STALE_CHANGE: The target file on GitHub was modified after this fix was generated. Please regenerate the fix.");
   }
