@@ -61,6 +61,7 @@ export const Connections: React.FC = () => {
   const [isGitHubModalOpen, setIsGitHubModalOpen] = useState(false);
   const [gitHubToken, setGitHubToken] = useState('');
   const [loadingRepos, setLoadingRepos] = useState(false);
+  const [loadingDirectLookup, setLoadingDirectLookup] = useState(false);
   const [repositories, setRepositories] = useState<any[]>([]);
   const [repoSearch, setRepoSearch] = useState('');
   const [selectedRepo, setSelectedRepo] = useState<any | null>(null);
@@ -237,6 +238,21 @@ export const Connections: React.FC = () => {
     }
   };
 
+  const parseGitHubRepoInput = (input: string): { owner?: string; repo?: string; fullName?: string } | null => {
+    if (!input || !input.trim()) return null;
+    let clean = input.trim()
+      .replace(/^https?:\/\/github\.com\//i, '')
+      .replace(/\.git$/i, '')
+      .replace(/^\/+|\/+$/g, '');
+    const parts = clean.split('/');
+    if (parts.length >= 2 && parts[0] && parts[1]) {
+      return { owner: parts[0], repo: parts[1], fullName: `${parts[0]}/${parts[1]}` };
+    } else if (parts.length === 1 && parts[0]) {
+      return { repo: parts[0], fullName: parts[0] };
+    }
+    return null;
+  };
+
   const handleFetchRepos = async () => {
     try {
       setLoadingRepos(true);
@@ -248,6 +264,45 @@ export const Connections: React.FC = () => {
       setFeedback({ type: 'error', message: err.message || 'Failed to retrieve repositories.' });
     } finally {
       setLoadingRepos(false);
+    }
+  };
+
+  const handleDirectLookup = async (owner: string, repo: string) => {
+    try {
+      setLoadingDirectLookup(true);
+      let repoObj: any = null;
+      try {
+        const res = await getGitHubRepositories(gitHubToken.trim() || undefined, owner, repo);
+        if (Array.isArray(res) && res.length > 0) {
+          repoObj = res[0];
+        }
+      } catch {
+        // Fallback
+      }
+
+      if (!repoObj) {
+        repoObj = {
+          id: `${owner}/${repo}`,
+          name: repo,
+          fullName: `${owner}/${repo}`,
+          owner: owner,
+          defaultBranch: 'main',
+          isPrivate: false
+        };
+      }
+
+      setRepositories(prev => {
+        const exists = prev.some(p => (p.fullName || '').toLowerCase() === repoObj.fullName.toLowerCase());
+        return exists ? prev : [repoObj, ...prev];
+      });
+
+      await handleSelectRepo(repoObj);
+      setFeedback({ type: 'success', message: `Loaded repository ${owner}/${repo}` });
+      setTimeout(() => setFeedback(null), 3000);
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err.message || `Failed to lookup ${owner}/${repo}.` });
+    } finally {
+      setLoadingDirectLookup(false);
     }
   };
 
@@ -1071,36 +1126,118 @@ export const Connections: React.FC = () => {
                 </div>
               </div>
 
-              {repositories.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-mono font-bold text-[#141413] uppercase">2. Select Repository ({repositories.length} loaded)</label>
-                  </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-mono font-bold text-[#141413] uppercase">
+                    2. Select or Enter Repository {repositories.length > 0 ? `(${repositories.length} loaded)` : ''}
+                  </label>
+                </div>
+                
+                <div className="relative">
                   <input
                     type="text"
                     value={repoSearch}
                     onChange={(e) => setRepoSearch(e.target.value)}
-                    placeholder="Search repositories by name..."
-                    className="w-full h-8 px-3 text-xs font-mono rounded-lg border border-[#e6dfd8] bg-[#faf9f5]"
+                    placeholder="Search loaded or enter 'owner/repo' or https://github.com/..."
+                    className="w-full h-9 pl-3 pr-8 text-xs font-mono rounded-xl border border-[#e6dfd8] bg-[#faf9f5] focus:bg-white focus:outline-none focus:border-[#cc785c]"
                   />
-                  <div className="max-h-48 overflow-y-auto border border-[#e6dfd8] rounded-xl divide-y divide-[#e6dfd8] bg-[#faf9f5]">
+                  {repoSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setRepoSearch('')}
+                      className="absolute right-2.5 top-2.5 text-[#8e8b82] hover:text-[#141413]"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Direct Lookup Prompt if URL or owner/repo entered */}
+                {(() => {
+                  const parsed = parseGitHubRepoInput(repoSearch);
+                  if (!parsed || !parsed.repo) return null;
+                  const targetFullName = parsed.fullName || (parsed.owner ? `${parsed.owner}/${parsed.repo}` : parsed.repo);
+                  const isAlreadySelected = selectedRepo && (selectedRepo.fullName === targetFullName || selectedRepo.name === parsed.repo);
+                  
+                  return (
+                    <div className="p-3 bg-[#fdfbf7] border border-[#cc785c]/40 rounded-xl flex items-center justify-between gap-3 animate-in fade-in">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-mono uppercase bg-[#cc785c]/15 text-[#cc785c] px-1.5 py-0.5 rounded font-bold">Direct Target</span>
+                          <p className="text-xs font-mono font-bold text-[#141413] truncate">{targetFullName}</p>
+                        </div>
+                        <p className="text-[10px] text-[#8e8b82] mt-0.5">Connect this specific repository directly via GitHub API</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        type="button"
+                        onClick={() => handleDirectLookup(parsed.owner || 'saninabbas', parsed.repo!)}
+                        disabled={loadingDirectLookup || isAlreadySelected}
+                        className="bg-[#cc785c] hover:bg-[#b8674d] text-white text-xs h-8 px-3 shrink-0"
+                      >
+                        {loadingDirectLookup ? (
+                          <RefreshCw size={13} className="animate-spin text-white" />
+                        ) : isAlreadySelected ? (
+                          <CheckCircle2 size={13} className="text-white" />
+                        ) : (
+                          'Select Repo'
+                        )}
+                      </Button>
+                    </div>
+                  );
+                })()}
+
+                {/* Filtered Repository List */}
+                {repositories.length > 0 && (
+                  <div className="max-h-40 overflow-y-auto border border-[#e6dfd8] rounded-xl divide-y divide-[#e6dfd8] bg-[#faf9f5]">
                     {repositories
-                      .filter(r => (r.fullName || r.name || '').toLowerCase().includes(repoSearch.toLowerCase()))
+                      .filter(r => {
+                        const cleanQuery = repoSearch
+                          .trim()
+                          .replace(/^https?:\/\/github\.com\//i, '')
+                          .replace(/\.git$/i, '')
+                          .toLowerCase();
+                        return (r.fullName || r.name || '').toLowerCase().includes(cleanQuery);
+                      })
                       .map((repo) => (
                         <button
-                          key={repo.id}
+                          key={repo.id || repo.fullName}
+                          type="button"
                           onClick={() => handleSelectRepo(repo)}
                           className={`w-full px-3 py-2 text-left flex items-center justify-between text-xs cursor-pointer ${
-                            selectedRepo?.id === repo.id ? 'bg-[#efe9de] text-[#141413] font-bold' : 'hover:bg-[#efe9de]/50'
+                            selectedRepo?.fullName === repo.fullName || selectedRepo?.id === repo.id
+                              ? 'bg-[#efe9de] text-[#141413] font-bold'
+                              : 'hover:bg-[#efe9de]/50'
                           }`}
                         >
-                          <span className="font-mono">{repo.fullName}</span>
-                          {selectedRepo?.id === repo.id && <CheckCircle2 size={14} className="text-[#cc785c]" />}
+                          <span className="font-mono">{repo.fullName || `${repo.owner}/${repo.name}`}</span>
+                          {(selectedRepo?.fullName === repo.fullName || selectedRepo?.id === repo.id) && (
+                            <CheckCircle2 size={14} className="text-[#cc785c]" />
+                          )}
                         </button>
                       ))}
                   </div>
-                </div>
-              )}
+                )}
+
+                {/* Selected Repository Card */}
+                {selectedRepo && (
+                  <div className="p-2.5 bg-[#eef7ee] border border-[#487e49]/30 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <CheckCircle2 size={15} className="text-[#487e49] shrink-0" />
+                      <span className="text-xs font-mono font-bold text-[#2d5a2e] truncate">
+                        {selectedRepo.fullName || `${selectedRepo.owner}/${selectedRepo.name}`}
+                      </span>
+                    </div>
+                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 bg-white text-[#2d5a2e] rounded border border-[#487e49]/20 shrink-0">
+                      Ready
+                    </span>
+                  </div>
+                )}
+
+                <p className="text-[10px] text-[#8e8b82] font-mono">
+                  💡 Tip: If using a Fine-Grained Personal Access Token, ensure it has permissions for this repository.
+                </p>
+              </div>
 
               {selectedRepo && (
                 <div className="space-y-2">

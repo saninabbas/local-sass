@@ -531,8 +531,12 @@ export async function deleteConnection(connectionId: string): Promise<any> {
   });
 }
 
-export async function getGitHubRepositories(token?: string): Promise<any[]> {
-  const query = token ? `?token=${encodeURIComponent(token)}` : '';
+export async function getGitHubRepositories(token?: string, owner?: string, repo?: string): Promise<any[]> {
+  const params = new URLSearchParams();
+  if (token) params.set('token', token);
+  if (owner) params.set('owner', owner);
+  if (repo) params.set('repo', repo);
+  const query = params.toString() ? `?${params.toString()}` : '';
   return fetchApi(`/api/github/repositories${query}`);
 }
 

@@ -32,7 +32,7 @@ export class GitHubProvider implements WebsiteProvider {
 
   async getRepositories(token: string): Promise<RepositoryItem[]> {
     let allRepos: any[] = [];
-    for (let page = 1; page <= 3; page++) {
+    for (let page = 1; page <= 10; page++) {
       const pageRepos: any = await this.fetchGitHub(
         `https://api.github.com/user/repos?sort=updated&per_page=100&page=${page}&affiliation=owner,collaborator,organization_member`,
         token
@@ -57,6 +57,25 @@ export class GitHubProvider implements WebsiteProvider {
       description: r.description || '',
       updatedAt: r.updated_at
     }));
+  }
+
+  async getSingleRepository(token: string, owner: string, repo: string): Promise<RepositoryItem> {
+    const r: any = await this.fetchGitHub(
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
+      token
+    );
+
+    return {
+      id: String(r.id),
+      name: r.name,
+      fullName: r.full_name,
+      owner: r.owner?.login || '',
+      defaultBranch: r.default_branch || 'main',
+      isPrivate: Boolean(r.private),
+      htmlUrl: r.html_url,
+      description: r.description || '',
+      updatedAt: r.updated_at
+    };
   }
 
   async getBranches(token: string, owner: string, repo: string): Promise<BranchItem[]> {

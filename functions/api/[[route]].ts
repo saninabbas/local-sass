@@ -6911,6 +6911,13 @@ export const onRequest = async (context: any) => {
         }
 
         try {
+          const queryOwner = url.searchParams.get('owner');
+          const queryRepo = url.searchParams.get('repo');
+          if (queryOwner && queryRepo) {
+            const single = await githubProvider.getSingleRepository(token, queryOwner, queryRepo);
+            return jsonResponse({ success: true, data: [single] });
+          }
+
           const repos = await githubProvider.getRepositories(token);
           return jsonResponse({ success: true, data: repos });
         } catch (err: any) {
