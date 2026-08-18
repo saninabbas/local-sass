@@ -3178,7 +3178,7 @@ export const onRequest = async (context: any) => {
               .then(r => ({ exists: r.ok, status: r.status, url: `${origin}/sitemap.xml` })).catch(() => ({ exists: false, status: 404 }))
           ]);
 
-          const extractor = new Extractor(validatedUrl.hostname);
+          const extractor = new Extractor(urlObj.hostname);
           extractor.httpStatus = response.status;
           extractor.isHttps = siteUrl.startsWith('https');
           extractor.securityHeaders = {
@@ -3211,7 +3211,7 @@ export const onRequest = async (context: any) => {
           populateExtractorFromHtml(extractor, htmlText);
 
           const tempBusiness = {
-            name: name || extractor.title.split(/[-|:]/)[0]?.trim() || validatedUrl.hostname,
+            name: name || extractor.title.split(/[-|:]/)[0]?.trim() || urlObj.hostname,
             city: 'Local Market',
             type: 'Business',
             website_url: siteUrl

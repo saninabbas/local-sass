@@ -293,7 +293,7 @@ const SCENARIOS: Scenario[] = [
         browserState: {
           url: 'https://staging.app.internal/checkout',
           stage: 'devtools-open',
-          activeTab: 'Elements — DevTools',
+          activeTab: 'Elements : DevTools',
           viewData: { bugDetected: true, status: 'Inspecting <div.backdrop>' }
         },
         durationMs: 1300

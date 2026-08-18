@@ -76,7 +76,7 @@ export function Onboarding() {
             <img src="/brand/logo.svg" alt="Rankora" className="w-[140px] h-auto object-contain" />
           </div>
           <p className="text-xs text-[#6c6a64] font-sans text-center">
-            AI Local Growth Operating System — Automated Business & Market Discovery
+            AI Local Growth Operating System : Automated Business & Market Discovery
           </p>
         </div>
 
@@ -102,11 +102,11 @@ export function Onboarding() {
               {/* 5-Step Visual Pipeline */}
               <div className="w-full bg-[#faf9f5] p-4 rounded-xl border border-[#e6dfd8] space-y-2.5 font-mono text-xs text-left">
                 {[
-                  { step: 1, label: "STEP 1 — Target Website & DOM Analysis" },
-                  { step: 2, label: "STEP 2 — Local Business & Service Detection" },
-                  { step: 3, label: "STEP 3 — Google SERP Competitor Discovery" },
-                  { step: 4, label: "STEP 4 — 7-Vector Growth Score Baseline" },
-                  { step: 5, label: "STEP 5 — 30-Day Action Roadmap Synthesis" }
+                  { step: 1, label: "STEP 1 : Target Website & DOM Analysis" },
+                  { step: 2, label: "STEP 2 : Local Business & Service Detection" },
+                  { step: 3, label: "STEP 3 : Google SERP Competitor Discovery" },
+                  { step: 4, label: "STEP 4 : 7-Vector Growth Score Baseline" },
+                  { step: 5, label: "STEP 5 : 30-Day Action Roadmap Synthesis" }
                 ].map((item, idx) => {
                   const isDone = loadingStep > idx;
                   const isCurrent = loadingStep === idx;

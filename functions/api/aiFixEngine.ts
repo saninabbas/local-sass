@@ -154,7 +154,7 @@ function generateFallbackFix(req: FixRequest): FixResponse {
   } else if (type === 'service_page_structure') {
     content = `### Dedicated Landing Page Blueprint for ${category} in ${city}\n\n` +
       `- **URL Slug**: \`/services/${category.toLowerCase().replace(/\s+/g, '-')}-${city.toLowerCase().replace(/\s+/g, '-')}\`\n` +
-      `- **H1 Heading**: \`Leading ${category} in ${city} — Expert Solutions You Can Trust\`\n` +
+      `- **H1 Heading**: \`Leading ${category} in ${city}: Expert Solutions You Can Trust\`\n` +
       `- **Section 1 (Hero)**: Value proposition + Direct Phone & Booking CTA\n` +
       `- **Section 2 (Why Choose Us)**: Local experience in ${city}, licensed specialists, modern technology\n` +
       `- **Section 3 (Process Breakdown)**: Step-by-step what clients can expect\n` +

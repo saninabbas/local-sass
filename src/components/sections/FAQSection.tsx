@@ -13,7 +13,7 @@ export function FAQSection() {
     },
     {
       question: 'How is the Growth Score calculated?',
-      answer: 'The Growth Score is a verified benchmark (0–100) calculated across search visibility, local map pack rankings, customer review sentiment, and mobile page speed metrics.'
+      answer: 'The Growth Score is a verified benchmark (0-100) calculated across search visibility, local map pack rankings, customer review sentiment, and mobile page speed metrics.'
     },
     {
       question: 'Does this support multi-location businesses?',

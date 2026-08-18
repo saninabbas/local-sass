@@ -128,7 +128,7 @@ export function Content() {
       });
 
       const pkg: GeneratedPackage = {
-        title: response.title || `${finalTopic} — Comprehensive Guide`,
+        title: response.title || `${finalTopic}: Comprehensive Guide`,
         meta_description: response.meta_description || `Discover expert insights on ${finalTopic}. Fast, reliable local service. Schedule your appointment today!`,
         slug: response.slug || finalTopic.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         h1: response.title || finalTopic,

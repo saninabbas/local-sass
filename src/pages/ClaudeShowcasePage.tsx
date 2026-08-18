@@ -168,7 +168,7 @@ console.log(message.content);`;
           </h1>
 
           <p className="font-sans text-lg sm:text-xl text-[#3d3d3a] leading-relaxed max-w-2xl mx-auto font-normal">
-            Claude perceives screen viewports, coordinates synthetic mouse clicks, and keystrokes across applications — unlocking autonomous desktop workflows without API limitations.
+            Claude perceives screen viewports, coordinates synthetic mouse clicks, and keystrokes across applications, unlocking autonomous desktop workflows without API limitations.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-4 pt-2">

@@ -335,15 +335,15 @@ export function GeoGrid() {
           <div className="pt-4 mt-6 border-t border-gray-100 flex items-center justify-between flex-wrap gap-2 text-[11px] font-medium text-secondary">
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />
-              <span>#1–3 (Local Pack)</span>
+              <span>#1-3 (Local Pack)</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-full bg-blue-500 inline-block" />
-              <span>#4–10 (Page 1)</span>
+              <span>#4-10 (Page 1)</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-full bg-amber-500 inline-block" />
-              <span>#11–20</span>
+              <span>#11-20</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-full bg-red-500 inline-block" />

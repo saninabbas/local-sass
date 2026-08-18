@@ -349,7 +349,7 @@ Output strictly valid JSON:
         const data = await response.json() as any;
         const parsed = JSON.parse(data.choices[0].message.content);
         return {
-          subject: parsed.subject || `Local Business Listing & Community Partnership — ${biz}`,
+          subject: parsed.subject || `Local Business Listing & Community Partnership: ${biz}`,
           body: parsed.body || `Hello Team,\n\nI hope you're having a great week. I'm reaching out from ${biz} here in ${loc}.\n\nWe noticed your comprehensive resource guide on ${opportunityName} and would love to ensure our verified local service details are accurately listed for residents.\n\nCould you let us know the best process to submit our updated local information?\n\nBest regards,\n${biz} Team`
         };
       }
@@ -359,7 +359,7 @@ Output strictly valid JSON:
   }
 
   return {
-    subject: `Local Directory Listing / Partnership Inquiry — ${biz}`,
+    subject: `Local Directory Listing / Partnership Inquiry: ${biz}`,
     body: `Hello Team,\n\nI hope you are having a wonderful week.\n\nI am reaching out on behalf of ${biz}, proudly serving the ${loc} community. We love the valuable resources and directory guides published on ${opportunityName}.\n\nWe would appreciate the opportunity to submit our verified local business details to be included in your local service listings to assist residents seeking trusted providers.\n\nPlease let us know the best link or contact person to submit our details.\n\nThank you for your time and continued support of local businesses!\n\nWarm regards,\n\n${biz} Partnerships Team`
   };
 }

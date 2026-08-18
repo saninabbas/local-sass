@@ -281,7 +281,7 @@ export function Reports() {
                     <History size={16} className="text-[#cc785c]" />
                     <div>
                       <div className="font-medium text-[#141413]">
-                        Diagnostic Audit — {new Date(item.created_at).toLocaleDateString()} at {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        Diagnostic Audit: {new Date(item.created_at).toLocaleDateString()} at {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
                       <div className="text-[10px] font-mono text-[#8e8b82]">Audit ID: {item.id}</div>
                     </div>
