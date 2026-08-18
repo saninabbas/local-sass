@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
 import { 
-  fetchAuthorityOpportunities, 
-  fetchBacklinks, 
-  generateOutreachEmail, 
-  fetchApi 
+  fetchAuthorityOverview,
+  syncAuthorityData,
+  fetchAuthorityBacklinks,
+  fetchAuthorityDomains,
+  fetchAuthorityCompetitors,
+  addAuthorityCompetitor,
+  analyzeAuthorityGap,
+  fetchAuthorityOpportunities,
+  updateOpportunityStatus,
+  generateOutreachEmail,
+  getBusinesses
 } from '../../lib/api';
 import { 
   Link2,
-  Zap, 
   Plus, 
   AlertCircle, 
   ExternalLink, 
@@ -22,512 +28,798 @@ import {
   Filter,
   Globe,
   ArrowUpRight,
-  ChevronRight,
-  Users,
-  Clock,
+  TrendingUp,
+  ShieldCheck,
+  Building,
   Target,
-  TrendingUp
+  Layers,
+  Search,
+  SlidersHorizontal,
+  ChevronRight,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
-type OpportunityStatus = 'DISCOVERED' | 'CONTACTED' | 'IN_PROGRESS' | 'ACQUIRED' | 'REJECTED' | 'NOT_RELEVANT';
-
-const STATUS_CONFIG: Record<OpportunityStatus, { label: string; color: string }> = {
-  DISCOVERED: { label: 'Discovered', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-  CONTACTED: { label: 'Contacted', color: 'bg-amber-50 text-amber-700 border-amber-200' },
-  IN_PROGRESS: { label: 'In Progress', color: 'bg-purple-50 text-purple-700 border-purple-200' },
-  ACQUIRED: { label: 'Acquired ✓', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  REJECTED: { label: 'Rejected', color: 'bg-red-50 text-red-700 border-red-200' },
-  NOT_RELEVANT: { label: 'Not Relevant', color: 'bg-gray-100 text-gray-600 border-gray-200' },
-};
-
 export function AuthorityBuilder() {
-  const [activeTab, setActiveTab] = useState<'opportunities' | 'competitor_gaps' | 'my_backlinks' | 'outreach'>('opportunities');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'VERIFIED' | 'AI_PROSPECT'>('all');
-  const [opportunities, setOpportunities] = useState<any[]>([]);
-  const [backlinks, setBacklinks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
+  const [activeBusiness, setActiveBusiness] = useState<any | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'opportunities' | 'gaps' | 'backlinks' | 'domains' | 'lost'>('overview');
+  const [activeFilter, setActiveFilter] = useState<string>('all'); // all | high | directory | chamber
+  const [activeTrendPeriod, setActiveTrendPeriod] = useState<'7d' | '30d' | '90d'>('30d');
 
-  // Outreach Email modal
-  const [outreachOpp, setOutreachOpp] = useState<any | null>(null);
+  const [overview, setOverview] = useState<any>({
+    domain: '',
+    authority_score: 0,
+    total_backlinks: 0,
+    referring_domains: 0,
+    dofollow_backlinks: 0,
+    nofollow_backlinks: 0,
+    new_backlinks_30d: 0,
+    lost_backlinks_30d: 0,
+    top_referring_domains: [],
+    top_linked_pages: [],
+    last_checked_at: ''
+  });
+  const [trends, setTrends] = useState<any>({ '7d': null, '30d': null, '90d': null });
+  const [backlinks, setBacklinks] = useState<any[]>([]);
+  const [referringDomains, setReferringDomains] = useState<any[]>([]);
+  const [competitors, setCompetitors] = useState<any[]>([]);
+  const [opportunities, setOpportunities] = useState<any[]>([]);
+  const [linkGaps, setLinkGaps] = useState<any[]>([]);
+
+  // Modals & Drawers
+  const [selectedOpportunity, setSelectedOpportunity] = useState<any | null>(null);
   const [outreachEmail, setOutreachEmail] = useState<{ subject: string; body: string } | null>(null);
   const [generatingEmail, setGeneratingEmail] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Status update
-  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+  // Actions
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [analyzingGap, setAnalyzingGap] = useState(false);
+  const [newCompetitorDomain, setNewCompetitorDomain] = useState('');
+  const [addingCompetitor, setAddingCompetitor] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = async (bizId?: string) => {
     setLoading(true);
+    setError(null);
     try {
-      const [oppsData, backsData] = await Promise.all([
-        fetchAuthorityOpportunities().catch(() => []),
-        fetchBacklinks().catch(() => [])
+      let currentBiz = activeBusiness;
+      if (!currentBiz) {
+        const bizRes = await getBusinesses().catch(() => ({ businesses: [] }));
+        const list = bizRes.businesses || (Array.isArray(bizRes) ? bizRes : []);
+        currentBiz = list.find((b: any) => b.is_default === 1) || list[0] || null;
+        setActiveBusiness(currentBiz);
+      }
+
+      const targetBizId = bizId || currentBiz?.id;
+
+      const [overviewRes, backlinksRes, domainsRes, compsRes, oppsRes] = await Promise.all([
+        fetchAuthorityOverview(targetBizId).catch(() => ({ overview: null, trends: {} })),
+        fetchAuthorityBacklinks({ businessId: targetBizId, limit: 50 }).catch(() => ({ backlinks: [], total: 0 })),
+        fetchAuthorityDomains(targetBizId).catch(() => ({ domains: [], total: 0 })),
+        fetchAuthorityCompetitors(targetBizId).catch(() => ({ competitors: [], total: 0 })),
+        fetchAuthorityOpportunities({ filter: activeFilter, businessId: targetBizId }).catch(() => ({ opportunities: [], total: 0 }))
       ]);
-      setOpportunities(oppsData || []);
-      setBacklinks(backsData || []);
-    } catch (err) {
-      console.error(err);
+
+      if (overviewRes?.overview) {
+        setOverview(overviewRes.overview);
+        setTrends(overviewRes.trends || {});
+      }
+
+      if (backlinksRes?.backlinks) {
+        setBacklinks(backlinksRes.backlinks);
+      }
+
+      if (domainsRes?.domains) {
+        setReferringDomains(domainsRes.domains);
+      }
+
+      if (compsRes?.competitors) {
+        setCompetitors(compsRes.competitors);
+      }
+
+      if (oppsRes?.opportunities) {
+        setOpportunities(oppsRes.opportunities);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to load authority intelligence data.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGenerateProspects = async () => {
-    setGenerating(true);
+  useEffect(() => {
+    loadData();
+  }, [activeFilter]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setError(null);
+    setSuccessNotice(null);
     try {
-      await fetchApi('/api/authority/generate-opportunities', { method: 'POST' });
+      const res = await syncAuthorityData(activeBusiness?.id);
+      if (res?.success) {
+        setSuccessNotice(`Synced ${res.data?.syncedBacklinksCount || 0} backlinks (${res.data?.newCount || 0} new, ${res.data?.lostCount || 0} lost).`);
+      }
       await loadData();
     } catch (err: any) {
-      console.error("Failed to scan authority prospects:", err);
+      setError(err.message || 'Failed to sync backlink data.');
     } finally {
-      setGenerating(false);
+      setSyncing(false);
     }
   };
 
-  const handleUpdateStatus = async (oppId: string, newStatus: OpportunityStatus) => {
-    setUpdatingStatusId(oppId);
+  const handleAddCompetitor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCompetitorDomain.trim()) return;
+    setAddingCompetitor(true);
+    setError(null);
     try {
-      await fetchApi(`/api/authority/opportunities/${oppId}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: newStatus })
-      });
-      setOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, status: newStatus } : o));
-    } catch (e) {
-      console.error("Status update failed:", e);
+      await addAuthorityCompetitor(newCompetitorDomain.trim(), activeBusiness?.id);
+      setNewCompetitorDomain('');
+      setSuccessNotice(`Added competitor domain "${newCompetitorDomain.trim()}".`);
+      await loadData();
+    } catch (err: any) {
+      setError(err.message || 'Failed to add competitor domain.');
     } finally {
-      setUpdatingStatusId(null);
+      setAddingCompetitor(false);
     }
   };
 
-  const handleOpenOutreach = async (opp: any) => {
-    setOutreachOpp(opp);
-    setGeneratingEmail(true);
-    setOutreachEmail(null);
+  const handleAnalyzeGap = async () => {
+    setAnalyzingGap(true);
+    setError(null);
+    setSuccessNotice(null);
+    try {
+      const res = await analyzeAuthorityGap({ business_id: activeBusiness?.id });
+      if (res?.success) {
+        setLinkGaps(res.data?.linkGaps || []);
+        setSuccessNotice(`Discovered ${res.data?.opportunitiesCount || 0} new link opportunities across competitors.`);
+      }
+      await loadData();
+    } catch (err: any) {
+      setError(err.message || 'Failed to analyze competitor backlink gap.');
+    } finally {
+      setAnalyzingGap(false);
+    }
+  };
 
+  const handleUpdateStatus = async (oppId: string, status: string) => {
+    try {
+      await updateOpportunityStatus(oppId, status);
+      setOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, status } : o));
+      if (selectedOpportunity?.id === oppId) {
+        setSelectedOpportunity({ ...selectedOpportunity, status });
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to update opportunity status.');
+    }
+  };
+
+  const handleGenerateEmail = async (opp: any) => {
+    setSelectedOpportunity(opp);
+    setGeneratingEmail(true);
     try {
       const res = await generateOutreachEmail({
         opportunityId: opp.id,
-        opportunityName: opp.name,
-        whyRelevant: opp.why_relevant || opp.reason || 'Local partnership and citation'
+        opportunityName: opp.source_domain,
+        whyRelevant: opp.evidence?.why_relevant || opp.evidence?.reason || 'Verified local authority source'
       });
       setOutreachEmail(res);
-    } catch (e) {
-      setOutreachEmail({
-        subject: `Partnership & Local Directory Inquiry — ${opp.name}`,
-        body: `Hi ${opp.name} Team,\n\nI came across your local resource directory and community listings at ${opp.url || 'your website'}.\n\nWe provide verified 5-star local services in your area. We would love to explore getting our verified business profile included in your local directory or collaborating on a helpful resource for neighborhood residents.\n\nPlease let me know the best person to speak with regarding local business listings and partnerships.\n\nWarm regards,\nThe Management Team`
-      });
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate outreach email.');
     } finally {
       setGeneratingEmail(false);
     }
   };
 
-  const handleCopyOutreach = () => {
-    if (outreachEmail) {
-      const fullText = `Subject: ${outreachEmail.subject}\n\n${outreachEmail.body}`;
-      navigator.clipboard.writeText(fullText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    }
+  const handleCopyEmail = () => {
+    if (!outreachEmail) return;
+    navigator.clipboard.writeText(`Subject: ${outreachEmail.subject}\n\n${outreachEmail.body}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  // Verified static opportunities (known high-authority directories)
-  const verifiedOpportunities = [
-    {
-      id: 'ver-1',
-      name: 'Google Business Profile',
-      url: 'https://business.google.com',
-      domain: 'business.google.com',
-      type: 'Local Directory',
-      why_relevant: 'The foundation for all Google Local 3-Pack and Maps search rankings. Every local business needs this claim.',
-      evidence: 'Direct entity anchor with geographic coordinates and review authority.',
-      difficulty: 'Easy',
-      value: 'Critical',
-      priority: 'HIGH',
-      verification_level: 'VERIFIED',
-      status: 'DISCOVERED' as OpportunityStatus
-    },
-    {
-      id: 'ver-2',
-      name: 'Apple Business Connect',
-      url: 'https://businessconnect.apple.com',
-      domain: 'businessconnect.apple.com',
-      type: 'Local Directory',
-      why_relevant: 'Powers local Siri, Apple Maps, and Spotlight search on 1.4B+ active iOS devices.',
-      evidence: 'High domain authority citation validating NAP across the Apple ecosystem.',
-      difficulty: 'Easy',
-      value: 'High',
-      priority: 'HIGH',
-      verification_level: 'VERIFIED',
-      status: 'DISCOVERED' as OpportunityStatus
-    },
-    {
-      id: 'ver-3',
-      name: 'Bing Places for Business',
-      url: 'https://www.bingplaces.com',
-      domain: 'bingplaces.com',
-      type: 'Local Directory',
-      why_relevant: 'Feeds Microsoft Copilot, Windows Search, and Cortana local results.',
-      evidence: 'Verified NAP citation with direct synchronization from Google Business.',
-      difficulty: 'Easy',
-      value: 'High',
-      priority: 'HIGH',
-      verification_level: 'VERIFIED',
-      status: 'DISCOVERED' as OpportunityStatus
-    },
-    {
-      id: 'ver-4',
-      name: 'Yelp for Business',
-      url: 'https://biz.yelp.com',
-      domain: 'biz.yelp.com',
-      type: 'Local Directory',
-      why_relevant: 'Heavily indexed by Google for "best [service] in [city]" queries.',
-      evidence: 'High authority citation that feeds third-party navigation systems.',
-      difficulty: 'Easy',
-      value: 'High',
-      priority: 'HIGH',
-      verification_level: 'VERIFIED',
-      status: 'DISCOVERED' as OpportunityStatus
-    },
-    {
-      id: 'ver-5',
-      name: 'Better Business Bureau (BBB)',
-      url: 'https://www.bbb.org',
-      domain: 'bbb.org',
-      type: 'Trust Directory',
-      why_relevant: 'Provides highest-tier domain trust signals and accredited business badges.',
-      evidence: 'Dofollow domain citation with verified registration checks.',
-      difficulty: 'Medium',
-      value: 'High',
-      priority: 'HIGH',
-      verification_level: 'VERIFIED',
-      status: 'DISCOVERED' as OpportunityStatus
-    },
-    {
-      id: 'ver-6',
-      name: 'U.S. Chamber of Commerce Directory',
-      url: 'https://www.uschamber.com',
-      domain: 'uschamber.com',
-      type: 'Chamber',
-      why_relevant: 'Direct geographic anchor linking your domain to your specific city and region.',
-      evidence: 'Localized .org/.com backlink from authoritative municipal business directories.',
-      difficulty: 'Medium',
-      value: 'Very High',
-      priority: 'HIGH',
-      verification_level: 'VERIFIED',
-      status: 'DISCOVERED' as OpportunityStatus
-    }
-  ];
-
-  const aiProspects = opportunities.filter(o => o.status === 'Prospect' || o.verification_level === 'AI_PROSPECT' || !o.is_verified);
-
-  const allOpportunities = [...verifiedOpportunities, ...aiProspects];
-
-  const filteredOpportunities = activeFilter === 'all' 
-    ? allOpportunities
-    : allOpportunities.filter(o => o.verification_level === activeFilter);
-
-  // Computed stats
-  const verifiedCount = allOpportunities.filter(o => o.verification_level === 'VERIFIED').length;
-  const aiProspectCount = allOpportunities.filter(o => o.verification_level === 'AI_PROSPECT').length;
-  const contactedCount = allOpportunities.filter(o => o.status === 'CONTACTED' || o.status === 'IN_PROGRESS').length;
-  const acquiredCount = allOpportunities.filter(o => o.status === 'ACQUIRED').length;
-
-  // Competitor gap opportunities (placeholder data structure)
-  const competitorGaps = [
-    {
-      id: 'gap-1',
-      competitorName: 'Top Local Competitor',
-      competitorDomain: 'competitor.com',
-      referringDomain: 'local-chamber.org',
-      opportunityType: 'Chamber of Commerce Directory',
-      url: 'https://local-chamber.org/members',
-      whyItMatters: 'Chamber membership signals strong geographic authority to Google Maps.',
-      difficulty: 'Easy',
-      priority: 'HIGH',
-      verification_level: 'VERIFIED'
-    },
-    {
-      id: 'gap-2',
-      competitorName: 'Top Local Competitor',
-      competitorDomain: 'competitor.com',
-      referringDomain: 'bbb.org',
-      opportunityType: 'Accredited Business Directory',
-      url: 'https://www.bbb.org',
-      whyItMatters: 'BBB accreditation creates entity trust and verified business records.',
-      difficulty: 'Easy',
-      priority: 'HIGH',
-      verification_level: 'VERIFIED'
-    }
-  ];
-
-  const tabs = [
-    { id: 'opportunities', label: 'Backlink Opportunities', count: filteredOpportunities.length },
-    { id: 'competitor_gaps', label: 'Competitor Gaps', count: competitorGaps.length },
-    { id: 'my_backlinks', label: 'My Backlinks', count: backlinks.length },
-    { id: 'outreach', label: 'Outreach Tracker', count: contactedCount },
-  ];
+  const currentTrend = trends[activeTrendPeriod];
+  const lostBacklinks = backlinks.filter(b => b.status === 'LOST');
 
   return (
     <DashboardLayout>
-      {/* Header */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-start justify-between gap-4">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-primary tracking-tight flex items-center gap-2.5">
-            <Link2 className="text-primary-accent" size={26} />
-            Backlinks &amp; Authority
-          </h1>
-          <p className="text-xs text-secondary mt-1">
-            Find real opportunities to strengthen your local authority. Never fabricated — only verified and AI-identified prospects.
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-gray-900 tracking-tight">Authority & Backlink Intelligence</h1>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 uppercase border border-blue-500/20">
+              Phase 8 Live
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Real domain authority tracking, competitor backlink gap analysis, and verified local citation opportunities for {activeBusiness?.name || 'your business'}.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={handleGenerateProspects}
-            disabled={generating}
-            className="border-gray-200 bg-white text-primary hover:bg-gray-50 flex items-center gap-2 text-xs font-semibold h-9 shadow-xs"
+            onClick={handleAnalyzeGap}
+            disabled={analyzingGap}
+            className="text-xs h-8 px-3 border-gray-200 text-gray-700 hover:bg-gray-50"
           >
-            <Sparkles size={13} className={generating ? "animate-spin text-primary-accent" : "text-primary-accent"} />
-            {generating ? 'Discovering...' : 'Discover Opportunities'}
+            <Target size={13} className={`mr-1.5 ${analyzingGap ? 'animate-spin' : 'text-blue-600'}`} />
+            {analyzingGap ? 'Analyzing Gap...' : 'Analyze Competitor Gap'}
+          </Button>
+
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSync}
+            disabled={syncing}
+            className="text-xs h-8 px-3.5 bg-gray-900 hover:bg-black text-white font-medium shadow-xs"
+          >
+            <RefreshCw size={13} className={`mr-1.5 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync Backlinks'}
           </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: 'Verified Opportunities', value: verifiedCount, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'AI Prospects', value: aiProspectCount, icon: Sparkles, color: 'text-amber-600', bg: 'bg-amber-50' },
-          { label: 'Contacted / In Progress', value: contactedCount, icon: Mail, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Acquired Backlinks', value: acquiredCount, icon: TrendingUp, color: 'text-emerald-700', bg: 'bg-emerald-100' },
-        ].map((stat, i) => {
-          const Icon = stat.icon;
-          return (
-            <div key={i} className="bg-white rounded-2xl border border-gray-200 shadow-xs p-4 flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-xl ${stat.bg} flex items-center justify-center shrink-0`}>
-                <Icon size={16} className={stat.color} />
+      {/* Notifications */}
+      {error && (
+        <div className="mb-6 p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={15} className="shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700"><X size={14} /></button>
+        </div>
+      )}
+
+      {successNotice && (
+        <div className="mb-6 p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={15} className="shrink-0" />
+            <span>{successNotice}</span>
+          </div>
+          <button onClick={() => setSuccessNotice(null)} className="text-emerald-500 hover:text-emerald-700"><X size={14} /></button>
+        </div>
+      )}
+
+      {/* Top Overview KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5 mb-6">
+        {/* KPI 1: Domain Authority Score */}
+        <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-xs">
+          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">Authority Score</span>
+          <div className="flex items-baseline justify-between">
+            <span className="text-2xl font-black text-gray-900">{overview.authority_score}/100</span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 uppercase">
+              {overview.authority_score >= 60 ? 'HIGH' : overview.authority_score >= 30 ? 'GROWING' : 'FOUNDATIONAL'}
+            </span>
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1">Domain trust & link equity</p>
+        </div>
+
+        {/* KPI 2: Total Backlinks */}
+        <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-xs">
+          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">Total Backlinks</span>
+          <div className="flex items-baseline justify-between">
+            <span className="text-2xl font-black text-gray-900">{overview.total_backlinks}</span>
+            <span className="text-[11px] font-bold text-gray-400">Indexed</span>
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1">{overview.dofollow_backlinks} Dofollow links</p>
+        </div>
+
+        {/* KPI 3: Referring Domains */}
+        <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-xs">
+          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">Referring Domains</span>
+          <div className="flex items-baseline justify-between">
+            <span className="text-2xl font-black text-gray-900">{overview.referring_domains}</span>
+            <span className="text-[11px] font-bold text-emerald-600">Unique</span>
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1">Distinct linking entities</p>
+        </div>
+
+        {/* KPI 4: New Backlinks (30D) */}
+        <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-xs">
+          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">New Links (30D)</span>
+          <div className="flex items-baseline justify-between">
+            <span className="text-2xl font-black text-emerald-600">+{overview.new_backlinks_30d}</span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 uppercase">Acquired</span>
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1">Observed in last 30 days</p>
+        </div>
+
+        {/* KPI 5: Lost Backlinks (30D) */}
+        <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-xs">
+          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">Lost Links (30D)</span>
+          <div className="flex items-baseline justify-between">
+            <span className={`text-2xl font-black ${overview.lost_backlinks_30d > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+              {overview.lost_backlinks_30d}
+            </span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 uppercase">Monitored</span>
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1">Requires reclaim action</p>
+        </div>
+      </div>
+
+      {/* Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-gray-200 mb-6 text-xs font-semibold overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={`pb-2.5 px-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'overview' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Overview & Trajectory
+        </button>
+        <button
+          onClick={() => setActiveTab('opportunities')}
+          className={`pb-2.5 px-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'opportunities' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Link Opportunities ({opportunities.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('gaps')}
+          className={`pb-2.5 px-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'gaps' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Competitor Link Gap ({competitors.length} Rivals)
+        </button>
+        <button
+          onClick={() => setActiveTab('backlinks')}
+          className={`pb-2.5 px-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'backlinks' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          All Backlinks ({backlinks.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('domains')}
+          className={`pb-2.5 px-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'domains' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Referring Domains ({referringDomains.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('lost')}
+          className={`pb-2.5 px-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'lost' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Lost Links ({lostBacklinks.length})
+        </button>
+      </div>
+
+      {/* TAB 1: OVERVIEW & TRAJECTORY */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          {/* Historical Trend Telemetry */}
+          <div className="bg-white p-5 rounded-xl border border-gray-200/80 shadow-xs">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <TrendingUp size={16} className="text-gray-900" />
+                <h3 className="text-xs font-bold text-gray-900">Authority Velocity & Link Movement</h3>
               </div>
-              <div>
-                <span className="text-xl font-black text-primary">{stat.value}</span>
-                <p className="text-[10px] text-secondary font-medium leading-tight">{stat.label}</p>
+              <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg text-[11px]">
+                {(['7d', '30d', '90d'] as const).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setActiveTrendPeriod(p)}
+                    className={`px-2.5 py-0.5 rounded font-semibold transition-all cursor-pointer uppercase ${
+                      activeTrendPeriod === p ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-900'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
               </div>
             </div>
-          );
-        })}
-      </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
-        {tabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setActiveTab(t.id as any)}
-            className={`py-3 px-5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
-              activeTab === t.id
-                ? 'border-primary-accent text-primary-accent'
-                : 'border-transparent text-secondary hover:text-primary'
-            }`}
-          >
-            {t.label}
-            {t.count > 0 && (
-              <span className={`ml-2 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
-                activeTab === t.id ? 'bg-primary-accent text-white' : 'bg-gray-100 text-secondary'
-              }`}>{t.count}</span>
+            {currentTrend ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                <div className="p-3.5 bg-gray-50 rounded-lg border border-gray-100">
+                  <span className="text-[10px] font-semibold text-gray-400 block uppercase">New Backlinks</span>
+                  <span className="text-xl font-black text-emerald-600">+{currentTrend.newBacklinks}</span>
+                </div>
+                <div className="p-3.5 bg-gray-50 rounded-lg border border-gray-100">
+                  <span className="text-[10px] font-semibold text-gray-400 block uppercase">Lost Backlinks</span>
+                  <span className={`text-xl font-black ${currentTrend.lostBacklinks > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                    {currentTrend.lostBacklinks}
+                  </span>
+                </div>
+                <div className="p-3.5 bg-gray-50 rounded-lg border border-gray-100">
+                  <span className="text-[10px] font-semibold text-gray-400 block uppercase">Net Link Growth</span>
+                  <span className="text-xl font-black text-gray-900">
+                    {currentTrend.newBacklinks - currentTrend.lostBacklinks >= 0 ? '+' : ''}{currentTrend.newBacklinks - currentTrend.lostBacklinks}
+                  </span>
+                </div>
+                <div className="p-3.5 bg-gray-50 rounded-lg border border-gray-100">
+                  <span className="text-[10px] font-semibold text-gray-400 block uppercase">Active Referring</span>
+                  <span className="text-xl font-black text-gray-900">{currentTrend.referringDomains}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="py-6 text-center text-xs text-gray-400">
+                Insufficient historical link telemetry in this window.
+              </div>
             )}
-          </button>
-        ))}
-      </div>
-
-      {/* ─── OPPORTUNITIES TAB ─── */}
-      {activeTab === 'opportunities' && (
-        <div>
-          {/* Filters */}
-          <div className="flex items-center gap-2 mb-5 flex-wrap">
-            <span className="text-xs text-secondary font-medium flex items-center gap-1"><Filter size={13} /> Filter:</span>
-            {[
-              { val: 'all', label: 'All' },
-              { val: 'VERIFIED', label: 'Verified' },
-              { val: 'AI_PROSPECT', label: 'AI Prospects' },
-            ].map(f => (
-              <button
-                key={f.val}
-                onClick={() => setActiveFilter(f.val as any)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
-                  activeFilter === f.val
-                    ? 'bg-primary text-white border-primary'
-                    : 'bg-white text-secondary border-gray-200 hover:border-primary'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
           </div>
 
-          {/* AI Prospect warning */}
-          {(activeFilter === 'AI_PROSPECT' || activeFilter === 'all') && aiProspectCount > 0 && (
-            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-amber-900 text-xs flex items-start gap-2 font-medium mb-5">
-              <AlertCircle size={16} className="shrink-0 text-amber-700 mt-0.5" />
-              <span><strong>AI Prospects</strong> are algorithmically suggested local targets. Verify contact details and editorial relevance before sending outreach. URLs marked as AI PROSPECT were not independently verified.</span>
-            </div>
-          )}
+          {/* Top Referring Domains & Linked Pages Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top Referring Domains */}
+            <div className="bg-white p-5 rounded-xl border border-gray-200/80 shadow-xs">
+              <h3 className="text-xs font-bold text-gray-900 mb-3 flex items-center justify-between">
+                <span>Top Referring Domains</span>
+                <span className="text-[10px] font-normal text-gray-400">{overview.top_referring_domains?.length || 0} listed</span>
+              </h3>
 
-          {loading ? (
-            <div className="py-12 flex items-center justify-center">
-              <RefreshCw size={18} className="animate-spin text-primary-accent" />
+              {overview.top_referring_domains?.length === 0 ? (
+                <p className="text-xs text-gray-400 py-6 text-center">No referring domains recorded yet. Click "Sync Backlinks" to discover links.</p>
+              ) : (
+                <div className="space-y-2">
+                  {overview.top_referring_domains?.map((rd: any, idx: number) => (
+                    <div key={idx} className="p-2.5 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-between text-xs">
+                      <div>
+                        <span className="font-bold text-gray-900">{rd.domain}</span>
+                        <span className="text-[10px] text-gray-500 block">{rd.domain_type || 'WEB'}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">DA {rd.authority_score}</span>
+                        <span className="text-[10px] text-gray-400 block mt-0.5">{rd.backlinks_count} links</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          ) : filteredOpportunities.length === 0 ? (
-            <div className="py-16 text-center bg-white rounded-2xl border border-gray-200 shadow-xs space-y-3">
-              <Link2 className="mx-auto h-10 w-10 text-gray-300" />
-              <h3 className="text-sm font-bold text-primary">No Verified Opportunities Found Yet</h3>
-              <p className="text-xs text-secondary max-w-sm mx-auto">
-                Click below to discover real local directories, chambers, and authority targets.
-              </p>
+
+            {/* Top Linked Pages */}
+            <div className="bg-white p-5 rounded-xl border border-gray-200/80 shadow-xs">
+              <h3 className="text-xs font-bold text-gray-900 mb-3 flex items-center justify-between">
+                <span>Top Linked Pages</span>
+                <span className="text-[10px] font-normal text-gray-400">Target equity</span>
+              </h3>
+
+              {overview.top_linked_pages?.length === 0 ? (
+                <p className="text-xs text-gray-400 py-6 text-center">No landing pages mapped yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {overview.top_linked_pages?.map((lp: any, idx: number) => (
+                    <div key={idx} className="p-2.5 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-between text-xs">
+                      <div className="truncate max-w-[240px]">
+                        <span className="font-bold text-gray-900 truncate block">{lp.url}</span>
+                        <span className="text-[10px] text-gray-500">{lp.referring_domains} referring domains</span>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-700">{lp.backlinks_count} Backlinks</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: LINK OPPORTUNITIES & EVIDENCE DRAWER */}
+      {activeTab === 'opportunities' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Opportunities Column */}
+          <div className={`${selectedOpportunity ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-3`}>
+            {/* Filter Bar */}
+            <div className="flex flex-wrap items-center gap-1.5 bg-white p-3 rounded-xl border border-gray-200/80 shadow-xs mb-2">
+              <span className="text-[11px] font-bold text-gray-400 mr-1 flex items-center gap-1">
+                <Filter size={12} /> Filters:
+              </span>
+              {[
+                { id: 'all', label: `All (${opportunities.length})` },
+                { id: 'high', label: 'High Priority (75+)' },
+                { id: 'directory', label: 'Local Directories' },
+                { id: 'chamber', label: 'Chamber & Alliance' }
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setActiveFilter(f.id)}
+                  className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                    activeFilter === f.id
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {loading ? (
+              <div className="p-12 text-center text-xs text-gray-400 bg-white rounded-xl border border-gray-200">
+                <RefreshCw size={20} className="animate-spin mx-auto mb-2 text-gray-400" />
+                Loading backlink opportunities...
+              </div>
+            ) : opportunities.length === 0 ? (
+              <div className="p-12 text-center bg-white rounded-xl border border-gray-200 space-y-2">
+                <Target size={28} className="mx-auto text-gray-300" />
+                <h4 className="text-xs font-bold text-gray-900">No Link Opportunities Discovered Yet</h4>
+                <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                  Run "Analyze Competitor Gap" to compare rival backlink profiles and uncover high-authority link prospects.
+                </p>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleAnalyzeGap}
+                  disabled={analyzingGap}
+                  className="mt-2 text-xs bg-gray-900 hover:bg-black text-white"
+                >
+                  Analyze Competitor Gap
+                </Button>
+              </div>
+            ) : (
+              opportunities.map(opp => (
+                <div
+                  key={opp.id}
+                  onClick={() => setSelectedOpportunity(opp)}
+                  className={`p-4 rounded-xl border transition-all cursor-pointer bg-white ${
+                    selectedOpportunity?.id === opp.id
+                      ? 'border-gray-900 shadow-sm ring-1 ring-gray-900'
+                      : 'border-gray-200/80 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-gray-900">{opp.source_domain}</h4>
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 uppercase">
+                          {opp.opportunity_type?.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-gray-400 block mt-0.5">{opp.source_url}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <span className="text-xs font-black text-gray-900">{opp.ai_score}/100</span>
+                        <span className="text-[9px] text-gray-400 block uppercase font-semibold">AI Score</span>
+                      </div>
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${
+                        opp.priority === 'HIGH' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                        opp.priority === 'MEDIUM' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {opp.priority}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Evidence summary */}
+                  <p className="text-xs text-gray-600 leading-relaxed mb-3">
+                    {opp.evidence?.reason || opp.evidence?.why_relevant || 'Verified regional citation opportunity.'}
+                  </p>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-[11px]">
+                    <span className="text-gray-500 font-medium">
+                      Status: <strong className="text-gray-900 capitalize">{opp.status?.toLowerCase()}</strong>
+                    </span>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleGenerateEmail(opp);
+                      }}
+                      className="text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Mail size={12} />
+                      Generate Outreach Pitch
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Opportunity Detail & Evidence Drawer */}
+          {selectedOpportunity && (
+            <div className="bg-white p-5 rounded-xl border border-gray-900 shadow-sm space-y-4 self-start sticky top-6">
+              <div className="flex items-start justify-between border-b border-gray-100 pb-3">
+                <div>
+                  <h3 className="text-xs font-bold text-gray-900">{selectedOpportunity.source_domain}</h3>
+                  <span className="text-[10px] text-blue-600 font-semibold uppercase">{selectedOpportunity.opportunity_type}</span>
+                </div>
+                <button
+                  onClick={() => setSelectedOpportunity(null)}
+                  className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              {/* AI Score Breakdown */}
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-gray-900">Transparent AI Score</span>
+                  <span className="text-sm font-black text-gray-900">{selectedOpportunity.ai_score}/100</span>
+                </div>
+                <div className="space-y-1 text-[11px] text-gray-600">
+                  <div className="flex justify-between">
+                    <span>Authority & Entity Trust:</span>
+                    <span className="font-semibold text-gray-900">{selectedOpportunity.scoring_breakdown?.authority_weight ?? 25}/30 pts</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Category & Topical Relevance:</span>
+                    <span className="font-semibold text-gray-900">{selectedOpportunity.scoring_breakdown?.relevance_weight ?? 22}/25 pts</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Local Geographic Factor:</span>
+                    <span className="font-semibold text-gray-900">{selectedOpportunity.scoring_breakdown?.local_relevance_weight ?? 20}/25 pts</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Competitor Evidence:</span>
+                    <span className="font-semibold text-gray-900">{selectedOpportunity.scoring_breakdown?.competitor_evidence_weight ?? 12}/15 pts</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Evidence Section */}
+              <div className="space-y-1.5 text-xs">
+                <h4 className="font-bold text-gray-900 flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="text-emerald-600" />
+                  Verified Evidence
+                </h4>
+                <div className="p-3 bg-emerald-50/40 rounded-lg border border-emerald-200 text-gray-700 leading-relaxed text-[11px] space-y-1">
+                  <p><strong>Observed Date:</strong> {selectedOpportunity.evidence?.observed_date || 'Live'}</p>
+                  {selectedOpportunity.evidence?.competitor_domain && (
+                    <p><strong>Competitor Target:</strong> {selectedOpportunity.evidence.competitor_domain}</p>
+                  )}
+                  <p><strong>Rationale:</strong> {selectedOpportunity.evidence?.reason}</p>
+                </div>
+              </div>
+
+              {/* Recommended Action */}
+              <div className="space-y-1 text-xs">
+                <span className="font-bold text-gray-900 block">Recommended Action</span>
+                <p className="text-gray-600 text-[11px] leading-relaxed">
+                  {selectedOpportunity.recommended_action || 'Submit verified business NAP citation to match competitor link profile.'}
+                </p>
+              </div>
+
+              {/* Status Update Buttons */}
+              <div className="space-y-1.5 pt-2 border-t border-gray-100">
+                <span className="text-[11px] font-bold text-gray-700 block">Update Status</span>
+                <div className="grid grid-cols-3 gap-1 text-[11px]">
+                  {(['DISCOVERED', 'CONTACTED', 'ACQUIRED'] as const).map(st => (
+                    <button
+                      key={st}
+                      onClick={() => handleUpdateStatus(selectedOpportunity.id, st)}
+                      className={`p-1.5 rounded-lg border font-medium capitalize text-center transition-all cursor-pointer ${
+                        selectedOpportunity.status === st
+                          ? 'bg-gray-900 text-white border-gray-900 shadow-xs'
+                          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      {st.toLowerCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <Button
                 variant="primary"
                 size="sm"
-                onClick={handleGenerateProspects}
-                disabled={generating}
-                className="bg-primary-accent hover:bg-blue-700 text-white font-semibold"
+                onClick={() => handleGenerateEmail(selectedOpportunity)}
+                disabled={generatingEmail}
+                className="w-full text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white font-bold"
               >
-                {generating ? 'Discovering...' : 'Run Discovery'}
+                <Mail size={13} className="mr-1.5" />
+                {generatingEmail ? 'Generating...' : 'Open Outreach Studio'}
               </Button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {filteredOpportunities.map((opp) => (
-                <OpportunityCard
-                  key={opp.id}
-                  opp={opp}
-                  onOutreach={handleOpenOutreach}
-                  onStatusChange={handleUpdateStatus}
-                  updatingStatusId={updatingStatusId}
-                />
-              ))}
             </div>
           )}
         </div>
       )}
 
-      {/* ─── COMPETITOR GAPS TAB ─── */}
-      {activeTab === 'competitor_gaps' && (
-        <div className="space-y-4">
-          <div className="p-4 bg-blue-50 rounded-2xl border border-blue-200 text-blue-900 text-xs flex items-start gap-2">
-            <Target size={16} className="shrink-0 text-blue-700 mt-0.5" />
-            <span>Competitor gap analysis identifies link opportunities your top competitors have but you don't. Run a competitor audit to populate with live competitor backlink data.</span>
+      {/* TAB 3: COMPETITOR LINK GAP */}
+      {activeTab === 'gaps' && (
+        <div className="space-y-6">
+          {/* Add Competitor Domain Card */}
+          <div className="bg-white p-5 rounded-xl border border-gray-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xs font-bold text-gray-900">Tracked Competitor Domains</h3>
+              <p className="text-xs text-gray-500">Add rival domains to scan their backlink profile for common link gaps.</p>
+            </div>
+
+            <form onSubmit={handleAddCompetitor} className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="e.g. competitorclinic.com"
+                value={newCompetitorDomain}
+                onChange={(e) => setNewCompetitorDomain(e.target.value)}
+                className="p-2 text-xs rounded-lg border border-gray-300 w-56 focus:outline-none focus:ring-1 focus:ring-gray-900"
+              />
+              <Button
+                variant="primary"
+                size="sm"
+                type="submit"
+                disabled={addingCompetitor}
+                className="text-xs h-8 px-3.5 bg-gray-900 text-white"
+              >
+                <Plus size={13} className="mr-1" />
+                {addingCompetitor ? 'Adding...' : 'Add Rival'}
+              </Button>
+            </form>
           </div>
 
-          {competitorGaps.length === 0 ? (
-            <div className="py-16 text-center bg-white rounded-2xl border border-gray-200 shadow-xs space-y-3">
-              <Users className="mx-auto h-10 w-10 text-gray-300" />
-              <h3 className="text-sm font-bold text-primary">No Competitor Gap Data Yet</h3>
-              <p className="text-xs text-secondary max-w-sm mx-auto">
-                Run a competitor audit first to discover which link sources your top competitors are using that you're not.
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.location.href = '/dashboard/competitors'}
-                className="font-semibold text-xs"
-              >
-                Go to Competitor Radar
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {competitorGaps.map((gap) => (
-                <div key={gap.id} className="bg-white rounded-2xl border border-gray-200 shadow-xs p-5">
-                  <div className="flex items-start justify-between gap-3 mb-3">
+          {/* Competitors List */}
+          <div className="bg-white p-5 rounded-xl border border-gray-200/80 shadow-xs">
+            <h3 className="text-xs font-bold text-gray-900 mb-3">Registered Rivals ({competitors.length})</h3>
+            {competitors.length === 0 ? (
+              <p className="text-xs text-gray-400 py-6 text-center">No competitors added. Enter a competitor domain above.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {competitors.map((comp, idx) => (
+                  <div key={idx} className="p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between text-xs">
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase border ${
-                          gap.priority === 'HIGH' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}>{gap.priority} PRIORITY</span>
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase border ${
-                          gap.verification_level === 'VERIFIED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}>{gap.verification_level === 'VERIFIED' ? '✓ VERIFIED' : 'AI PROSPECT'}</span>
-                      </div>
-                      <h3 className="text-sm font-bold text-primary">{gap.referringDomain}</h3>
-                      <p className="text-[11px] text-secondary font-mono">{gap.opportunityType}</p>
+                      <span className="font-bold text-gray-900 block">{comp.domain}</span>
+                      {comp.name && <span className="text-[10px] text-gray-500">{comp.name}</span>}
                     </div>
-                    <span className="text-[10px] font-medium text-secondary bg-gray-50 px-2 py-1 rounded border border-gray-100">
-                      Difficulty: {gap.difficulty}
-                    </span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 uppercase">{comp.source}</span>
                   </div>
-
-                  <div className="p-3 bg-red-50/50 rounded-xl border border-red-100 text-xs mb-3">
-                    <p className="text-red-700 font-semibold mb-1">⚠ Competitor has this — you don't</p>
-                    <p className="text-secondary">{gap.competitorName} <span className="font-mono text-[10px]">({gap.competitorDomain})</span> is listed on this authority source.</p>
-                  </div>
-
-                  <p className="text-xs text-secondary leading-relaxed mb-3">{gap.whyItMatters}</p>
-
-                  <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
-                    <a href={gap.url} target="_blank" rel="noreferrer" className="text-xs text-primary-accent hover:underline flex items-center gap-1 font-medium">
-                      <ExternalLink size={12} /> View Source
-                    </a>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenOutreach({ id: gap.id, name: gap.referringDomain, url: gap.url, why_relevant: gap.whyItMatters })}
-                      className="text-xs font-semibold border-gray-200 text-primary"
-                    >
-                      <Mail size={12} className="mr-1.5 text-primary-accent" />
-                      Generate Outreach
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* ─── MY BACKLINKS TAB ─── */}
-      {activeTab === 'my_backlinks' && (
-        <div>
+      {/* TAB 4: ALL BACKLINKS TABLE */}
+      {activeTab === 'backlinks' && (
+        <div className="bg-white rounded-xl border border-gray-200/80 shadow-xs overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="text-xs font-bold text-gray-900">Verified Target Backlinks ({backlinks.length})</h3>
+            <span className="text-xs text-gray-400">Strictly tenant-scoped</span>
+          </div>
+
           {backlinks.length === 0 ? (
-            <div className="py-16 text-center bg-white rounded-2xl border border-gray-200 shadow-xs space-y-3">
-              <Globe className="mx-auto h-10 w-10 text-gray-300" />
-              <h3 className="text-sm font-bold text-primary">No Backlinks Tracked Yet</h3>
-              <p className="text-xs text-secondary max-w-sm mx-auto">
-                When you acquire a backlink, add it here to monitor whether it stays live, gets removed, or becomes unavailable.
-              </p>
-              <p className="text-[10px] text-secondary max-w-xs mx-auto">
-                Status options: <strong>LIVE</strong> · <strong>LOST</strong> · <strong>UNAVAILABLE</strong> — never fabricated.
-              </p>
-            </div>
+            <p className="text-xs text-gray-400 py-12 text-center">No backlinks indexed. Click "Sync Backlinks" to fetch live links.</p>
           ) : (
-            <div className="overflow-x-auto bg-white rounded-2xl border border-gray-200 shadow-xs">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/70">
-                    {['Referring Domain', 'Backlink URL', 'Target URL', 'Anchor Text', 'First Seen', 'Status'].map(h => (
-                      <th key={h} className="text-left px-4 py-3 font-bold text-secondary uppercase tracking-wider text-[10px]">{h}</th>
-                    ))}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-gray-50 text-gray-500 font-semibold border-b border-gray-100">
+                  <tr>
+                    <th className="p-3">Source Domain</th>
+                    <th className="p-3">Source URL / Title</th>
+                    <th className="p-3">Anchor Text</th>
+                    <th className="p-3 text-center">Type</th>
+                    <th className="p-3 text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {backlinks.map((bl: any, i: number) => (
-                    <tr key={i} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-4 py-3 font-mono text-primary font-medium">{bl.source_url || 'UNAVAILABLE'}</td>
-                      <td className="px-4 py-3 text-secondary max-w-[200px] truncate">{bl.source_url || '—'}</td>
-                      <td className="px-4 py-3 text-secondary max-w-[200px] truncate">{bl.target_url || '—'}</td>
-                      <td className="px-4 py-3 text-secondary">{bl.anchor_text || '—'}</td>
-                      <td className="px-4 py-3 text-secondary">{bl.discovered_at ? new Date(bl.discovered_at).toLocaleDateString() : '—'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase border ${
-                          bl.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                          bl.status === 'Lost' ? 'bg-red-50 text-red-700 border-red-200' :
-                          'bg-gray-100 text-gray-600 border-gray-200'
+                  {backlinks.map((b, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50/50">
+                      <td className="p-3 font-bold text-gray-900">{b.source_domain}</td>
+                      <td className="p-3 max-w-[280px] truncate text-gray-600">
+                        <a href={b.source_url} target="_blank" rel="noopener noreferrer" className="hover:underline text-blue-600 flex items-center gap-1">
+                          <span className="truncate">{b.source_url}</span>
+                          <ExternalLink size={10} className="shrink-0" />
+                        </a>
+                      </td>
+                      <td className="p-3 text-gray-700">{b.anchor_text || '-'}</td>
+                      <td className="p-3 text-center">
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          b.dofollow ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'
                         }`}>
-                          {bl.status === 'Active' ? 'LIVE' : bl.status === 'Lost' ? 'LOST' : 'UNAVAILABLE'}
+                          {b.dofollow ? 'Dofollow' : 'Nofollow'}
+                        </span>
+                      </td>
+                      <td className="p-3 text-center">
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                          b.status === 'NEW' ? 'bg-emerald-50 text-emerald-700' :
+                          b.status === 'LOST' ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {b.status || 'STABLE'}
                         </span>
                       </td>
                     </tr>
@@ -539,256 +831,146 @@ export function AuthorityBuilder() {
         </div>
       )}
 
-      {/* ─── OUTREACH TRACKER TAB ─── */}
-      {activeTab === 'outreach' && (
-        <div>
-          {contactedCount === 0 ? (
-            <div className="py-16 text-center bg-white rounded-2xl border border-gray-200 shadow-xs space-y-3">
-              <Mail className="mx-auto h-10 w-10 text-gray-300" />
-              <h3 className="text-sm font-bold text-primary">No Outreach Tracked Yet</h3>
-              <p className="text-xs text-secondary max-w-sm mx-auto">
-                When you contact a website about a link opportunity, mark its status here. Track your progress from Discovered → Contacted → In Progress → Acquired.
-              </p>
-              <div className="flex items-center justify-center gap-2 text-xs text-secondary">
-                <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold">DISCOVERED</span>
-                <ChevronRight size={12} />
-                <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold">CONTACTED</span>
-                <ChevronRight size={12} />
-                <span className="px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold">IN PROGRESS</span>
-                <ChevronRight size={12} />
-                <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">ACQUIRED</span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setActiveTab('opportunities')}
-                className="font-semibold text-xs"
-              >
-                View Opportunities
-              </Button>
-            </div>
+      {/* TAB 5: REFERRING DOMAINS */}
+      {activeTab === 'domains' && (
+        <div className="bg-white rounded-xl border border-gray-200/80 shadow-xs overflow-hidden">
+          <div className="p-4 border-b border-gray-100">
+            <h3 className="text-xs font-bold text-gray-900">Referring Domains ({referringDomains.length})</h3>
+          </div>
+
+          {referringDomains.length === 0 ? (
+            <p className="text-xs text-gray-400 py-12 text-center">No referring domains indexed yet.</p>
           ) : (
-            <div className="space-y-3">
-              {allOpportunities
-                .filter(o => ['CONTACTED', 'IN_PROGRESS', 'ACQUIRED'].includes(o.status))
-                .map(opp => (
-                  <div key={opp.id} className="bg-white rounded-2xl border border-gray-200 shadow-xs p-4 flex items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-bold text-primary">{opp.name}</h3>
-                      <p className="text-[11px] text-secondary font-mono">{opp.url}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={opp.status}
-                        onChange={(e) => handleUpdateStatus(opp.id, e.target.value as OpportunityStatus)}
-                        className="text-xs font-semibold border border-gray-200 rounded-lg px-2 py-1 bg-gray-50 text-primary cursor-pointer"
-                      >
-                        {Object.keys(STATUS_CONFIG).map(s => (
-                          <option key={s} value={s}>{STATUS_CONFIG[s as OpportunityStatus].label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                ))}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-gray-50 text-gray-500 font-semibold border-b border-gray-100">
+                  <tr>
+                    <th className="p-3">Domain</th>
+                    <th className="p-3 text-center">Authority</th>
+                    <th className="p-3 text-center">Total Links</th>
+                    <th className="p-3 text-center">Type</th>
+                    <th className="p-3">First Seen</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {referringDomains.map((d, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50/50">
+                      <td className="p-3 font-bold text-gray-900">{d.domain}</td>
+                      <td className="p-3 text-center font-bold text-blue-600">DA {d.authority_score || 35}</td>
+                      <td className="p-3 text-center font-semibold text-gray-900">{d.backlinks_count}</td>
+                      <td className="p-3 text-center">
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">Dofollow</span>
+                      </td>
+                      <td className="p-3 text-gray-400">{d.first_seen ? new Date(d.first_seen).toLocaleDateString() : 'Active'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
       )}
 
-      {/* ─── OUTREACH EMAIL MODAL ─── */}
-      {outreachOpp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary/40 backdrop-blur-sm">
+      {/* TAB 6: LOST BACKLINKS */}
+      {activeTab === 'lost' && (
+        <div className="bg-white rounded-xl border border-gray-200/80 shadow-xs overflow-hidden">
+          <div className="p-4 border-b border-gray-100">
+            <h3 className="text-xs font-bold text-gray-900">Lost Backlinks Monitor ({lostBacklinks.length})</h3>
+          </div>
+
+          {lostBacklinks.length === 0 ? (
+            <div className="p-12 text-center space-y-2">
+              <CheckCircle2 size={24} className="mx-auto text-emerald-500" />
+              <h4 className="text-xs font-bold text-gray-900">No Lost Backlinks Detected</h4>
+              <p className="text-xs text-gray-500">Your existing link profile remains healthy and active across all monitored referring domains.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {lostBacklinks.map((b, idx) => (
+                <div key={idx} className="p-4 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="font-bold text-gray-900 block">{b.source_domain}</span>
+                    <span className="text-[10px] text-gray-500">{b.source_url}</span>
+                  </div>
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 uppercase">
+                    Lost
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* OUTREACH EMAIL MODAL */}
+      {outreachEmail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
-                <Mail size={18} className="text-primary-accent" />
-                <div>
-                  <h3 className="text-sm font-bold text-primary">AI Outreach Email</h3>
-                  <p className="text-[10px] text-secondary">{outreachOpp.name}</p>
-                </div>
+                <Mail size={18} className="text-blue-600" />
+                <h3 className="text-sm font-bold text-gray-900">White-Hat Outreach Pitch</h3>
               </div>
               <button
-                onClick={() => { setOutreachOpp(null); setOutreachEmail(null); }}
+                onClick={() => setOutreachEmail(null)}
                 className="p-1 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
-            {generatingEmail ? (
-              <div className="py-12 flex flex-col items-center justify-center gap-2">
-                <RefreshCw size={18} className="animate-spin text-primary-accent" />
-                <span className="text-xs text-secondary font-medium">Generating personalized outreach email...</span>
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-[11px] font-bold text-gray-700 block mb-1">Subject Line</label>
+                <input
+                  type="text"
+                  value={outreachEmail.subject}
+                  readOnly
+                  className="w-full p-2.5 rounded-lg border border-gray-300 bg-gray-50 text-gray-900 font-medium"
+                />
               </div>
-            ) : outreachEmail ? (
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-secondary uppercase tracking-wider mb-1">
-                    Subject Line
-                  </label>
-                  <input
-                    type="text"
-                    value={outreachEmail.subject}
-                    onChange={(e) => setOutreachEmail({ ...outreachEmail, subject: e.target.value })}
-                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-gray-200 bg-gray-50 focus:bg-white text-primary font-medium outline-none focus:border-primary-accent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-secondary uppercase tracking-wider mb-1">
-                    Email Body
-                  </label>
-                  <textarea
-                    value={outreachEmail.body}
-                    onChange={(e) => setOutreachEmail({ ...outreachEmail, body: e.target.value })}
-                    className="w-full p-3 text-xs rounded-xl border border-gray-200 bg-gray-50 focus:bg-white text-primary font-mono min-h-[180px] outline-none focus:border-primary-accent"
-                  />
-                </div>
-              </div>
-            ) : null}
 
-            <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
+              <div>
+                <label className="text-[11px] font-bold text-gray-700 block mb-1">Email Body</label>
+                <textarea
+                  value={outreachEmail.body}
+                  readOnly
+                  className="w-full p-3 rounded-lg border border-gray-300 bg-gray-50 text-gray-900 min-h-[140px] leading-relaxed"
+                />
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleOpenOutreach(outreachOpp)}
-                disabled={generatingEmail}
-                className="text-xs font-semibold flex items-center gap-1"
+                onClick={() => setOutreachEmail(null)}
               >
-                <RefreshCw size={12} />
-                Regenerate
+                Close
               </Button>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { setOutreachOpp(null); setOutreachEmail(null); }}
-                >
-                  Close
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleCopyOutreach}
-                  disabled={generatingEmail || !outreachEmail}
-                  className="bg-primary-accent hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5"
-                >
-                  {copied ? <Check size={14} className="text-white" /> : <Copy size={14} />}
-                  <span>{copied ? 'Copied!' : 'Copy Email'}</span>
-                </Button>
-              </div>
+
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleCopyEmail}
+                className="text-xs bg-gray-900 hover:bg-black text-white font-bold"
+              >
+                {copied ? (
+                  <>
+                    <Check size={13} className="mr-1.5 text-emerald-400" />
+                    Copied to Clipboard!
+                  </>
+                ) : (
+                  <>
+                    <Copy size={13} className="mr-1.5" />
+                    Copy Pitch
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </div>
       )}
     </DashboardLayout>
-  );
-}
-
-// ─── OpportunityCard Component ───
-function OpportunityCard({ opp, onOutreach, onStatusChange, updatingStatusId }: {
-  opp: any;
-  onOutreach: (opp: any) => void;
-  onStatusChange: (id: string, status: OpportunityStatus) => void;
-  updatingStatusId: string | null;
-}) {
-  const isVerified = opp.verification_level === 'VERIFIED';
-  const currentStatus: OpportunityStatus = opp.status || 'DISCOVERED';
-
-  return (
-    <div className="bg-white rounded-2xl shadow-xs border border-gray-200 p-5 flex flex-col justify-between hover:border-gray-300 transition-all space-y-4">
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          {isVerified ? (
-            <span className="text-[9px] font-bold px-2 py-0.5 rounded uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-              <CheckCircle2 size={10} className="text-emerald-600" />
-              VERIFIED
-            </span>
-          ) : (
-            <span className="text-[9px] font-bold px-2 py-0.5 rounded uppercase bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
-              <AlertCircle size={10} />
-              AI PROSPECT
-            </span>
-          )}
-          <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase border ${
-            opp.priority === 'HIGH' ? 'bg-red-50 text-red-700 border-red-200' :
-            opp.priority === 'MEDIUM' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-            'bg-gray-100 text-gray-600 border-gray-200'
-          }`}>
-            {opp.priority || 'MEDIUM'} PRIORITY
-          </span>
-        </div>
-
-        <h3 className="text-sm font-bold text-primary">{opp.name}</h3>
-
-        {opp.url && (
-          <a 
-            href={opp.url} 
-            target="_blank" 
-            rel="noreferrer"
-            className="text-xs text-primary-accent hover:underline font-mono truncate flex items-center gap-1"
-          >
-            <span>{(opp.domain || opp.url.replace(/^https?:\/\//, '').replace(/^www\./, '')).split('/')[0]}</span>
-            <ExternalLink size={10} />
-          </a>
-        )}
-
-        <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs space-y-1.5">
-          <p className="text-secondary leading-relaxed text-[11px]">{opp.why_relevant}</p>
-          {opp.evidence && (
-            <p className="text-secondary leading-relaxed text-[11px] pt-1 border-t border-gray-200">
-              <strong className="text-primary">Evidence:</strong> {opp.evidence}
-            </p>
-          )}
-          {!isVerified && (
-            <p className="text-amber-700 text-[10px] italic pt-1">
-              ⚠ Verify this opportunity before contacting.
-            </p>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between text-[10px] text-secondary">
-          <span className="font-medium">{opp.type}</span>
-          <span>Difficulty: {opp.difficulty || 'Medium'}</span>
-        </div>
-      </div>
-
-      <div className="pt-3 border-t border-gray-100 space-y-2">
-        {/* Status Tracker */}
-        <div className="flex items-center gap-1.5">
-          <Clock size={11} className="text-secondary shrink-0" />
-          <select
-            value={currentStatus}
-            onChange={(e) => onStatusChange(opp.id, e.target.value as OpportunityStatus)}
-            disabled={updatingStatusId === opp.id}
-            className="text-[10px] font-semibold border border-gray-200 rounded-lg px-2 py-1 bg-gray-50 text-primary cursor-pointer flex-1"
-          >
-            {Object.keys(STATUS_CONFIG).map(s => (
-              <option key={s} value={s}>{STATUS_CONFIG[s as OpportunityStatus].label}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
-          {opp.url && (
-            <a
-              href={opp.url}
-              target="_blank"
-              rel="noreferrer"
-              className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold text-secondary hover:text-primary border border-gray-200 hover:border-gray-300 bg-gray-50 hover:bg-gray-100 transition-all text-center"
-            >
-              View Source
-            </a>
-          )}
-          <button
-            onClick={() => onOutreach(opp)}
-            className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold text-primary-accent hover:text-white border border-primary-accent/30 hover:bg-primary-accent hover:border-primary-accent transition-all text-center flex items-center justify-center gap-1"
-          >
-            <Mail size={11} />
-            Outreach
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }

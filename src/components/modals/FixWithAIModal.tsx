@@ -119,12 +119,13 @@ export function FixWithAIModal({
         })
       });
 
-      if (res.success && res.data) {
-        setChangeRecord(res.data);
-        setEditedContent(res.data.proposedValue);
+      const changeData = res?.data || (res?.id || res?.proposedValue ? res : null);
+      if (changeData && (changeData.proposedValue || changeData.proposed_value)) {
+        setChangeRecord(changeData);
+        setEditedContent(changeData.proposedValue || changeData.proposed_value);
         setStep('PREVIEW');
       } else {
-        setErrorMessage(res.error || res.message || 'Failed to generate solution');
+        setErrorMessage(res?.error || res?.message || 'Failed to generate solution');
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Generation error');
@@ -170,25 +171,26 @@ export function FixWithAIModal({
         customCommitMessage: `Rankora SEO Fix: ${normalizedChangeType} for ${context.businessName || 'website'}`
       });
 
-      if (!execRes.success) {
-        throw new Error(execRes.message || execRes.error || 'Execution failed');
+      const execData = execRes?.data || execRes;
+      if (!execRes?.success && !execData?.provider && !execData?.status) {
+        throw new Error(execRes?.message || execRes?.error || 'Execution failed');
       }
 
-      setExecutionResult(execRes.data);
+      setExecutionResult(execData);
 
-      if (execRes.data?.provider === 'github') {
+      if (execData?.provider === 'github') {
         setStep('PR_CREATED');
-      } else if (execRes.data?.provider === 'manual') {
+      } else if (execData?.provider === 'manual') {
         setStep('APPLY_MANUAL');
       } else {
         // WordPress or Shopify with live verification
         setVerificationResult({
-          success: execRes.data?.status === 'VERIFIED',
-          message: execRes.data?.message,
-          evidence: execRes.data?.verification
+          success: execData?.status === 'VERIFIED',
+          message: execData?.message,
+          evidence: execData?.verification
         });
         setStep('RESULT');
-        if (execRes.data?.status === 'VERIFIED' && onSuccess) {
+        if (execData?.status === 'VERIFIED' && onSuccess) {
           onSuccess();
         }
       }
@@ -211,9 +213,10 @@ export function FixWithAIModal({
         method: 'POST'
       });
 
-      setVerificationResult(verifyRes);
+      const verifyData = verifyRes?.data || verifyRes;
+      setVerificationResult(verifyData);
       setStep('RESULT');
-      if (verifyRes.success && onSuccess) {
+      if ((verifyData?.success || verifyData?.status === 'VERIFIED') && onSuccess) {
         onSuccess();
       }
     } catch (err: any) {

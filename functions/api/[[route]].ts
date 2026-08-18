@@ -1016,6 +1016,64 @@ export const onRequest = async (context: any) => {
           await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_reviews_replied ON reviews(business_id, is_replied)").run().catch(() => {});
           await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_gbp_loc_biz ON gbp_locations(business_id, is_connected)").run().catch(() => {});
 
+          // --- PHASE 8: AUTHORITY & BACKLINK INTELLIGENCE TABLES ---
+          await env.DB.prepare(`CREATE TABLE IF NOT EXISTS authority_domains (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            business_id TEXT NOT NULL,
+            domain TEXT NOT NULL,
+            domain_type TEXT DEFAULT 'USER_PRIMARY',
+            authority_score INTEGER DEFAULT 0,
+            referring_domains INTEGER DEFAULT 0,
+            backlinks_count INTEGER DEFAULT 0,
+            last_checked_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )`).run().catch(() => {});
+
+          await env.DB.prepare(`CREATE TABLE IF NOT EXISTS competitor_domains (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            business_id TEXT NOT NULL,
+            domain TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )`).run().catch(() => {});
+
+          await env.DB.prepare(`CREATE TABLE IF NOT EXISTS backlink_opportunities (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            business_id TEXT NOT NULL,
+            source_domain TEXT NOT NULL,
+            source_url TEXT,
+            opportunity_type TEXT NOT NULL,
+            evidence TEXT,
+            priority TEXT DEFAULT 'MEDIUM',
+            ai_score INTEGER DEFAULT 50,
+            status TEXT DEFAULT 'DISCOVERED',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )`).run().catch(() => {});
+
+          await env.DB.prepare("ALTER TABLE backlinks ADD COLUMN business_id TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE backlinks ADD COLUMN source_domain TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE backlinks ADD COLUMN source_url TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE backlinks ADD COLUMN target_domain TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE backlinks ADD COLUMN target_url TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE backlinks ADD COLUMN anchor_text TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE backlinks ADD COLUMN dofollow INTEGER DEFAULT 1").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE backlinks ADD COLUMN first_seen DATETIME").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE backlinks ADD COLUMN last_seen DATETIME").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE backlinks ADD COLUMN authority_score INTEGER DEFAULT 30").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE backlinks ADD COLUMN status TEXT DEFAULT 'STABLE'").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE backlinks ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP").run().catch(() => {});
+
+          await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_auth_dom_biz ON authority_domains(business_id)").run().catch(() => {});
+          await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_comp_dom_biz ON competitor_domains(business_id)").run().catch(() => {});
+          await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_backlink_opps_biz ON backlink_opportunities(business_id, priority, ai_score DESC)").run().catch(() => {});
+          await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_backlinks_biz_status ON backlinks(business_id, status)").run().catch(() => {});
+          await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_backlinks_source_domain ON backlinks(business_id, source_domain)").run().catch(() => {});
+          await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_backlinks_target_domain ON backlinks(business_id, target_domain)").run().catch(() => {});
+
           await ensureAdminUser();
 
           return jsonResponse({ success: true, message: "Database schema updated and admin seeded successfully!" });
@@ -2418,9 +2476,23 @@ export const onRequest = async (context: any) => {
           }
         }
 
+        const domainRow: any = await env.DB.prepare(
+          "SELECT * FROM authority_domains WHERE business_id = ? ORDER BY updated_at DESC LIMIT 1"
+        ).bind(business.id as string).first().catch(() => null);
+
         const { results: backlinkResults } = await env.DB.prepare(
-          "SELECT id FROM backlinks WHERE business_id = ?"
+          "SELECT source_domain, status, first_seen FROM backlinks WHERE business_id = ?"
         ).bind(business.id as string).all().catch(() => ({ results: [] }));
+
+        const { results: oppResults } = await env.DB.prepare(
+          "SELECT id, opportunity_type, priority FROM backlink_opportunities WHERE business_id = ?"
+        ).bind(business.id as string).all().catch(() => ({ results: [] }));
+
+        const backlinkList = backlinkResults || [];
+        const refDomainSet = new Set(backlinkList.map((b: any) => b.source_domain).filter(Boolean));
+        const new30d = backlinkList.filter((b: any) => b.status === 'NEW').length;
+        const lost30d = backlinkList.filter((b: any) => b.status === 'LOST').length;
+        const localOpps = (oppResults || []).filter((o: any) => o.opportunity_type?.includes('DIRECTORY') || o.opportunity_type === 'CHAMBER').length;
 
         const copilotContext = {
           business: {
@@ -2475,8 +2547,14 @@ export const onRequest = async (context: any) => {
             connected: revs.length > 0
           },
           authority: {
-            totalBacklinks: (backlinkResults || []).length,
-            pendingOpportunities: 5
+            totalBacklinks: backlinkList.length,
+            referringDomains: refDomainSet.size,
+            authorityScore: domainRow?.authority_score || (refDomainSet.size === 0 ? 0 : Math.min(99, Math.round(15 + Math.log2(refDomainSet.size + 1) * 12))),
+            newBacklinks30d: new30d,
+            lostBacklinks30d: lost30d,
+            competitorGapCount: (oppResults || []).length,
+            localOpportunitiesCount: localOpps,
+            connected: backlinkList.length > 0 || !!domainRow
           },
           actionPlanStats: {
             totalActions: (allRecs || []).length,
@@ -3409,6 +3487,376 @@ export const onRequest = async (context: any) => {
       }
 
       // --- AUTHORITY BUILDER ---
+      // =========================================================================
+      // PHASE 8: AUTHORITY & BACKLINK INTELLIGENCE ENGINE ENDPOINTS
+      // =========================================================================
+
+      // --- AUTHORITY: HEALTH CHECK PROBE ---
+      if (url.pathname === '/api/authority/health' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        try {
+          const { createAuthorityProvider } = await import('./authority/providerFactory');
+          const provider = createAuthorityProvider(env);
+          const health = await provider.testConnection();
+          return jsonResponse({ success: health.success, data: health });
+        } catch (e: any) {
+          return errorResponse("Failed to test authority provider health: " + e.message, 500);
+        }
+      }
+
+      // --- AUTHORITY: OVERVIEW & METRICS ---
+      if (url.pathname === '/api/authority/overview' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        try {
+          const { createAuthorityProvider } = await import('./authority/providerFactory');
+          const { AuthorityEngine } = await import('./authority/authorityEngine');
+          const provider = createAuthorityProvider(env);
+          const engine = new AuthorityEngine(env.DB, provider, env.NVIDIA_API_KEY);
+
+          const result = await engine.getAuthorityMetrics(business.id as string);
+          return jsonResponse({
+            success: true,
+            data: result
+          });
+        } catch (e: any) {
+          return errorResponse("Failed to load authority metrics: " + e.message, 500);
+        }
+      }
+
+      // --- AUTHORITY: SYNC TARGET DOMAIN BACKLINKS (Rate Limited: 5 req/min) ---
+      if (url.pathname === '/api/authority/sync' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        // Rate limiting: 5 requests per min per user
+        const rateLimitKey = `auth_sync_${user.id}`;
+        const isAllowed = await checkRateLimit(rateLimitKey, 5, 60);
+        if (!isAllowed) {
+          return jsonResponse({
+            success: false,
+            code: "RATE_LIMITED",
+            message: "Authority synchronization rate limit exceeded. Max 5 syncs per minute."
+          }, 429);
+        }
+
+        let bodyJson: any = {};
+        try { bodyJson = await request.clone().json(); } catch {}
+        const targetBizId = bodyJson?.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        try {
+          const { createAuthorityProvider } = await import('./authority/providerFactory');
+          const { AuthorityEngine } = await import('./authority/authorityEngine');
+          const provider = createAuthorityProvider(env);
+          const engine = new AuthorityEngine(env.DB, provider, env.NVIDIA_API_KEY);
+
+          const syncResult = await engine.syncDomainAuthority({
+            id: business.id as string,
+            website_url: business.website_url as string,
+            name: business.name as string,
+            city: business.city as string,
+            country: business.country as string
+          }, user.id as string);
+
+          return jsonResponse({
+            success: true,
+            data: syncResult
+          });
+        } catch (e: any) {
+          return errorResponse("Failed to sync authority data: " + e.message, 500);
+        }
+      }
+
+      // --- AUTHORITY: BACKLINKS LIST & FILTER ---
+      if (url.pathname === '/api/authority/backlinks' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const filter = url.searchParams.get('filter') || 'all'; // all | dofollow | nofollow | new | lost
+        const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 50)));
+        const offset = Math.max(0, Number(url.searchParams.get('offset') || 0));
+
+        let query = "SELECT * FROM backlinks WHERE business_id = ?";
+        const params: any[] = [business.id];
+
+        if (filter === 'dofollow') {
+          query += " AND dofollow = 1";
+        } else if (filter === 'nofollow') {
+          query += " AND (dofollow = 0 OR dofollow IS NULL)";
+        } else if (filter === 'new') {
+          query += " AND status = 'NEW'";
+        } else if (filter === 'lost') {
+          query += " AND status = 'LOST'";
+        }
+
+        query += " ORDER BY updated_at DESC LIMIT ? OFFSET ?";
+        params.push(limit, offset);
+
+        const { results } = await env.DB.prepare(query).bind(...params).all().catch(() => ({ results: [] }));
+        const countRow: any = await env.DB.prepare(
+          "SELECT COUNT(*) as total FROM backlinks WHERE business_id = ?"
+        ).bind(business.id).first().catch(() => ({ total: 0 }));
+
+        return jsonResponse({
+          success: true,
+          data: {
+            backlinks: results || [],
+            total: countRow?.total || (results || []).length,
+            limit,
+            offset
+          }
+        });
+      }
+
+      // --- AUTHORITY: REFERRING DOMAINS LIST ---
+      if (url.pathname === '/api/authority/domains' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const { results } = await env.DB.prepare(`
+          SELECT source_domain as domain, 
+                 MAX(authority_score) as authority_score, 
+                 COUNT(*) as backlinks_count,
+                 MAX(dofollow) as is_dofollow,
+                 MIN(first_seen) as first_seen,
+                 MAX(last_seen) as last_seen
+          FROM backlinks 
+          WHERE business_id = ? AND source_domain IS NOT NULL
+          GROUP BY source_domain
+          ORDER BY backlinks_count DESC
+          LIMIT 100
+        `).bind(business.id).all().catch(() => ({ results: [] }));
+
+        return jsonResponse({
+          success: true,
+          data: {
+            domains: results || [],
+            total: (results || []).length
+          }
+        });
+      }
+
+      // --- AUTHORITY: GET COMPETITOR DOMAINS ---
+      if (url.pathname === '/api/authority/competitors' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        // Fetch registered competitor domains + discovered competitors
+        const { results: registered } = await env.DB.prepare(
+          "SELECT id, domain, created_at FROM competitor_domains WHERE business_id = ? ORDER BY created_at DESC"
+        ).bind(business.id).all().catch(() => ({ results: [] }));
+
+        const { results: discovered } = await env.DB.prepare(
+          "SELECT domain, name FROM discovered_competitors WHERE business_id = ? LIMIT 10"
+        ).bind(business.id).all().catch(() => ({ results: [] }));
+
+        const compDomainSet = new Set<string>();
+        const combined: { domain: string; source: string; name?: string }[] = [];
+
+        for (const r of registered || []) {
+          if (r.domain && !compDomainSet.has(r.domain.toLowerCase())) {
+            compDomainSet.add(r.domain.toLowerCase());
+            combined.push({ domain: r.domain, source: 'CUSTOM' });
+          }
+        }
+
+        for (const d of discovered || []) {
+          if (d.domain && !compDomainSet.has(d.domain.toLowerCase())) {
+            compDomainSet.add(d.domain.toLowerCase());
+            combined.push({ domain: d.domain, source: 'DISCOVERED', name: d.name });
+          }
+        }
+
+        return jsonResponse({
+          success: true,
+          data: {
+            competitors: combined,
+            total: combined.length
+          }
+        });
+      }
+
+      // --- AUTHORITY: ADD COMPETITOR DOMAIN (Rate Limited: 10 req/min) ---
+      if (url.pathname === '/api/authority/competitors' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        // Rate limiting
+        const rateLimitKey = `auth_comp_${user.id}`;
+        const isAllowed = await checkRateLimit(rateLimitKey, 10, 60);
+        if (!isAllowed) {
+          return jsonResponse({
+            success: false,
+            code: "RATE_LIMITED",
+            message: "Competitor domain submission rate limit exceeded. Max 10 per minute."
+          }, 429);
+        }
+
+        const { domain, business_id } = await request.json() as any;
+        if (!domain) return errorResponse("Domain is required", 400);
+
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, business_id);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0].toLowerCase();
+        const id = `cdom_${crypto.randomUUID().replace(/-/g, '')}`;
+
+        await env.DB.prepare(`
+          INSERT INTO competitor_domains (id, user_id, business_id, domain)
+          VALUES (?, ?, ?, ?)
+        `).bind(id, user.id, business.id, cleanDomain).run();
+
+        return jsonResponse({
+          success: true,
+          data: { id, domain: cleanDomain }
+        });
+      }
+
+      // --- AUTHORITY: ANALYZE COMPETITOR LINK GAP & OPPORTUNITIES (Rate Limited: 10 req/min) ---
+      if (url.pathname === '/api/authority/analyze' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        // Rate limiting
+        const rateLimitKey = `auth_ana_${user.id}`;
+        const isAllowed = await checkRateLimit(rateLimitKey, 10, 60);
+        if (!isAllowed) {
+          return jsonResponse({
+            success: false,
+            code: "RATE_LIMITED",
+            message: "Competitor gap analysis rate limit exceeded. Max 10 per minute."
+          }, 429);
+        }
+
+        let bodyJson: any = {};
+        try { bodyJson = await request.clone().json(); } catch {}
+        const targetBizId = bodyJson?.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        // Resolve competitor domains to analyze
+        let competitorDomains: string[] = bodyJson?.competitor_domains || [];
+        if (competitorDomains.length === 0) {
+          const { results: registered } = await env.DB.prepare(
+            "SELECT domain FROM competitor_domains WHERE business_id = ?"
+          ).bind(business.id).all().catch(() => ({ results: [] }));
+          const { results: discovered } = await env.DB.prepare(
+            "SELECT domain FROM discovered_competitors WHERE business_id = ? LIMIT 5"
+          ).bind(business.id).all().catch(() => ({ results: [] }));
+          
+          competitorDomains = [
+            ...(registered || []).map((r: any) => r.domain),
+            ...(discovered || []).map((d: any) => d.domain)
+          ];
+        }
+
+        if (competitorDomains.length === 0) {
+          return jsonResponse({
+            success: true,
+            data: {
+              linkGaps: [],
+              opportunitiesCount: 0,
+              message: "No competitor domains configured. Add competitor domains to perform link gap analysis."
+            }
+          });
+        }
+
+        try {
+          const { createAuthorityProvider } = await import('./authority/providerFactory');
+          const { AuthorityEngine } = await import('./authority/authorityEngine');
+          const provider = createAuthorityProvider(env);
+          const engine = new AuthorityEngine(env.DB, provider, env.NVIDIA_API_KEY);
+
+          const analysis = await engine.analyzeCompetitorLinkGap({
+            id: business.id as string,
+            website_url: business.website_url as string,
+            name: business.name as string,
+            city: business.city as string,
+            country: business.country as string
+          }, user.id as string, competitorDomains);
+
+          return jsonResponse({
+            success: true,
+            data: analysis
+          });
+        } catch (e: any) {
+          return errorResponse("Failed to analyze competitor backlink gap: " + e.message, 500);
+        }
+      }
+
+      // --- AUTHORITY: GET OPPORTUNITIES LIST ---
       if (url.pathname === '/api/authority/opportunities' && request.method === 'GET') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
@@ -3422,57 +3870,57 @@ export const onRequest = async (context: any) => {
           throw err;
         }
 
-        // Ensure columns exist
-        await env.DB.prepare("ALTER TABLE authority_opportunities ADD COLUMN is_verified INTEGER DEFAULT 0").run().catch(() => {});
-        await env.DB.prepare("ALTER TABLE authority_opportunities ADD COLUMN evidence TEXT").run().catch(() => {});
-        await env.DB.prepare("ALTER TABLE authority_opportunities ADD COLUMN status TEXT DEFAULT 'DISCOVERED'").run().catch(() => {});
-        await env.DB.prepare("ALTER TABLE authority_opportunities ADD COLUMN priority TEXT DEFAULT 'MEDIUM'").run().catch(() => {});
-        await env.DB.prepare("ALTER TABLE authority_opportunities ADD COLUMN verification_level TEXT DEFAULT 'VERIFIED'").run().catch(() => {});
+        if (!business) return errorResponse("Business not found", 404);
 
-        let opps = await env.DB.prepare("SELECT * FROM authority_opportunities WHERE user_id = ? ORDER BY created_at DESC").bind(user.id).all();
-        
-        if (!opps.results || opps.results.length === 0) {
-          const city = business?.city || 'Local Area';
+        const filter = url.searchParams.get('filter') || 'all'; // all | high | directory | local | chamber
+        let query = "SELECT * FROM backlink_opportunities WHERE business_id = ?";
+        const params: any[] = [business.id];
 
-          const seeds = [
-            { id: crypto.randomUUID(), type: 'directory', name: 'Google Business Profile', url: 'https://business.google.com', difficulty: 'Easy', value: 'High', priority: 'HIGH', is_verified: 1, verification_level: 'VERIFIED', why_relevant: 'Essential for Google Local 3-Pack and Maps visibility.' },
-            { id: crypto.randomUUID(), type: 'directory', name: 'Apple Business Connect', url: 'https://businessconnect.apple.com', difficulty: 'Easy', value: 'High', priority: 'HIGH', is_verified: 1, verification_level: 'VERIFIED', why_relevant: 'Powers Siri, Apple Maps, and iOS local search ecosystem.' },
-            { id: crypto.randomUUID(), type: 'directory', name: 'Bing Places for Business', url: 'https://www.bingplaces.com', difficulty: 'Easy', value: 'High', priority: 'HIGH', is_verified: 1, verification_level: 'VERIFIED', why_relevant: 'Feeds Microsoft Copilot, Windows Search, and Bing local index.' },
-            { id: crypto.randomUUID(), type: 'directory', name: 'Better Business Bureau (BBB)', url: 'https://www.bbb.org', difficulty: 'Medium', value: 'High', priority: 'HIGH', is_verified: 1, verification_level: 'VERIFIED', why_relevant: 'High Domain Authority citation with verified business entity trust.' },
-            { id: crypto.randomUUID(), type: 'chamber', name: `${city} Chamber of Commerce / Business Alliance`, url: '', difficulty: 'Medium', value: 'High', priority: 'MEDIUM', is_verified: 0, verification_level: 'AI_PROSPECT', why_relevant: `Local business alliance in ${city} signals strong geographic authority to search engines.` }
-          ];
-
-          for (const s of seeds) {
-            await env.DB.prepare(
-              "INSERT INTO authority_opportunities (id, user_id, name, url, type, difficulty, value, priority, is_verified, verification_level, why_relevant, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DISCOVERED')"
-            ).bind(s.id, user.id, s.name, s.url, s.type, s.difficulty, s.value, s.priority, s.is_verified, s.verification_level, s.why_relevant).run();
-          }
-          opps = await env.DB.prepare("SELECT * FROM authority_opportunities WHERE user_id = ? ORDER BY created_at DESC").bind(user.id).all();
+        if (filter === 'high') {
+          query += " AND priority = 'HIGH'";
+        } else if (filter === 'directory') {
+          query += " AND opportunity_type LIKE '%DIRECTORY%'";
+        } else if (filter === 'chamber') {
+          query += " AND opportunity_type = 'CHAMBER'";
         }
 
-        return jsonResponse({ success: true, data: opps.results });
-      }
+        query += " ORDER BY ai_score DESC, created_at DESC LIMIT 50";
 
-      if (url.pathname === '/api/authority/backlinks' && request.method === 'GET') {
-        const user = await authenticate();
-        if (!user) return errorResponse("Unauthorized", 401);
-
-        const links = await env.DB.prepare("SELECT * FROM backlinks WHERE user_id = ? ORDER BY discovered_at DESC").bind(user.id).all();
-        return jsonResponse({ success: true, data: links.results });
-      }
-
-      if (url.pathname === '/api/authority/backlinks' && request.method === 'POST') {
-        const user = await authenticate();
-        if (!user) return errorResponse("Unauthorized", 401);
-
-        const { source_url, target_url, anchor_text, status, notes } = await request.json() as any;
-        const id = crypto.randomUUID();
+        const { results } = await env.DB.prepare(query).bind(...params).all().catch(() => ({ results: [] }));
         
-        await env.DB.prepare(
-          "INSERT INTO backlinks (id, user_id, source_url, target_url, anchor_text, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        ).bind(id, user.id, source_url, target_url, anchor_text, status || 'Active', notes || '').run();
+        const mapped = (results || []).map((r: any) => ({
+          ...r,
+          evidence: typeof r.evidence === 'string' ? (JSON.parse(r.evidence || '{}')) : (r.evidence || {})
+        }));
 
-        return jsonResponse({ success: true, data: { id } });
+        return jsonResponse({
+          success: true,
+          data: {
+            opportunities: mapped,
+            total: mapped.length
+          }
+        });
+      }
+
+      // --- AUTHORITY: GET OPPORTUNITY DETAIL ---
+      if (url.pathname.startsWith('/api/authority/opportunities/') && !url.pathname.endsWith('/status') && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const oppId = url.pathname.replace('/api/authority/opportunities/', '').split('/')[0];
+        const opp: any = await env.DB.prepare(
+          "SELECT * FROM backlink_opportunities WHERE id = ? AND user_id = ?"
+        ).bind(oppId, user.id).first().catch(() => null);
+
+        if (!opp) return errorResponse("Opportunity not found", 404);
+
+        return jsonResponse({
+          success: true,
+          data: {
+            ...opp,
+            evidence: typeof opp.evidence === 'string' ? JSON.parse(opp.evidence || '{}') : opp.evidence
+          }
+        });
       }
 
       // --- AUTHORITY: UPDATE OPPORTUNITY STATUS ---
@@ -3481,20 +3929,16 @@ export const onRequest = async (context: any) => {
         if (!user) return errorResponse("Unauthorized", 401);
 
         const parts = url.pathname.split('/');
-        const oppId = parts[parts.length - 2]; // /api/authority/opportunities/{id}/status
+        const oppId = parts[parts.length - 2];
         const { status } = await request.json() as any;
 
-        const validStatuses = ['DISCOVERED', 'CONTACTED', 'IN_PROGRESS', 'ACQUIRED', 'REJECTED', 'NOT_RELEVANT'];
+        const validStatuses = ['DISCOVERED', 'EVALUATING', 'CONTACTED', 'ACQUIRED', 'REJECTED'];
         if (!validStatuses.includes(status)) {
           return errorResponse("Invalid status value", 400);
         }
 
-        // Ensure status column exists
-        await env.DB.prepare("ALTER TABLE authority_opportunities ADD COLUMN status TEXT DEFAULT 'DISCOVERED'").run().catch(() => {});
-
-        // Only update if this opportunity belongs to the authenticated user
         await env.DB.prepare(
-          "UPDATE authority_opportunities SET status = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?"
+          "UPDATE backlink_opportunities SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?"
         ).bind(status, oppId, user.id).run();
 
         return jsonResponse({ success: true, data: { id: oppId, status } });

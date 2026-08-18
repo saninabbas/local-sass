@@ -925,7 +925,7 @@ export async function testProviderHealth(
   db: any,
   userId: string,
   projectId: string,
-  provider: 'github' | 'wordpress' | 'shopify' | 'serp' | 'google_business' | 'gbp',
+  provider: 'github' | 'wordpress' | 'shopify' | 'serp' | 'google_business' | 'gbp' | 'authority' | 'backlinks',
   env?: any
 ): Promise<{
   success: boolean;
@@ -938,6 +938,31 @@ export async function testProviderHealth(
 }> {
   const startTime = Date.now();
   const testedAt = new Date().toISOString();
+
+  if (provider === 'authority' || provider === 'backlinks') {
+    try {
+      const { createAuthorityProvider } = await import('./authority/providerFactory');
+      const authProvider = createAuthorityProvider(env || {});
+      const res = await authProvider.testConnection();
+      return {
+        success: res.success,
+        provider: `authority_${authProvider.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+        status: res.status === 'CONNECTED' ? 'CONNECTED' : 'ERROR',
+        latencyMs: res.latencyMs,
+        message: res.message,
+        testedAt
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        provider: 'authority',
+        status: 'ERROR',
+        latencyMs: Date.now() - startTime,
+        message: `Authority provider check failed: ${err.message}`,
+        testedAt
+      };
+    }
+  }
 
   if (provider === 'google_business' || provider === 'gbp') {
     const integration = await db.prepare(

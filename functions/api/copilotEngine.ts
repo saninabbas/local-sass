@@ -81,6 +81,12 @@ export interface CopilotFullContext {
   };
   authority?: {
     totalBacklinks: number;
+    referringDomains?: number;
+    authorityScore?: number;
+    newBacklinks30d?: number;
+    lostBacklinks30d?: number;
+    competitorGapCount?: number;
+    localOpportunitiesCount?: number;
     connected: boolean;
   };
   actionPlanStats?: {
@@ -181,7 +187,10 @@ GOOGLE BUSINESS PROFILE & REVIEWS:
 ${context.reviews?.connected 
   ? `- Rating: ${context.reviews.avgRating} ★ across ${context.reviews.totalReviews} reviews. Unanswered: ${context.reviews.unansweredReviews ?? 0}, Response Rate: ${context.reviews.responseRate ?? 0}%, 30D Negative Reviews: ${context.reviews.negativeReviewsLast30Days ?? 0}${context.reviews.topTopics && context.reviews.topTopics.length > 0 ? `, Key Topics: ${context.reviews.topTopics.join(', ')}` : ''}`
   : 'NOT_CONNECTED / UNAVAILABLE'}
-BACKLINKS: ${context.authority?.connected ? `${context.authority.totalBacklinks} backlinks` : 'NOT_CONNECTED / UNAVAILABLE'}
+AUTHORITY & BACKLINKS:
+${context.authority?.connected 
+  ? `- Authority Score: ${context.authority.authorityScore ?? 0}/100, Total Backlinks: ${context.authority.totalBacklinks}, Referring Domains: ${context.authority.referringDomains ?? 0}, 30D New: ${context.authority.newBacklinks30d ?? 0}, 30D Lost: ${context.authority.lostBacklinks30d ?? 0}, Competitor Link Gap: ${context.authority.competitorGapCount ?? 0} domains, Local Opportunities: ${context.authority.localOpportunitiesCount ?? 0}`
+  : 'NOT_CONNECTED / UNAVAILABLE'}
 
 ZERO FABRICATION RULE: Never invent rankings, backlinks, domain authority, search volume, or health scores. Use UNAVAILABLE or NOT_CONNECTED if data is missing.`;
 

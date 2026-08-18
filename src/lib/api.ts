@@ -137,16 +137,100 @@ export async function connectGoogleSearchConsole(): Promise<void> {
   window.location.href = (import.meta.env.VITE_API_BASE_URL || '') + '/api/integrations/google/auth';
 }
 
-export async function fetchAuthorityOpportunities(): Promise<any> {
-  return fetchApi('/api/authority/opportunities');
+// -----------------------------------------------------------------------------
+// AUTHORITY & BACKLINK INTELLIGENCE (PHASE 8)
+// -----------------------------------------------------------------------------
+export async function fetchAuthorityOverview(businessId?: string): Promise<{
+  overview: {
+    domain: string;
+    authority_score: number;
+    total_backlinks: number;
+    referring_domains: number;
+    dofollow_backlinks: number;
+    nofollow_backlinks: number;
+    new_backlinks_30d: number;
+    lost_backlinks_30d: number;
+    top_referring_domains: any[];
+    top_linked_pages: any[];
+    last_checked_at: string;
+  };
+  trends: {
+    '7d': { periodDays: number; newBacklinks: number; lostBacklinks: number; referringDomains: number };
+    '30d': { periodDays: number; newBacklinks: number; lostBacklinks: number; referringDomains: number };
+    '90d': { periodDays: number; newBacklinks: number; lostBacklinks: number; referringDomains: number };
+  };
+}> {
+  const query = businessId ? `?business_id=${encodeURIComponent(businessId)}` : '';
+  return fetchApi(`/api/authority/overview${query}`);
 }
 
-export async function fetchBacklinks(): Promise<any> {
-  return fetchApi('/api/authority/backlinks');
+export async function syncAuthorityData(businessId?: string): Promise<any> {
+  return fetchApi('/api/authority/sync', {
+    method: 'POST',
+    body: JSON.stringify({ business_id: businessId })
+  });
 }
 
-export async function addBacklink(data: any): Promise<any> {
-  return fetchApi('/api/authority/backlinks', { method: 'POST', body: JSON.stringify(data) });
+export async function fetchAuthorityBacklinks(params?: {
+  filter?: string;
+  limit?: number;
+  offset?: number;
+  businessId?: string;
+}): Promise<{ backlinks: any[]; total: number; limit: number; offset: number }> {
+  const q = new URLSearchParams();
+  if (params?.filter) q.append('filter', params.filter);
+  if (params?.limit) q.append('limit', String(params.limit));
+  if (params?.offset) q.append('offset', String(params.offset));
+  if (params?.businessId) q.append('business_id', params.businessId);
+  const qs = q.toString() ? `?${q.toString()}` : '';
+  return fetchApi(`/api/authority/backlinks${qs}`);
+}
+
+export async function fetchAuthorityDomains(businessId?: string): Promise<{ domains: any[]; total: number }> {
+  const query = businessId ? `?business_id=${encodeURIComponent(businessId)}` : '';
+  return fetchApi(`/api/authority/domains${query}`);
+}
+
+export async function fetchAuthorityCompetitors(businessId?: string): Promise<{ competitors: any[]; total: number }> {
+  const query = businessId ? `?business_id=${encodeURIComponent(businessId)}` : '';
+  return fetchApi(`/api/authority/competitors${query}`);
+}
+
+export async function addAuthorityCompetitor(domain: string, businessId?: string): Promise<any> {
+  return fetchApi('/api/authority/competitors', {
+    method: 'POST',
+    body: JSON.stringify({ domain, business_id: businessId })
+  });
+}
+
+export async function analyzeAuthorityGap(payload?: { competitor_domains?: string[]; business_id?: string }): Promise<any> {
+  return fetchApi('/api/authority/analyze', {
+    method: 'POST',
+    body: JSON.stringify(payload || {})
+  });
+}
+
+export async function fetchAuthorityOpportunities(params?: { filter?: string; businessId?: string }): Promise<{ opportunities: any[]; total: number }> {
+  const q = new URLSearchParams();
+  if (params?.filter) q.append('filter', params.filter);
+  if (params?.businessId) q.append('business_id', params.businessId);
+  const qs = q.toString() ? `?${q.toString()}` : '';
+  return fetchApi(`/api/authority/opportunities${qs}`);
+}
+
+export async function fetchAuthorityOpportunityDetail(id: string): Promise<any> {
+  return fetchApi(`/api/authority/opportunities/${encodeURIComponent(id)}`);
+}
+
+export async function updateOpportunityStatus(id: string, status: string): Promise<any> {
+  return fetchApi(`/api/authority/opportunities/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status })
+  });
+}
+
+export async function fetchAuthorityHealth(): Promise<any> {
+  return fetchApi('/api/authority/health', { method: 'POST' });
 }
 
 // -----------------------------------------------------------------------------
