@@ -104,8 +104,20 @@ export async function updateRecommendationStatus(id: string, status: 'pending' |
   return fetchApi(`/api/recommendations/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
 }
 
-export async function createCheckout(productId: string): Promise<{ url: string }> {
-  return fetchApi('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ productId }) });
+export async function createCheckout(plan: string = 'growth'): Promise<{ url: string; checkout_url?: string; plan?: string }> {
+  return fetchApi('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan }) });
+}
+
+export async function getBillingPlan(): Promise<any> {
+  return fetchApi('/api/billing/plan', { method: 'GET' });
+}
+
+export async function getBillingHealth(): Promise<any> {
+  return fetchApi('/api/billing/health', { method: 'GET' });
+}
+
+export async function openBillingPortal(): Promise<{ url: string }> {
+  return fetchApi('/api/billing/portal', { method: 'POST' });
 }
 
 export async function analyzeWebsite(): Promise<any> {

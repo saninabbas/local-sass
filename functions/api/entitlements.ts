@@ -7,8 +7,9 @@
 
 export interface PlanLimits {
   name: string;
-  tier: 'free' | 'growth' | 'pro';
-  project_limit: number;
+  tier: 'starter' | 'growth' | 'pro' | 'agency_pro' | 'free';
+  price: number;
+  project_limit: number; // 999999 for unlimited
   keyword_limit: number;
   audit_limit: number;
   competitor_limit: number;
@@ -21,40 +22,71 @@ export interface PlanLimits {
 
 export const PLAN_LIMITS: Record<string, PlanLimits> = {
   free: {
-    name: '14-Day Free Trial',
+    name: 'Starter / Free Trial',
     tier: 'free',
+    price: 5,
     project_limit: 1,
-    keyword_limit: 5,
-    audit_limit: 5,
+    keyword_limit: 10,
+    audit_limit: 10,
     competitor_limit: 3,
-    geogrid_limit: 1,
-    ai_limit: 15,
+    geogrid_limit: 2,
+    ai_limit: 30,
     lead_limit: 10,
-    reports_allowed: true,
+    reports_allowed: false,
+    agency_features: false
+  },
+  starter: {
+    name: 'Starter Plan',
+    tier: 'starter',
+    price: 5,
+    project_limit: 1,
+    keyword_limit: 10,
+    audit_limit: 10,
+    competitor_limit: 3,
+    geogrid_limit: 2,
+    ai_limit: 30,
+    lead_limit: 10,
+    reports_allowed: false,
     agency_features: false
   },
   growth: {
     name: 'Growth Plan',
     tier: 'growth',
+    price: 30,
     project_limit: 5,
-    keyword_limit: 50,
-    audit_limit: 50,
+    keyword_limit: 100,
+    audit_limit: 100,
     competitor_limit: 15,
-    geogrid_limit: 10,
-    ai_limit: 250,
+    geogrid_limit: 25,
+    ai_limit: 500,
     lead_limit: 100,
     reports_allowed: true,
     agency_features: false
   },
-  pro: {
-    name: 'Agency / Pro Plan',
-    tier: 'pro',
-    project_limit: 25,
-    keyword_limit: 500,
-    audit_limit: 500,
+  agency_pro: {
+    name: 'Agency Pro Plan',
+    tier: 'agency_pro',
+    price: 80,
+    project_limit: 999999, // Unlimited websites
+    keyword_limit: 1000,
+    audit_limit: 1000,
     competitor_limit: 50,
-    geogrid_limit: 50,
-    ai_limit: 2500,
+    geogrid_limit: 100,
+    ai_limit: 5000,
+    lead_limit: 1000,
+    reports_allowed: true,
+    agency_features: true
+  },
+  pro: {
+    name: 'Agency Pro Plan',
+    tier: 'pro',
+    price: 80,
+    project_limit: 999999, // Unlimited websites
+    keyword_limit: 1000,
+    audit_limit: 1000,
+    competitor_limit: 50,
+    geogrid_limit: 100,
+    ai_limit: 5000,
     lead_limit: 1000,
     reports_allowed: true,
     agency_features: true
@@ -62,11 +94,10 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
 };
 
 export function getUserPlan(user: any): PlanLimits {
-  const tier = (user.subscription_status === 'active' || user.subscription_status === 'growth' || user.subscription_status === 'pro') 
-    ? (user.subscription_tier || user.subscription_status || 'free') 
-    : 'free';
+  const rawTier = (user.subscription_tier || user.subscription_status || 'starter').toLowerCase();
+  const normalizedTier = (rawTier === 'pro' || rawTier === 'agency' || rawTier === 'agency_pro') ? 'agency_pro' : rawTier;
 
-  return PLAN_LIMITS[tier] || PLAN_LIMITS.free;
+  return PLAN_LIMITS[normalizedTier] || PLAN_LIMITS.starter;
 }
 
 export function calculateTrialStatus(user: any): {
@@ -143,9 +174,10 @@ export async function enforceEntitlement(
   const usage = await getUserUsageStats(db, user.id);
 
   if (action === 'create_project' && usage.projectsUsed >= plan.project_limit) {
+    const limitLabel = plan.project_limit >= 999999 ? 'Unlimited' : plan.project_limit.toString();
     return {
       allowed: false,
-      reason: `WEBSITE LIMIT REACHED: You are currently using ${usage.projectsUsed}/${plan.project_limit} website project(s) on the ${plan.name}. Upgrade to Growth to manage up to 5 websites.`,
+      reason: `Your current plan allows up to ${limitLabel} website(s). Upgrade your plan to add another website.`,
       limits: plan,
       currentUsed: usage.projectsUsed
     };

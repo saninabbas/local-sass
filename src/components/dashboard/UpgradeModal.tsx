@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Sparkles, Check, ArrowRight, ShieldAlert, CreditCard } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { fetchApi } from '../../lib/api';
+import { createCheckout } from '../../lib/api';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -17,7 +17,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   isOpen,
   onClose,
   title = "WEBSITE LIMIT REACHED",
-  description = "You have reached your project limit on the 14-Day Free Trial.",
+  description = "You have reached your website limit on your current plan.",
   currentUsed = 1,
   maxAllowed = 1,
   featureName = "websites"
@@ -29,17 +29,12 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   const handleStartGrowthCheckout = async () => {
     try {
       setLoading(true);
-      const res = await fetchApi('/api/billing/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: 'growth' })
-      });
-
-      const targetUrl = typeof res === 'string' ? res : (res?.url || res?.checkoutUrl || res?.data?.url);
+      const res = await createCheckout('growth');
+      const targetUrl = typeof res === 'string' ? res : (res?.url || res?.checkout_url);
       if (targetUrl) {
         window.location.href = targetUrl;
       } else {
-        alert(res?.error || 'Failed to initiate checkout. Please try again.');
+        alert('Failed to initiate checkout. Please try again.');
       }
     } catch (err: any) {
       alert(err.message || 'Checkout initiation failed.');
@@ -94,7 +89,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
               <span className="text-[10px] font-mono text-[#8e8b82] block">Upgrade & Unlock Capacity</span>
             </div>
             <div className="text-right">
-              <span className="text-lg font-serif font-bold text-[#141413]">$49</span>
+              <span className="text-lg font-serif font-bold text-[#141413]">$30</span>
               <span className="text-[10px] font-mono text-[#8e8b82]">/month</span>
             </div>
           </div>
@@ -106,11 +101,11 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
             </li>
             <li className="flex items-center gap-2 text-[#141413]">
               <Check size={14} className="text-[#cc785c]" />
-              <span><strong>50 Tracked Keywords</strong> & 10 GeoGrid Scans</span>
+              <span><strong>100 Tracked Keywords</strong> & SERP Radar</span>
             </li>
             <li className="flex items-center gap-2 text-[#141413]">
               <Check size={14} className="text-[#cc785c]" />
-              <span><strong>250 AI Code Fixes</strong> & Live Verification</span>
+              <span><strong>AI Review Intelligence</strong> & Automated Fixes</span>
             </li>
           </ul>
         </div>
@@ -124,7 +119,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
             className="w-full sm:flex-1 py-3 bg-[#141413] hover:bg-[#252320] text-[#faf9f5] text-xs font-semibold rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-md"
           >
             <CreditCard size={15} className="text-[#cc785c]" />
-            <span>{loading ? 'Initiating Checkout...' : 'UPGRADE TO GROWTH ($49/mo)'}</span>
+            <span>{loading ? 'Initiating Checkout...' : 'UPGRADE TO GROWTH ($30/mo)'}</span>
           </Button>
 
           <button

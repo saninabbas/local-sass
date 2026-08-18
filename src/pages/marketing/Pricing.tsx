@@ -1,73 +1,61 @@
 import { useState } from 'react';
 import { Navbar } from '../../components/layout/Navbar';
 import { Footer } from '../../components/layout/Footer';
-import { Link } from 'react-router-dom';
-import { Check, Sparkles, ArrowRight, ShieldCheck, Zap } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Check, Sparkles, ArrowRight, ShieldCheck, Zap, Loader2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { PLANS } from '../../config/plans';
+import { useAuth } from '../../contexts/AuthContext';
+import { createCheckout } from '../../lib/api';
 
 export function Pricing() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
-  const plans = [
+  const handlePlanClick = async (planKey: string) => {
+    if (!user) {
+      navigate(`/signup?plan=${planKey}`);
+      return;
+    }
+
+    try {
+      setLoadingPlan(planKey);
+      const res = await createCheckout(planKey);
+      const checkoutUrl = typeof res === 'string' ? res : (res?.url || res?.checkout_url);
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+      } else {
+        navigate('/dashboard/billing');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Could not start checkout session.');
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
+
+  const plansList = [
     {
-      name: "FREE TRIAL",
-      badge: "14 Days Free",
-      who: "Try Rankora risk-free for 14 days with zero credit card required.",
-      description: "Complete local SEO diagnostic baseline and 7-vector DOM crawl.",
-      price: "$0",
-      period: "14 Days",
-      features: [
-        "1 Website Project",
-        "5 Tracked Keywords",
-        "5 Diagnostic Audits",
-        "1 GeoGrid Local Scan",
-        "15 AI Fixes & Code Generations",
-        "Live Change Verification"
-      ],
-      cta: "START FREE TRIAL",
-      ctaHref: "/signup",
+      ...PLANS.starter,
+      priceFormatted: billingCycle === 'monthly' ? '$5' : '$4',
+      badge: "1 Website",
+      cta: "Start Starter",
       popular: false
     },
     {
-      name: "GROWTH",
-      badge: "Most Popular",
-      who: "For businesses serious about dominating local Google search.",
-      description: "Scale local rankings, monitor top competitors, and execute automated AI fixes.",
-      price: billingCycle === 'monthly' ? "$49" : "$39",
-      period: "/month",
-      features: [
-        "5 Website Projects",
-        "50 Tracked Keywords",
-        "50 Diagnostic Audits",
-        "10 GeoGrid Scans",
-        "250 AI Fixes & Code Generations",
-        "Competitor Radar Monitoring",
-        "Google Business Profile Sync",
-        "Internal Link Discovery"
-      ],
-      cta: "START GROWTH",
-      ctaHref: "/signup",
+      ...PLANS.growth,
+      priceFormatted: billingCycle === 'monthly' ? '$30' : '$24',
+      badge: "MOST POPULAR",
+      cta: "Start Growth",
       popular: true
     },
     {
-      name: "AGENCY / PRO",
-      badge: "For Agencies & Teams",
-      who: "For agencies and multi-location business operations.",
-      description: "White-label reports, multi-client workspace management, and high volume limits.",
-      price: billingCycle === 'monthly' ? "$149" : "$119",
-      period: "/month",
-      features: [
-        "25 Website Projects",
-        "500 Tracked Keywords",
-        "500 Diagnostic Audits",
-        "50 GeoGrid Scans",
-        "2,500 AI Fixes",
-        "White-Label Executive Reports",
-        "Lead Generation Widget Embed",
-        "Priority 24/7 Support"
-      ],
-      cta: "START AGENCY",
-      ctaHref: "/signup",
+      ...PLANS.agency_pro,
+      priceFormatted: billingCycle === 'monthly' ? '$80' : '$64',
+      badge: "Unlimited Websites",
+      cta: "Start Agency Pro",
       popular: false
     }
   ];
@@ -86,7 +74,7 @@ export function Pricing() {
               Invest in predictable <span className="italic text-[#cc785c]">local revenue growth</span>.
             </h1>
             <p className="text-base sm:text-lg text-[#6c6a64] max-w-2xl mx-auto leading-relaxed mb-8">
-              Start your 14-day free trial. No credit card required. Upgrade or cancel anytime.
+              Verified Polar subscriptions. Upgrade, downgrade, or cancel anytime.
             </p>
 
             {/* Toggle */}
@@ -118,7 +106,7 @@ export function Pricing() {
         {/* Pricing Cards */}
         <section className="py-20 px-6 sm:px-8 max-w-6xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {plans.map((plan) => (
+            {plansList.map((plan) => (
               <div
                 key={plan.name}
                 className={`p-8 rounded-2xl border transition-all flex flex-col justify-between ${
@@ -130,12 +118,12 @@ export function Pricing() {
                 <div>
                   {plan.popular && (
                     <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#cc785c] text-white uppercase tracking-wider shadow-xs">
-                      Most Popular
+                      MOST POPULAR
                     </span>
                   )}
 
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-serif text-xl font-medium text-[#141413]">{plan.name}</h3>
+                    <h3 className="font-semibold text-xl text-[#141413] tracking-tight">{plan.name}</h3>
                     {plan.badge && !plan.popular && (
                       <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#efe9de] text-[#6c6a64] border border-[#e6dfd8] uppercase">
                         {plan.badge}
@@ -146,7 +134,7 @@ export function Pricing() {
                   <p className="text-xs text-[#6c6a64] font-sans mb-6 leading-relaxed">{plan.description}</p>
 
                   <div className="flex items-baseline gap-1 mb-6 pb-6 border-b border-[#e6dfd8]">
-                    <span className="font-serif text-4xl font-normal text-[#141413]">{plan.price}</span>
+                    <span className="font-semibold text-4xl text-[#141413] tracking-tight">${plan.price}</span>
                     <span className="text-xs font-mono text-[#8e8b82]">{plan.period}</span>
                   </div>
 
@@ -160,19 +148,25 @@ export function Pricing() {
                   </ul>
                 </div>
 
-                <Link to={plan.ctaHref} className="w-full">
-                  <Button
-                    size="lg"
-                    className={`w-full py-3 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 cursor-pointer ${
-                      plan.popular
-                        ? 'bg-[#141413] hover:bg-[#252320] text-[#faf9f5]'
-                        : 'bg-[#faf9f5] hover:bg-[#efe9de] text-[#141413] border border-[#e6dfd8]'
-                    }`}
-                  >
-                    <span>{plan.cta}</span>
-                    <ArrowRight size={13} />
-                  </Button>
-                </Link>
+                <Button
+                  size="lg"
+                  onClick={() => handlePlanClick(plan.id)}
+                  disabled={loadingPlan === plan.id}
+                  className={`w-full py-3 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 cursor-pointer ${
+                    plan.popular
+                      ? 'bg-[#141413] hover:bg-[#252320] text-[#faf9f5]'
+                      : 'bg-[#faf9f5] hover:bg-[#efe9de] text-[#141413] border border-[#e6dfd8]'
+                  }`}
+                >
+                  {loadingPlan === plan.id ? (
+                    <Loader2 size={13} className="animate-spin text-[#cc785c]" />
+                  ) : (
+                    <>
+                      <span>{user ? `Upgrade to ${plan.name}` : plan.cta}</span>
+                      <ArrowRight size={13} />
+                    </>
+                  )}
+                </Button>
               </div>
             ))}
           </div>

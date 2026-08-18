@@ -19,12 +19,27 @@ import { githubProvider } from './providers/githubProvider';
 import { wordpressProvider } from './providers/wordpressProvider';
 import { shopifyProvider } from './providers/shopifyProvider';
 import { routeApprovedSeoFix } from './providers/providerRouter';
+import {
+  POLAR_PLANS,
+  normalizePlanKey,
+  resolvePolarProductId,
+  resolvePlanFromPolarProductId,
+  getUserPlanLimit as getPlanLimitFromEngine,
+  canUseFeature,
+  verifyPolarWebhookSignature,
+  createPolarCheckoutSession,
+  createPolarCustomerPortalSession
+} from './billingEngine';
 
 export interface Env {
   DB: D1Database;
   NVIDIA_API_KEY: string;
   POLAR_ACCESS_TOKEN?: string;
   POLAR_WEBHOOK_SECRET?: string;
+  POLAR_STARTER_PRODUCT_ID?: string;
+  POLAR_GROWTH_PRODUCT_ID?: string;
+  POLAR_AGENCY_PRO_PRODUCT_ID?: string;
+  POLAR_PRODUCT_ID?: string;
   SENDGRID_API_KEY?: string;
   BASE_URL?: string;
   GITHUB_APP_TOKEN?: string;
@@ -209,12 +224,8 @@ export const onRequest = async (context: any) => {
       'enterprise': 999
     };
 
-    const getUserPlanLimit = (subscriptionStatus?: string, role?: string): number => {
-      if (role === 'admin') return 999;
-      const plan = (subscriptionStatus || 'free').toLowerCase();
-      if (plan === 'growth') return 5;
-      if (plan === 'pro' || plan === 'agency') return 25;
-      return 1; // 14-Day Free Trial limit is 1 project
+    const getUserPlanLimit = (subscriptionStatus?: string, role?: string, subscriptionTier?: string): number => {
+      return getPlanLimitFromEngine(subscriptionTier, subscriptionStatus, role);
     };
 
     const resolveTargetBusiness = async (userId: string, explicitBizId?: string | null) => {
@@ -513,12 +524,40 @@ export const onRequest = async (context: any) => {
         await db.prepare("ALTER TABLE users ADD COLUMN password_hash TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN polar_customer_id TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN polar_subscription_id TEXT").run().catch(() => {});
-        await db.prepare("ALTER TABLE users ADD COLUMN subscription_tier TEXT DEFAULT 'free'").run().catch(() => {});
-        await db.prepare("ALTER TABLE users ADD COLUMN subscription_status TEXT DEFAULT 'free'").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN polar_product_id TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN subscription_tier TEXT DEFAULT 'starter'").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN subscription_status TEXT DEFAULT 'active'").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN trial_started_at DATETIME").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN trial_ends_at DATETIME").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN trial_status TEXT DEFAULT 'ACTIVE'").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN current_period_start DATETIME").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN current_period_end DATETIME").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN cancel_at_period_end INTEGER DEFAULT 0").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN plan_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP").run().catch(() => {});
+        await db.prepare(`CREATE TABLE IF NOT EXISTS subscriptions (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          business_id TEXT,
+          plan TEXT NOT NULL,
+          subscription_status TEXT NOT NULL,
+          polar_customer_id TEXT,
+          polar_subscription_id TEXT UNIQUE,
+          polar_product_id TEXT,
+          current_period_start DATETIME,
+          current_period_end DATETIME,
+          cancel_at_period_end INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+        await db.prepare(`CREATE TABLE IF NOT EXISTS subscription_events (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          polar_event_id TEXT UNIQUE,
+          event_type TEXT NOT NULL,
+          payload_hash TEXT,
+          received_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          processed_at DATETIME
+        )`).run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN verification_token TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN totp_secret TEXT").run().catch(() => {});
@@ -1526,7 +1565,7 @@ export const onRequest = async (context: any) => {
           ORDER BY b.is_default DESC, b.created_at DESC
         `).bind(user.id as string).all();
 
-        const planLimit = getUserPlanLimit(user.subscription_status, user.role);
+        const planLimit = getUserPlanLimit(user.subscription_status, user.role, user.subscription_tier);
         const activeBiz = (results || []).find((b: any) => b.is_default === 1) || (results || [])[0] || null;
 
         return jsonResponse({
@@ -1536,7 +1575,8 @@ export const onRequest = async (context: any) => {
             total: (results || []).length,
             planLimit,
             activeBusinessId: activeBiz?.id || null,
-            subscriptionStatus: user.subscription_status || 'free'
+            subscriptionStatus: user.subscription_status || 'active',
+            subscriptionTier: user.subscription_tier || 'starter'
           }
         });
       }
@@ -1548,7 +1588,7 @@ export const onRequest = async (context: any) => {
         const { name, type, city, country, websiteUrl, setAsActive } = await request.json() as any;
         if (!websiteUrl || !websiteUrl.trim()) return errorResponse("Website URL is required", 400);
 
-        const planLimit = getUserPlanLimit(user.subscription_status, user.role);
+        const planLimit = getUserPlanLimit(user.subscription_status, user.role, user.subscription_tier);
         const countRow = await env.DB.prepare(
           "SELECT COUNT(*) as count FROM businesses WHERE user_id = ? AND (is_archived IS NULL OR is_archived = 0)"
         ).bind(user.id as string).first();
@@ -1557,7 +1597,8 @@ export const onRequest = async (context: any) => {
         if (currentCount >= planLimit) {
           return jsonResponse({
             success: false,
-            error: `You have reached your website limit (${currentCount}/${planLimit}). Please upgrade your plan to add another website.`,
+            code: "PLAN_LIMIT_REACHED",
+            error: `You have reached your website limit (${currentCount}/${planLimit}) on your ${user.subscription_tier || 'Starter'} plan. Please upgrade your plan to add another website.`,
             limitReached: true,
             currentCount,
             planLimit
@@ -3044,29 +3085,49 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true, data: { id, status } });
       }
 
-      // --- BILLING: STATUS & ENTITLEMENTS ---
-      if (url.pathname === '/api/billing/status' && request.method === 'GET') {
+      // --- BILLING: HEALTH CHECK ---
+      if (url.pathname === '/api/billing/health' && request.method === 'GET') {
+        const polarToken = env.POLAR_ACCESS_TOKEN || (env as any).POLAR_API_KEY;
+        const isConfigured = !!polarToken;
+        return jsonResponse({
+          success: true,
+          provider: "polar",
+          status: isConfigured ? "CONNECTED" : "CONFIGURATION_PENDING",
+          message: isConfigured 
+            ? "Polar Billing Provider is active and connected." 
+            : "POLAR_ACCESS_TOKEN is missing in Cloudflare environment secrets."
+        });
+      }
+
+      // --- BILLING: PLAN & ENTITLEMENTS ---
+      if ((url.pathname === '/api/billing/plan' || url.pathname === '/api/billing/status') && request.method === 'GET') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const { getUserPlan, calculateTrialStatus, getUserUsageStats } = await import('./entitlements');
-        const plan = getUserPlan(user);
-        const trial = calculateTrialStatus(user);
-        const usage = await getUserUsageStats(env.DB, user.id);
+        const countRow = await env.DB.prepare(
+          "SELECT COUNT(*) as count FROM businesses WHERE user_id = ? AND (is_archived IS NULL OR is_archived = 0)"
+        ).bind(user.id as string).first().catch(() => ({ count: 0 }));
+        const websitesUsed = (countRow?.count as number) || 0;
+
+        const normPlan = normalizePlanKey(user.subscription_tier || user.subscription_status);
+        const planConfig = POLAR_PLANS[normPlan] || POLAR_PLANS.starter;
 
         return jsonResponse({
           success: true,
           data: {
-            plan,
-            trial,
-            usage,
-            polarConfigured: !!env.POLAR_ACCESS_TOKEN,
-            user: {
-              email: user.email,
-              subscription_status: user.subscription_status || 'free',
-              subscription_tier: user.subscription_tier || 'free',
-              current_period_end: user.current_period_end || null
-            }
+            plan: planConfig.key,
+            planName: planConfig.name,
+            price: planConfig.priceMonthly,
+            currency: "USD",
+            websiteLimit: planConfig.websiteLimit,
+            websitesUsed: websitesUsed,
+            subscriptionStatus: user.subscription_status || "active",
+            currentPeriodStart: user.current_period_start || null,
+            currentPeriodEnd: user.current_period_end || null,
+            cancelAtPeriodEnd: user.cancel_at_period_end === 1 || user.cancel_at_period_end === true,
+            polarCustomerId: user.polar_customer_id || null,
+            isLimitExceeded: planConfig.websiteLimit !== null && websitesUsed > planConfig.websiteLimit,
+            polarConfigured: !!(env.POLAR_ACCESS_TOKEN || (env as any).POLAR_API_KEY)
           }
         });
       }
@@ -3213,16 +3274,58 @@ export const onRequest = async (context: any) => {
         }
       }
 
-      // --- BILLING: CHECKOUT ---
+      // --- BILLING: POLAR CHECKOUT ---
       if (url.pathname === '/api/billing/checkout' && request.method === 'POST') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const payload = await request.json() as any;
-        const planType = payload.planType || payload.plan || 'growth';
+        const polarToken = env.POLAR_ACCESS_TOKEN || (env as any).POLAR_API_KEY || (env as any).POLAR_TOKEN;
+        if (!polarToken) {
+          return jsonResponse({
+            success: false,
+            code: "POLAR_NOT_CONFIGURED",
+            error: "POLAR_ACCESS_TOKEN is missing in Cloudflare environment variables."
+          }, 400);
+        }
+
+        const payload = await request.json().catch(() => ({})) as any;
+        const requestedPlan = payload.plan || payload.planType || 'growth';
+        const normPlan = normalizePlanKey(requestedPlan);
+        const targetProductId = resolvePolarProductId(normPlan, env);
+
+        const successUrl = `${url.origin}/dashboard/billing?checkout=success&plan=${normPlan}`;
+        const checkoutRes = await createPolarCheckoutSession({
+          polarToken,
+          productId: targetProductId,
+          customerEmail: user.email,
+          customerName: user.name,
+          userId: user.id,
+          planKey: normPlan,
+          successUrl
+        });
+
+        if (!checkoutRes.success || !checkoutRes.checkoutUrl) {
+          return jsonResponse({
+            success: false,
+            code: "CHECKOUT_FAILED",
+            error: checkoutRes.error || "Failed to initialize Polar checkout session."
+          }, 400);
+        }
+
+        return jsonResponse({
+          success: true,
+          checkout_url: checkoutRes.checkoutUrl,
+          url: checkoutRes.checkoutUrl,
+          plan: normPlan
+        });
+      }
+
+      // --- BILLING: CUSTOMER PORTAL ---
+      if (url.pathname === '/api/billing/portal' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
 
         const polarToken = env.POLAR_ACCESS_TOKEN || (env as any).POLAR_API_KEY || (env as any).POLAR_TOKEN;
-
         if (!polarToken) {
           return jsonResponse({
             success: false,
@@ -3230,91 +3333,163 @@ export const onRequest = async (context: any) => {
           }, 400);
         }
 
-        const envProductId = (env as any).POLAR_PRODUCT_ID || (env as any).POLAR_GROWTH_PRODUCT_ID;
-        const targetProductId = payload.productId || payload.product_id || envProductId || '7594755d-5580-4b77-86ae-90baae0e20d8';
+        const portalRes = await createPolarCustomerPortalSession({
+          polarToken,
+          customerId: user.polar_customer_id,
+          externalCustomerId: user.id
+        });
 
-        try {
-          const polarRes = await fetch('https://api.polar.sh/v1/checkouts/', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${polarToken}`
-            },
-            body: JSON.stringify({
-              product_id: targetProductId,
-              customer_email: user.email,
-              customer_name: user.name,
-              metadata: {
-                user_id: user.id,
-                plan: planType
-              },
-              success_url: `${url.origin}/dashboard/billing?checkout=success`,
-            })
-          });
-
-          if (!polarRes.ok) {
-            const errorText = await polarRes.text();
-            console.error("Polar API Error:", polarRes.status, errorText);
-            return jsonResponse({
-              success: false,
-              error: `Polar API Error (${polarRes.status}): ${errorText}`
-            }, 400);
-          }
-
-          const checkoutData = await polarRes.json() as any;
-          const checkoutUrl = checkoutData.url || checkoutData.checkout_url;
-          return jsonResponse({ 
-            success: true, 
-            data: { url: checkoutUrl } 
-          });
-        } catch (e: any) {
-          console.error("Polar API call error:", e);
+        if (!portalRes.success || !portalRes.portalUrl) {
           return jsonResponse({
             success: false,
-            error: "Failed to connect to Polar API: " + e.message
-          }, 500);
+            error: portalRes.error || "Failed to generate Polar customer portal session."
+          }, 400);
         }
+
+        return jsonResponse({
+          success: true,
+          url: portalRes.portalUrl,
+          portal_url: portalRes.portalUrl
+        });
       }
 
       // --- BILLING: POLAR WEBHOOK ---
       if (url.pathname === '/api/webhooks/polar' && request.method === 'POST') {
-        const payload = await request.json() as any;
+        const rawBody = await request.text();
+        
+        // 1. Signature Verification
+        const verification = await verifyPolarWebhookSignature(rawBody, request.headers, env.POLAR_WEBHOOK_SECRET);
+        if (!verification.isValid) {
+          console.warn("Polar webhook signature rejected:", verification.reason);
+          return errorResponse("Invalid webhook signature: " + verification.reason, 401);
+        }
 
-        if (payload.type === 'order.created' || payload.type === 'subscription.created' || payload.type === 'subscription.active') {
-          const { metadata, customer_id, product_id, id: subId } = payload.data || {};
-          
-          if (metadata && metadata.user_id) {
-            let plan = metadata.plan || 'growth';
-            if (product_id === '7594755d-5580-4b77-86ae-90baae0e20d8') {
-              plan = 'growth';
-            }
+        let payload: any;
+        try {
+          payload = JSON.parse(rawBody);
+        } catch {
+          return errorResponse("Malformed JSON payload", 400);
+        }
 
-            try {
-              // Update user record
-              await env.DB.prepare(`
-                UPDATE users 
-                SET subscription_tier = ?, subscription_status = 'active', polar_customer_id = ?, polar_subscription_id = ?, trial_status = 'CONVERTED'
-                WHERE id = ?
-              `).bind(plan, customer_id || '', subId || '', metadata.user_id).run();
+        const eventId = payload.id || request.headers.get('webhook-id') || request.headers.get('polar-webhook-id') || crypto.randomUUID();
+        const eventType = payload.type || 'unknown';
 
-              // Update businesses records
-              await env.DB.prepare(
-                "UPDATE businesses SET subscription_tier = ?, polar_customer_id = ? WHERE user_id = ?"
-              ).bind(plan, customer_id || '', metadata.user_id).run();
-            } catch (e) {
-              console.error("Failed to update user billing status:", e);
-            }
-          }
-        } else if (payload.type === 'subscription.canceled' || payload.type === 'subscription.revoked') {
-          const { metadata } = payload.data || {};
-          if (metadata && metadata.user_id) {
+        // 2. Idempotency Check
+        const existingEvent = await env.DB.prepare(
+          "SELECT id FROM subscription_events WHERE polar_event_id = ?"
+        ).bind(eventId).first().catch(() => null);
+
+        if (existingEvent) {
+          return jsonResponse({ success: true, message: "Duplicate event skipped", eventId });
+        }
+
+        const eventData = payload.data || {};
+        const { metadata, customer_id, product_id, id: subId, current_period_start, current_period_end, cancel_at_period_end } = eventData;
+        const targetUserId = metadata?.user_id || eventData.customer?.external_id || eventData.customer_external_id;
+
+        // Find user by ID, polar_customer_id, or email
+        let dbUser = targetUserId 
+          ? await env.DB.prepare("SELECT id, email, subscription_tier FROM users WHERE id = ?").bind(targetUserId).first().catch(() => null)
+          : null;
+
+        if (!dbUser && customer_id) {
+          dbUser = await env.DB.prepare("SELECT id, email, subscription_tier FROM users WHERE polar_customer_id = ?").bind(customer_id).first().catch(() => null);
+        }
+
+        if (!dbUser && eventData.customer_email) {
+          dbUser = await env.DB.prepare("SELECT id, email, subscription_tier FROM users WHERE LOWER(email) = LOWER(?)").bind(eventData.customer_email).first().catch(() => null);
+        }
+
+        if (dbUser) {
+          const userId = dbUser.id;
+          const resolvedPlan = resolvePlanFromPolarProductId(product_id || metadata?.plan, env);
+
+          if (eventType === 'subscription.active' || eventType === 'order.paid' || eventType === 'subscription.created' || eventType === 'subscription.updated') {
+            await env.DB.prepare(`
+              UPDATE users 
+              SET subscription_tier = ?,
+                  subscription_status = 'active',
+                  polar_customer_id = COALESCE(?, polar_customer_id),
+                  polar_subscription_id = COALESCE(?, polar_subscription_id),
+                  polar_product_id = COALESCE(?, polar_product_id),
+                  current_period_start = ?,
+                  current_period_end = ?,
+                  cancel_at_period_end = ?,
+                  plan_updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).bind(
+              resolvedPlan,
+              customer_id || null,
+              subId || null,
+              product_id || null,
+              current_period_start || null,
+              current_period_end || null,
+              cancel_at_period_end ? 1 : 0,
+              userId
+            ).run().catch(e => console.error("Error updating user subscription:", e));
+
             await env.DB.prepare(
-              "UPDATE users SET subscription_status = 'canceled', subscription_tier = 'free' WHERE id = ?"
-            ).bind(metadata.user_id).run().catch(() => {});
+              "UPDATE businesses SET subscription_tier = ?, polar_customer_id = COALESCE(?, polar_customer_id) WHERE user_id = ?"
+            ).bind(resolvedPlan, customer_id || null, userId).run().catch(() => {});
+
+            // Upsert in subscriptions table
+            const subRecordId = subId || crypto.randomUUID();
+            await env.DB.prepare(`
+              INSERT INTO subscriptions (
+                id, user_id, plan, subscription_status, polar_customer_id, polar_subscription_id, polar_product_id,
+                current_period_start, current_period_end, cancel_at_period_end, updated_at
+              ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+              ON CONFLICT(id) DO UPDATE SET
+                plan = excluded.plan,
+                subscription_status = 'active',
+                current_period_start = excluded.current_period_start,
+                current_period_end = excluded.current_period_end,
+                cancel_at_period_end = excluded.cancel_at_period_end,
+                updated_at = CURRENT_TIMESTAMP
+            `).bind(
+              subRecordId,
+              userId,
+              resolvedPlan,
+              customer_id || '',
+              subId || subRecordId,
+              product_id || '',
+              current_period_start || null,
+              current_period_end || null,
+              cancel_at_period_end ? 1 : 0
+            ).run().catch(() => {});
+
+          } else if (eventType === 'subscription.canceled') {
+            if (cancel_at_period_end) {
+              await env.DB.prepare(
+                "UPDATE users SET cancel_at_period_end = 1, plan_updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+              ).bind(userId).run().catch(() => {});
+            } else {
+              await env.DB.prepare(
+                "UPDATE users SET subscription_status = 'canceled', plan_updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+              ).bind(userId).run().catch(() => {});
+            }
+          } else if (eventType === 'subscription.uncanceled') {
+            await env.DB.prepare(
+              "UPDATE users SET cancel_at_period_end = 0, subscription_status = 'active', plan_updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+            ).bind(userId).run().catch(() => {});
+          } else if (eventType === 'subscription.revoked') {
+            await env.DB.prepare(
+              "UPDATE users SET subscription_status = 'revoked', subscription_tier = 'starter', plan_updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+            ).bind(userId).run().catch(() => {});
+          } else if (eventType === 'subscription.past_due') {
+            await env.DB.prepare(
+              "UPDATE users SET subscription_status = 'past_due', plan_updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+            ).bind(userId).run().catch(() => {});
           }
         }
 
-        return jsonResponse({ success: true, received: true });
+        // 3. Record in subscription_events for idempotency
+        await env.DB.prepare(`
+          INSERT INTO subscription_events (id, user_id, polar_event_id, event_type, processed_at)
+          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `).bind(crypto.randomUUID(), dbUser?.id || targetUserId || 'unknown', eventId, eventType).run().catch(() => {});
+
+        return jsonResponse({ success: true, received: true, eventId });
       }
 
       // --- WIDGET CAPTURE (PUBLIC) ---
@@ -6499,8 +6674,14 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const payload = await request.json() as any;
-        const changeId = payload.changeId || url.pathname.split('/')[4];
+        const payload = await request.json().catch(() => ({})) as any;
+        let changeId = payload.changeId || payload.change_id;
+        if (!changeId) {
+          const parts = url.pathname.split('/');
+          if (parts.length >= 6 && parts[4] !== 'verify') {
+            changeId = parts[4];
+          }
+        }
         if (!changeId) return errorResponse("Change ID required", 400);
 
         const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');

@@ -210,7 +210,9 @@ export function FixWithAIModal({
     setErrorMessage(null);
     try {
       const verifyRes = await fetchApi(`/api/seo/changes/${changeRecord.id}/verify`, {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ changeId: changeRecord.id })
       });
 
       const verifyData = verifyRes?.data || verifyRes;
