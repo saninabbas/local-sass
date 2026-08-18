@@ -856,9 +856,6 @@ export const onRequest = async (context: any) => {
         });
       }
 
-      // Auto ensure migrations on database access
-      await ensureD1Schema(env.DB);
-
       // --- HEALTH ---
       if (url.pathname === '/api/health') {
         await env.DB.prepare("SELECT 1").first();
