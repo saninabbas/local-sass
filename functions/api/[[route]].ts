@@ -3146,7 +3146,7 @@ export const onRequest = async (context: any) => {
 
           if (!rawUrl) return errorResponse("Website URL is required", 400);
 
-          const { validateAndNormalizeUrl, fetchWithTimeout, Extractor, calculateDeterministicAudit } = await import('./auditEngine');
+          const { validateAndNormalizeUrl, fetchWithTimeout, Extractor, calculateDeterministicAudit, populateExtractorFromHtml } = await import('./auditEngine');
           
           const urlValidation = validateAndNormalizeUrl(rawUrl);
           if (!urlValidation.valid) {
