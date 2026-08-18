@@ -329,10 +329,11 @@ export async function createPolarCheckoutSession(params: {
       })
     });
 
+    let lastErrText = '';
     // If product does not exist, attempt auto-discovery from live Polar catalog
     if (!response.ok && response.status === 422) {
-      const errText = await response.text();
-      if (errText.includes("Product does not exist") || errText.includes("product_id")) {
+      lastErrText = await response.text();
+      if (lastErrText.includes("Product does not exist") || lastErrText.includes("product_id")) {
         console.warn(`Polar Product ID '${currentProductId}' not found. Discovering active products in Polar account...`);
         const liveProducts = await fetchPolarProducts(params.polarToken);
         
@@ -372,13 +373,15 @@ export async function createPolarCheckoutSession(params: {
                 success_url: params.successUrl
               })
             });
+            // Reset lastErrText since we have a new response
+            lastErrText = '';
           }
         }
       }
     }
 
     if (!response.ok) {
-      const errText = await response.text();
+      const errText = lastErrText || await response.text();
       let errorMsg = `Polar API Error (${response.status}): ${errText}`;
       
       try {
