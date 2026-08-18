@@ -25,7 +25,7 @@ export const POLAR_PLANS: Record<string, PolarPlanConfig> = {
     keywordsLimit: 25,
     auditLimit: 25,
     envVar: 'POLAR_STARTER_PRODUCT_ID',
-    fallbackProductId: 'polar_starter_15usd'
+    fallbackProductId: 'f19a4c82-a816-47b3-b0ba-c72a6b2f46cc' // Rankora.Starter
   },
   growth: {
     key: 'growth',
@@ -35,7 +35,7 @@ export const POLAR_PLANS: Record<string, PolarPlanConfig> = {
     keywordsLimit: 100,
     auditLimit: 100,
     envVar: 'POLAR_GROWTH_PRODUCT_ID',
-    fallbackProductId: '7594755d-5580-4b77-86ae-90baae0e20d8'
+    fallbackProductId: '71c9c886-3ebb-4790-a87b-438694f22463' // Rankora.Growth
   },
   agency_pro: {
     key: 'agency_pro',
@@ -45,7 +45,7 @@ export const POLAR_PLANS: Record<string, PolarPlanConfig> = {
     keywordsLimit: 1000,
     auditLimit: 500,
     envVar: 'POLAR_AGENCY_PRO_PRODUCT_ID',
-    fallbackProductId: 'b39f379a-bf3b-4861-a083-d5951ff81561'
+    fallbackProductId: '47bdc1ba-789c-4a0c-88de-b7a7b5e43d21' // Rankora.Agency Pro
   }
 };
 
