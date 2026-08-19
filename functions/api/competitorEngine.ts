@@ -771,8 +771,8 @@ COMPETITOR URL: ${targetUrl}
 COMPETITOR TITLE: "${compExtractor.title || ''}"
 COMPETITOR META DESCRIPTION: "${compExtractor.metaDescription || ''}"
 COMPETITOR H1: "${compExtractor.h1 || ''}"
-COMPETITOR H2 SUBHEADINGS: ${JSON.stringify(compExtractor.headings.slice(0, 10).map((h: any) => h.text))}
-COMPETITOR BODY EXCERPT: "${compExtractor.bodyText.substring(0, 1500).replace(/\s+/g, ' ')}"
+COMPETITOR H2 SUBHEADINGS: ${JSON.stringify((compExtractor.headings || (compExtractor.h2List || []).map(h => ({ text: h }))).slice(0, 10).map((h: any) => h?.text || ''))}
+COMPETITOR BODY EXCERPT: "${(compExtractor.bodyText || '').substring(0, 1500).replace(/\s+/g, ' ')}"
 
 CUSTOMER BUSINESS CONTEXT:
 - Category: ${type}
@@ -837,9 +837,11 @@ Output STRICTLY valid JSON:
     if (compExtractor.h1) {
       candidateTerms.push(compExtractor.h1.trim());
     }
-    compExtractor.headings.slice(0, 8).forEach((h: any) => {
-      if (h.text && h.text.length > 4 && h.text.length < 50) {
-        candidateTerms.push(h.text.trim());
+    const headingsList = compExtractor.headings || (compExtractor.h2List || []).map(h => ({ text: h }));
+    headingsList.slice(0, 8).forEach((h: any) => {
+      const text = typeof h === 'string' ? h : h?.text;
+      if (text && text.length > 4 && text.length < 50) {
+        candidateTerms.push(text.trim());
       }
     });
 

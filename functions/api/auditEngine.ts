@@ -206,6 +206,7 @@ export class Extractor {
   h3Count: number = 0;
   h2List: string[] = [];
   h3List: string[] = [];
+  headings: Array<{ level: string; text: string }> = [];
   headingsCount: number = 0;
   scriptCount: number = 0;
   stylesheetCount: number = 0;
@@ -309,7 +310,13 @@ export class Extractor {
         element: () => { this.h3Count++; }
       },
       heading: {
-        element: () => { this.headingsCount++; }
+        element: () => { this.headingsCount++; },
+        text: (t: any) => {
+          const text = t.text.trim();
+          if (text && this.headings.length < 20) {
+            this.headings.push({ level: 'h', text });
+          }
+        }
       },
       script: {
         element: (e: any) => {

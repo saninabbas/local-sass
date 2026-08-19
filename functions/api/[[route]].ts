@@ -197,11 +197,16 @@ export const onRequest = async (context: any) => {
       if (!session) return null;
 
       let user: any = await env.DB.prepare(
-        "SELECT id, name, email, subscription_status, role FROM users WHERE id = ?"
+        "SELECT id, name, email, role, avatar_url, subscription_status, subscription_tier, created_at FROM users WHERE id = ?"
       ).bind(session.user_id).first().catch(async () => {
+        await env.DB.prepare("ALTER TABLE users ADD COLUMN avatar_url TEXT").run().catch(() => {});
         return await env.DB.prepare(
-          "SELECT id, name, email, subscription_status FROM users WHERE id = ?"
-        ).bind(session.user_id).first();
+          "SELECT id, name, email, subscription_status, role FROM users WHERE id = ?"
+        ).bind(session.user_id).first().catch(async () => {
+          return await env.DB.prepare(
+            "SELECT id, name, email, subscription_status FROM users WHERE id = ?"
+          ).bind(session.user_id).first();
+        });
       });
 
       if (user && !user.role && user.email === 'saninabbas@gmail.com') {
@@ -550,6 +555,7 @@ export const onRequest = async (context: any) => {
       if (isD1SchemaEnsured) return;
       try {
         await db.prepare("ALTER TABLE users ADD COLUMN password_hash TEXT").run().catch(() => {});
+        await db.prepare("ALTER TABLE users ADD COLUMN avatar_url TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN polar_customer_id TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN polar_subscription_id TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN polar_product_id TEXT").run().catch(() => {});
@@ -937,6 +943,7 @@ export const onRequest = async (context: any) => {
       if (url.pathname === '/api/setup-db') {
         try {
           await env.DB.prepare("ALTER TABLE users ADD COLUMN password_hash TEXT").run().catch(() => {});
+          await env.DB.prepare("ALTER TABLE users ADD COLUMN avatar_url TEXT").run().catch(() => {});
           await env.DB.prepare("ALTER TABLE users ADD COLUMN polar_customer_id TEXT").run().catch(() => {});
           await env.DB.prepare("ALTER TABLE users ADD COLUMN subscription_status TEXT DEFAULT 'free'").run().catch(() => {});
           await env.DB.prepare("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0").run().catch(() => {});
@@ -1583,10 +1590,20 @@ export const onRequest = async (context: any) => {
           await env.DB.prepare("UPDATE users SET name = ? WHERE id = ?").bind(name.trim(), user.id).run();
         }
         if (avatar_url !== undefined) {
-          await env.DB.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").bind(avatar_url || null, user.id).run();
+          await env.DB.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").bind(avatar_url || null, user.id).run().catch(async () => {
+            await env.DB.prepare("ALTER TABLE users ADD COLUMN avatar_url TEXT").run().catch(() => {});
+            await env.DB.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").bind(avatar_url || null, user.id).run();
+          });
         }
 
-        const updatedUser = await env.DB.prepare("SELECT id, name, email, role, avatar_url, subscription_status, subscription_tier FROM users WHERE id = ?").bind(user.id).first();
+        const updatedUser = await env.DB.prepare(
+          "SELECT id, name, email, role, avatar_url, subscription_status, subscription_tier FROM users WHERE id = ?"
+        ).bind(user.id).first().catch(async () => {
+          await env.DB.prepare("ALTER TABLE users ADD COLUMN avatar_url TEXT").run().catch(() => {});
+          return await env.DB.prepare(
+            "SELECT id, name, email, role, subscription_status, subscription_tier FROM users WHERE id = ?"
+          ).bind(user.id).first();
+        });
         return jsonResponse({ success: true, message: "Profile updated successfully", data: updatedUser });
       }
 
@@ -1616,6 +1633,8 @@ export const onRequest = async (context: any) => {
           return errorResponse("Image exceeds maximum size limit of 2 MB.", 400);
         }
 
+        await env.DB.prepare("ALTER TABLE users ADD COLUMN avatar_url TEXT").run().catch(() => {});
+
         await env.DB.prepare(`
           CREATE TABLE IF NOT EXISTS user_avatars (
             user_id TEXT PRIMARY KEY,
@@ -1635,11 +1654,19 @@ export const onRequest = async (context: any) => {
         `).bind(user.id, contentType, base64Data).run();
 
         const avatarUrl = `/api/auth/avatar/${user.id}?t=${Date.now()}`;
-        await env.DB.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").bind(avatarUrl, user.id).run();
+        await env.DB.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").bind(avatarUrl, user.id).run().catch(async () => {
+          await env.DB.prepare("ALTER TABLE users ADD COLUMN avatar_url TEXT").run().catch(() => {});
+          await env.DB.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").bind(avatarUrl, user.id).run();
+        });
 
         const updatedUser = await env.DB.prepare(
           "SELECT id, name, email, role, avatar_url, subscription_status, subscription_tier FROM users WHERE id = ?"
-        ).bind(user.id).first();
+        ).bind(user.id).first().catch(async () => {
+          await env.DB.prepare("ALTER TABLE users ADD COLUMN avatar_url TEXT").run().catch(() => {});
+          return await env.DB.prepare(
+            "SELECT id, name, email, role, subscription_status, subscription_tier FROM users WHERE id = ?"
+          ).bind(user.id).first();
+        });
 
         return jsonResponse({
           success: true,
@@ -1686,12 +1713,18 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
+        await env.DB.prepare("ALTER TABLE users ADD COLUMN avatar_url TEXT").run().catch(() => {});
         await env.DB.prepare("DELETE FROM user_avatars WHERE user_id = ?").bind(user.id).run().catch(() => {});
         await env.DB.prepare("UPDATE users SET avatar_url = NULL WHERE id = ?").bind(user.id).run();
 
         const updatedUser = await env.DB.prepare(
           "SELECT id, name, email, role, avatar_url, subscription_status, subscription_tier FROM users WHERE id = ?"
-        ).bind(user.id).first();
+        ).bind(user.id).first().catch(async () => {
+          await env.DB.prepare("ALTER TABLE users ADD COLUMN avatar_url TEXT").run().catch(() => {});
+          return await env.DB.prepare(
+            "SELECT id, name, email, role, subscription_status, subscription_tier FROM users WHERE id = ?"
+          ).bind(user.id).first();
+        });
 
         return jsonResponse({
           success: true,
