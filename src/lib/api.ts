@@ -740,6 +740,26 @@ export async function fetchRankingHistory(keywordId: string, days: number = 30, 
   return fetchApi(`/api/rankings/${keywordId}/history?days=${days}${businessId ? `&business_id=${businessId}` : ''}`);
 }
 
+export async function extractCompetitorKeywords(competitorUrl: string, businessId?: string): Promise<any> {
+  return fetchApi('/api/competitors/keywords/extract', {
+    method: 'POST',
+    body: JSON.stringify({ competitorUrl, business_id: businessId })
+  });
+}
+
+export async function bulkAddRankingKeywords(keywords: Array<{
+  keyword: string;
+  location?: string;
+  countryCode?: string;
+  languageCode?: string;
+  device?: 'desktop' | 'mobile';
+}>, businessId?: string): Promise<any> {
+  return fetchApi('/api/rankings/keywords/bulk', {
+    method: 'POST',
+    body: JSON.stringify({ keywords, business_id: businessId })
+  });
+}
+
 
 
 

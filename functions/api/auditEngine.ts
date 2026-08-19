@@ -1334,13 +1334,113 @@ export function getFallbackRecommendations(business?: any, scores?: any) {
   };
 }
 
+function generateDeterministicBlog(
+  businessName: string,
+  city: string,
+  topic: string,
+  businessType: string
+): { title: string; metaDescription: string; content: string; keyTakeaways: string[]; focus_keywords: string[]; faqs: Array<{ question: string; answer: string }> } {
+  const cleanTopic = topic.trim();
+  const title = `${cleanTopic} in ${city} (2026 Expert Guide)`;
+  const metaDescription = `Complete guide to ${cleanTopic.toLowerCase()} in ${city}. Learn key benefits, proven strategies, and how ${businessName} delivers industry-leading results.`;
+  
+  const keyTakeaways = [
+    `Understanding the core principles of ${cleanTopic.toLowerCase()} is crucial for local competitive advantage in ${city}.`,
+    `Quality, reliability, and local expertise separate top-tier providers like ${businessName} from average competitors.`,
+    `Implementing structured procedures and proactive management yields long-term cost efficiency and superior outcomes.`
+  ];
+
+  const faqs = [
+    {
+      question: `What should I look for when choosing ${cleanTopic.toLowerCase()} services in ${city}?`,
+      answer: `Look for verified local track records, transparent pricing, verified client reviews, and direct consultation availability. ${businessName} provides free baseline assessments across ${city}.`
+    },
+    {
+      question: `How quickly can I see results or get started?`,
+      answer: `Initial assessments and onboarding can typically be scheduled within 24 to 48 hours for local inquiries.`
+    },
+    {
+      question: `Why is local expertise in ${city} important?`,
+      answer: `Local providers understand regional regulatory nuances, local search dynamics, and specific customer expectations unique to the ${city} market.`
+    }
+  ];
+
+  const content = `# ${title}
+
+${metaDescription}
+
+## Executive Summary & Key Takeaways
+${keyTakeaways.map(t => `- **${t}**`).join('\n')}
+
+---
+
+## 1. Introduction: Why ${cleanTopic} Matters in ${city}
+In today's fast-evolving landscape, navigating **${cleanTopic.toLowerCase()}** requires a strategic, localized approach. Whether you are an established enterprise or growing your local presence in **${city}**, choosing the right partner and methodologies can make the difference between sustained success and missed opportunities.
+
+At **${businessName}**, we specialize in delivering tailored ${businessType.toLowerCase()} solutions designed specifically for the unique demands of clients across ${city} and surrounding areas.
+
+---
+
+## 2. Key Challenges & What Most People Get Wrong
+Many individuals and businesses attempting ${cleanTopic.toLowerCase()} encounter several recurring pitfalls:
+- **Lack of Local Market Context:** Generic solutions fail to address ${city}-specific nuances and customer expectations.
+- **Inconsistent Quality Standards:** Cutting corners on foundational requirements leads to higher long-term costs.
+- **Delayed Execution:** Waiting until issues become urgent reduces flexibility and increases turnaround time.
+
+By partnering with proven specialists, you eliminate guesswork and ensure reliable, predictable outcomes from day one.
+
+---
+
+## 3. Step-by-Step Blueprint for Success
+To achieve optimal results with **${cleanTopic.toLowerCase()}**, follow these verified steps:
+
+### Step 1: Initial Discovery & Needs Assessment
+Begin with a comprehensive audit of your current status, specific objectives, and local competitive dynamics in ${city}.
+
+### Step 2: Custom Strategy & Transparent Roadmap
+Develop an actionable plan with clear milestones, transparent cost structures, and defined deliverables.
+
+### Step 3: Professional Execution & Quality Assurance
+Execute with rigorous standards, utilizing modern tools and verified industry best practices.
+
+### Step 4: Ongoing Monitoring & Continuous Optimization
+Track key performance metrics and adapt to emerging local trends in ${city} to maintain long-term leadership.
+
+---
+
+## 4. Why Choose ${businessName} in ${city}?
+When it comes to ${businessType.toLowerCase()} in ${city}, **${businessName}** stands out through:
+- **Proven Track Record:** Consistently recognized for high-standard execution and client satisfaction.
+- **Transparent Communication:** Clear deliverables, realistic timelines, and no hidden surprises.
+- **Dedicated Local Support:** Real team members ready to assist you every step of the way.
+
+---
+
+## 5. Frequently Asked Questions (FAQs)
+${faqs.map(f => `### Q: ${f.question}\n**A:** ${f.answer}`).join('\n\n')}
+
+---
+
+## 6. Take the Next Step Today
+Ready to elevate your outcomes with industry-leading **${cleanTopic.toLowerCase()}** in **${city}**? Contact **${businessName}** today to schedule your consultation and get a customized action plan.`;
+
+  return {
+    title,
+    metaDescription,
+    content,
+    keyTakeaways,
+    focus_keywords: [cleanTopic, `${cleanTopic} in ${city}`, `${city} ${businessType}`],
+    faqs
+  };
+}
+
 export async function generateBlogWithNVIDIA(
   apiKey: string,
   businessName: string,
   city: string,
   topic: string,
   businessType: string
-): Promise<{ title: string; metaDescription: string; content: string; keyTakeaways: string[] }> {
+): Promise<{ title: string; metaDescription: string; content: string; keyTakeaways: string[]; focus_keywords?: string[]; faqs?: Array<{ question: string; answer: string }> }> {
   const prompt = `Write a comprehensive, localized, high-ranking SEO blog post for a local business.
 Business Name: ${businessName}
 Business Type: ${businessType}
@@ -1362,31 +1462,59 @@ Return strictly valid JSON with this format:
   "content": "Full markdown content with headings and paragraphs"
 }`;
 
-  const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: "meta/llama-3.1-70b-instruct",
-      messages: [
-        { role: "system", content: "You write high-quality localized SEO blog posts. Return strictly valid JSON." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.5,
-      max_tokens: 1800
-    })
-  });
+  const models = ["meta/llama-3.1-8b-instruct", "meta/llama-3.3-70b-instruct", "meta/llama-3.1-70b-instruct"];
 
-  if (!response.ok) {
-    throw new Error(`NVIDIA API Error: ${response.status}`);
+  if (apiKey) {
+    for (const model of models) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+        const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: "You write high-quality localized SEO blog posts. Return strictly valid JSON." },
+              { role: "user", content: prompt }
+            ],
+            temperature: 0.4,
+            max_tokens: 1200
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const data = await response.json() as any;
+          const rawText = data.choices?.[0]?.message?.content?.trim();
+          if (rawText) {
+            const cleanedJson = rawText.replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();
+            const parsed = JSON.parse(cleanedJson);
+            if (parsed.title && parsed.content) {
+              return {
+                title: parsed.title,
+                metaDescription: parsed.metaDescription || parsed.meta_description || '',
+                content: parsed.content || parsed.html_content || '',
+                keyTakeaways: parsed.keyTakeaways || parsed.outline || [],
+                focus_keywords: [topic, `${topic} in ${city}`],
+                faqs: parsed.faqs || []
+              };
+            }
+          }
+        }
+      } catch (err: any) {
+        console.warn(`Model ${model} failed or timed out:`, err.message);
+      }
+    }
   }
 
-  const data = await response.json() as any;
-  const rawText = data.choices[0].message.content.trim();
-  const cleanedJson = rawText.replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();
-  return JSON.parse(cleanedJson);
+  return generateDeterministicBlog(businessName, city, topic, businessType);
 }
 
 export async function compareWithNVIDIA(
@@ -1397,6 +1525,7 @@ export async function compareWithNVIDIA(
   compScores: any,
   business: any
 ) {
+  if (!apiKey) return null;
   const prompt = `Compare these two websites and explain why the competitor ranks where they do and how our client can overtake them:
 CLIENT DOMAIN: ${business.website_url}
 - Score: ${myScores.overall}/100
@@ -1422,26 +1551,37 @@ Return JSON:
   ]
 }`;
 
-  const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: "meta/llama-3.1-70b-instruct",
-      messages: [
-        { role: "system", content: "You analyze competitor SEO gaps. Output strictly valid JSON." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.4,
-      max_tokens: 800
-    })
-  });
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-  if (!response.ok) return null;
-  const data = await response.json() as any;
-  const rawText = data.choices[0].message.content.trim();
-  const cleanedJson = rawText.replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();
-  return JSON.parse(cleanedJson);
+    const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: "meta/llama-3.1-8b-instruct",
+        messages: [
+          { role: "system", content: "You analyze competitor SEO gaps. Output strictly valid JSON." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 600
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) return null;
+    const data = await response.json() as any;
+    const rawText = data.choices?.[0]?.message?.content?.trim();
+    if (!rawText) return null;
+    const cleanedJson = rawText.replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();
+    return JSON.parse(cleanedJson);
+  } catch {
+    return null;
+  }
 }

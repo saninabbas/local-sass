@@ -6,6 +6,8 @@ import {
   discoverCompetitors, 
   analyzeCompetitorDeep,
   fetchCompetitorsReputation,
+  extractCompetitorKeywords,
+  bulkAddRankingKeywords,
   getDashboard 
 } from '../../lib/api';
 import { Button } from '../../components/ui/Button';
@@ -30,9 +32,13 @@ import {
   ArrowRight, 
   ShieldCheck, 
   Check, 
-  MessageSquare 
+  MessageSquare,
+  Key,
+  CheckSquare,
+  Square,
+  Target
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { DiscoveredCompetitor } from '../../types';
 
 interface AnalysisResult {
@@ -84,8 +90,19 @@ interface AnalysisResult {
   };
 }
 
+export interface CompetitorKeywordItem {
+  keyword: string;
+  intent: 'COMMERCIAL' | 'TRANSACTIONAL' | 'INFORMATIONAL' | 'LOCAL';
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  relevance: 'HIGH' | 'MEDIUM' | 'LOW';
+  competitorEvidence: string;
+  status: 'OPPORTUNITY' | 'ALREADY_TRACKED';
+  isTracked: boolean;
+}
+
 export function Competitors() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [discoveredList, setDiscoveredList] = useState<DiscoveredCompetitor[]>([]);
   const [reputationData, setReputationData] = useState<any | null>(null);
@@ -98,6 +115,15 @@ export function Competitors() {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+
+  // Keyword Extraction & Tracking State
+  const [keywordOpportunities, setKeywordOpportunities] = useState<CompetitorKeywordItem[]>([]);
+  const [extractingKeywords, setExtractingKeywords] = useState(false);
+  const [selectedKeywords, setSelectedKeywords] = useState<Set<string>>(new Set());
+  const [submittingKeywords, setSubmittingKeywords] = useState(false);
+  const [trackingSuccessMessage, setTrackingSuccessMessage] = useState<string | null>(null);
+  const [keywordFilterTab, setKeywordFilterTab] = useState<'all' | 'opportunities' | 'tracked'>('all');
+  const [keywordSearchQuery, setKeywordSearchQuery] = useState('');
 
   const loadData = async () => {
     setLoading(true);
@@ -148,16 +174,122 @@ export function Competitors() {
     if (!targetUrl) return;
 
     setAnalyzing(true);
+    setExtractingKeywords(true);
     setError(null);
+    setTrackingSuccessMessage(null);
     try {
-      const result = await analyzeCompetitorDeep(targetUrl);
-      setAnalysisResult(result);
+      const [result, kwRes] = await Promise.allSettled([
+        analyzeCompetitorDeep(targetUrl),
+        extractCompetitorKeywords(targetUrl)
+      ]);
+
+      if (result.status === 'fulfilled') {
+        setAnalysisResult(result.value);
+      } else {
+        setError(result.reason?.message || "Deep competitor analysis failed.");
+      }
+
+      if (kwRes.status === 'fulfilled' && kwRes.value?.data?.keywords) {
+        const kws: CompetitorKeywordItem[] = kwRes.value.data.keywords;
+        setKeywordOpportunities(kws);
+        // Pre-select all non-tracked opportunities
+        const initialSelected = new Set<string>();
+        kws.filter(k => !k.isTracked).forEach(k => initialSelected.add(k.keyword));
+        setSelectedKeywords(initialSelected);
+      }
     } catch (err: any) {
-      setError(err.message || "Deep competitor analysis failed.");
+      setError(err.message || "Competitor analysis failed.");
     } finally {
       setAnalyzing(false);
+      setExtractingKeywords(false);
     }
   };
+
+  const handleExtractOnlyKeywords = async (targetUrl: string) => {
+    setSelectedCompUrl(targetUrl);
+    setExtractingKeywords(true);
+    setTrackingSuccessMessage(null);
+    try {
+      const res = await extractCompetitorKeywords(targetUrl);
+      if (res?.data?.keywords) {
+        const kws: CompetitorKeywordItem[] = res.data.keywords;
+        setKeywordOpportunities(kws);
+        const initialSelected = new Set<string>();
+        kws.filter(k => !k.isTracked).forEach(k => initialSelected.add(k.keyword));
+        setSelectedKeywords(initialSelected);
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to extract keywords.");
+    } finally {
+      setExtractingKeywords(false);
+    }
+  };
+
+  const toggleKeywordSelection = (kw: string) => {
+    const next = new Set(selectedKeywords);
+    if (next.has(kw)) {
+      next.delete(kw);
+    } else {
+      next.add(kw);
+    }
+    setSelectedKeywords(next);
+  };
+
+  const toggleSelectAll = () => {
+    const untrackedKws = keywordOpportunities.filter(k => !k.isTracked).map(k => k.keyword);
+    const allSelected = untrackedKws.length > 0 && untrackedKws.every(k => selectedKeywords.has(k));
+
+    if (allSelected) {
+      setSelectedKeywords(new Set());
+    } else {
+      const next = new Set<string>();
+      untrackedKws.forEach(k => next.add(k));
+      setSelectedKeywords(next);
+    }
+  };
+
+  const handleSubmitForTracking = async () => {
+    if (selectedKeywords.size === 0) return;
+
+    setSubmittingKeywords(true);
+    setTrackingSuccessMessage(null);
+    try {
+      const keywordsToSubmit = Array.from(selectedKeywords).map(kw => ({
+        keyword: kw,
+        location: dashboardData?.business?.city || 'United States',
+        countryCode: dashboardData?.business?.country === 'PAKISTAN' ? 'PK' : 'US',
+        device: 'desktop' as const
+      }));
+
+      const res = await bulkAddRankingKeywords(keywordsToSubmit);
+      if (res?.success) {
+        // Mark submitted keywords as tracked in local state
+        setKeywordOpportunities(prev => prev.map(k => {
+          if (selectedKeywords.has(k.keyword)) {
+            return { ...k, isTracked: true, status: 'ALREADY_TRACKED' };
+          }
+          return k;
+        }));
+        setSelectedKeywords(new Set());
+        setTrackingSuccessMessage(`Successfully added ${res.data?.addedCount || keywordsToSubmit.length} keywords to tracking! Real SERP rankings are now live.`);
+      } else {
+        throw new Error(res?.message || res?.error || "Failed to submit keywords");
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to submit keywords for tracking.");
+    } finally {
+      setSubmittingKeywords(false);
+    }
+  };
+
+  const filteredKeywords = keywordOpportunities.filter(item => {
+    if (keywordFilterTab === 'opportunities' && item.isTracked) return false;
+    if (keywordFilterTab === 'tracked' && !item.isTracked) return false;
+    if (keywordSearchQuery) {
+      return item.keyword.toLowerCase().includes(keywordSearchQuery.toLowerCase());
+    }
+    return true;
+  });
 
   const myBusiness = dashboardData?.business;
   const myGrowthScore = dashboardData?.growthScore?.overall || 65;
@@ -305,16 +437,28 @@ export function Competitors() {
                 </div>
               </div>
 
-              <button
-                onClick={() => {
-                  setSelectedCompUrl(comp.url);
-                  handleDeepAnalyze(comp.url);
-                }}
-                disabled={analyzing}
-                className="mt-4 w-full py-1.5 rounded-lg bg-white hover:bg-gray-100 border border-gray-200 text-xs font-semibold text-primary transition-colors cursor-pointer"
-              >
-                {analyzing && selectedCompUrl === comp.url ? 'Analyzing...' : 'Deep Gap Analysis'}
-              </button>
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                <button
+                  onClick={() => {
+                    setSelectedCompUrl(comp.url);
+                    handleDeepAnalyze(comp.url);
+                  }}
+                  disabled={analyzing}
+                  className="py-1.5 px-2 rounded-lg bg-white hover:bg-gray-100 border border-gray-200 text-xs font-semibold text-primary transition-colors cursor-pointer truncate"
+                >
+                  {analyzing && selectedCompUrl === comp.url ? 'Analyzing...' : 'Deep Analysis'}
+                </button>
+                <button
+                  onClick={() => {
+                    handleExtractOnlyKeywords(comp.url);
+                  }}
+                  disabled={extractingKeywords}
+                  className="py-1.5 px-2 rounded-lg bg-[#cc785c] hover:bg-[#b8674d] text-white text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1 truncate"
+                >
+                  <Key size={11} />
+                  <span>{extractingKeywords && selectedCompUrl === comp.url ? 'Extracting...' : 'Keywords'}</span>
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -411,14 +555,274 @@ export function Competitors() {
           variant="primary"
           onClick={() => handleDeepAnalyze(customUrl)}
           disabled={!customUrl || analyzing}
-          className="bg-primary-accent hover:bg-blue-700 text-white text-xs font-semibold h-10 px-5 shrink-0 mt-auto"
+          className="bg-primary-accent hover:bg-blue-700 text-white text-xs font-semibold h-10 px-5 shrink-0 mt-auto flex items-center gap-2"
         >
           {analyzing ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
           <span>Run Side-by-Side Analysis</span>
         </Button>
       </div>
 
-      {/* 4. DEEP GAP ANALYSIS: "WHY ARE THEY RANKING ABOVE ME?" */}
+      {/* SUCCESS BANNER WHEN KEYWORDS ARE SUBMITTED */}
+      {trackingSuccessMessage && (
+        <div className="mb-8 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 size={22} className="text-emerald-600 shrink-0" />
+            <div>
+              <h4 className="font-bold text-sm text-emerald-900">Keywords Submitted to Tracking</h4>
+              <p className="text-xs text-emerald-800 font-sans mt-0.5">{trackingSuccessMessage}</p>
+            </div>
+          </div>
+          <Link
+            to="/dashboard/keywords"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs shadow-xs transition-colors shrink-0"
+          >
+            <span>View in Keywords Radar</span>
+            <ArrowRight size={13} />
+          </Link>
+        </div>
+      )}
+
+      {/* 4. EXTRACTED KEYWORD OPPORTUNITIES & GAP RADAR */}
+      {keywordOpportunities.length > 0 && (
+        <div className="bg-white p-6 rounded-2xl border border-[#e6dfd8] shadow-xs mb-8 space-y-5 animate-in fade-in duration-200">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#e6dfd8]">
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[#8e8b82] block mb-1">
+                Real Keyword Intelligence Engine
+              </span>
+              <h2 className="text-lg font-serif font-bold text-[#141413] flex items-center gap-2">
+                <Target size={20} className="text-[#cc785c]" />
+                <span>Extracted Competitor Keyword Opportunities</span>
+                <span className="text-xs font-mono font-normal px-2.5 py-0.5 rounded-full bg-[#efe9de] text-[#141413]">
+                  {keywordOpportunities.filter(k => !k.isTracked).length} New Opportunities
+                </span>
+              </h2>
+              <p className="text-xs text-[#6c6a64] mt-1 font-sans">
+                Real search keywords extracted from competitor on-page content, cross-referenced against your tracked list to eliminate duplicates.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleSelectAll}
+                className="text-xs font-semibold border-[#e6dfd8] text-[#141413] hover:bg-[#efe9de]"
+              >
+                {keywordOpportunities.filter(k => !k.isTracked).every(k => selectedKeywords.has(k.keyword)) && selectedKeywords.size > 0
+                  ? 'Deselect All' 
+                  : 'Select All New Opportunities'}
+              </Button>
+
+              <Button
+                size="sm"
+                onClick={handleSubmitForTracking}
+                disabled={selectedKeywords.size === 0 || submittingKeywords}
+                className="bg-[#141413] hover:bg-[#252320] text-[#faf9f5] text-xs font-semibold flex items-center gap-1.5 h-9 px-4"
+              >
+                {submittingKeywords ? (
+                  <>
+                    <RefreshCw size={13} className="animate-spin text-[#cc785c]" />
+                    <span>Checking SERP & Submitting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check size={13} className="text-emerald-400" />
+                    <span>Submit Selected for Tracking ({selectedKeywords.size})</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Filter Tabs & Search Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+            <div className="flex items-center gap-1 bg-[#faf9f5] p-1 rounded-xl border border-[#e6dfd8]">
+              <button
+                type="button"
+                onClick={() => setKeywordFilterTab('all')}
+                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                  keywordFilterTab === 'all' ? 'bg-white shadow-xs text-[#141413]' : 'text-[#8e8b82] hover:text-[#141413]'
+                }`}
+              >
+                All ({keywordOpportunities.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setKeywordFilterTab('opportunities')}
+                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                  keywordFilterTab === 'opportunities' ? 'bg-white shadow-xs text-emerald-700' : 'text-[#8e8b82] hover:text-[#141413]'
+                }`}
+              >
+                New Opportunities ({keywordOpportunities.filter(k => !k.isTracked).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setKeywordFilterTab('tracked')}
+                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                  keywordFilterTab === 'tracked' ? 'bg-white shadow-xs text-blue-700' : 'text-[#8e8b82] hover:text-[#141413]'
+                }`}
+              >
+                Already Tracked ({keywordOpportunities.filter(k => k.isTracked).length})
+              </button>
+            </div>
+
+            <div className="relative w-full sm:w-64">
+              <Search size={14} className="absolute left-3 top-2.5 text-[#8e8b82]" />
+              <input
+                type="text"
+                placeholder="Search extracted keywords..."
+                value={keywordSearchQuery}
+                onChange={(e) => setKeywordSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 text-xs font-mono rounded-xl border border-[#e6dfd8] bg-[#faf9f5] focus:bg-white focus:outline-none focus:border-[#cc785c]"
+              />
+            </div>
+          </div>
+
+          {/* Keywords Table */}
+          <div className="overflow-x-auto rounded-xl border border-[#e6dfd8]">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#faf9f5] border-b border-[#e6dfd8] text-[10px] font-mono uppercase tracking-wider text-[#8e8b82]">
+                <tr>
+                  <th className="py-2.5 px-3 w-10 text-center">
+                    <button
+                      type="button"
+                      onClick={toggleSelectAll}
+                      className="cursor-pointer text-[#8e8b82] hover:text-[#141413]"
+                    >
+                      {keywordOpportunities.filter(k => !k.isTracked).every(k => selectedKeywords.has(k.keyword)) && selectedKeywords.size > 0 ? (
+                        <CheckSquare size={16} className="text-[#141413]" />
+                      ) : (
+                        <Square size={16} />
+                      )}
+                    </button>
+                  </th>
+                  <th className="py-2.5 px-3">Keyword Opportunity</th>
+                  <th className="py-2.5 px-3">Search Intent</th>
+                  <th className="py-2.5 px-3">Relevance / Difficulty</th>
+                  <th className="py-2.5 px-3">Competitor Evidence</th>
+                  <th className="py-2.5 px-3 text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#efe9de] font-sans">
+                {filteredKeywords.map((item, idx) => {
+                  const isSelected = selectedKeywords.has(item.keyword);
+                  return (
+                    <tr
+                      key={item.keyword || idx}
+                      className={`transition-colors ${
+                        item.isTracked 
+                          ? 'bg-[#faf9f5]/60 opacity-80' 
+                          : isSelected 
+                            ? 'bg-[#fdfbf7] hover:bg-[#faf6ee]' 
+                            : 'hover:bg-[#faf9f5]'
+                      }`}
+                    >
+                      <td className="py-3 px-3 text-center">
+                        {item.isTracked ? (
+                          <CheckCircle2 size={16} className="text-emerald-600 mx-auto" />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => toggleKeywordSelection(item.keyword)}
+                            className="cursor-pointer text-[#8e8b82] hover:text-[#141413]"
+                          >
+                            {isSelected ? (
+                              <CheckSquare size={16} className="text-[#cc785c]" />
+                            ) : (
+                              <Square size={16} />
+                            )}
+                          </button>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-3">
+                        <span className="font-bold text-[#141413] block">{item.keyword}</span>
+                      </td>
+
+                      <td className="py-3 px-3 font-mono text-[11px]">
+                        <span className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] ${
+                          item.intent === 'LOCAL' 
+                            ? 'bg-purple-100 text-purple-800' 
+                            : item.intent === 'COMMERCIAL' 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : item.intent === 'TRANSACTIONAL' 
+                                ? 'bg-emerald-100 text-emerald-800' 
+                                : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {item.intent}
+                        </span>
+                      </td>
+
+                      <td className="py-3 px-3 text-[11px] font-mono">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`px-1.5 py-0.5 rounded font-bold uppercase text-[10px] ${
+                            item.relevance === 'HIGH' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {item.relevance} Rel
+                          </span>
+                          <span className="text-[#8e8b82]">•</span>
+                          <span className="text-[#6c6a64]">{item.difficulty} Diff</span>
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-3 text-xs text-[#6c6a64] max-w-xs truncate">
+                        <span title={item.competitorEvidence}>{item.competitorEvidence}</span>
+                      </td>
+
+                      <td className="py-3 px-3 text-right">
+                        {item.isTracked ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 font-mono text-[10px] font-bold border border-blue-200">
+                            <Check size={11} />
+                            <span>TRACKED</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-mono text-[10px] font-bold border border-emerald-200">
+                            <span>OPPORTUNITY</span>
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Bottom Action Strip */}
+          <div className="p-3 bg-[#faf9f5] rounded-xl border border-[#e6dfd8] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-[#6c6a64]">
+              <Target size={14} className="text-[#cc785c]" />
+              <span>
+                <strong>{selectedKeywords.size}</strong> keyword{selectedKeywords.size === 1 ? '' : 's'} selected for tracking
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={handleSubmitForTracking}
+                disabled={selectedKeywords.size === 0 || submittingKeywords}
+                className="bg-[#141413] hover:bg-[#252320] text-[#faf9f5] text-xs font-semibold flex items-center gap-1.5 h-8 px-4"
+              >
+                {submittingKeywords ? (
+                  <>
+                    <RefreshCw size={12} className="animate-spin text-[#cc785c]" />
+                    <span>Submitting to Live SERP...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check size={12} className="text-emerald-400" />
+                    <span>Submit Selected for Tracking ({selectedKeywords.size})</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. DEEP GAP ANALYSIS: "WHY ARE THEY RANKING ABOVE ME?" */}
       {analysisResult && (
         <div className="space-y-6 mb-8 animate-in fade-in duration-200">
           

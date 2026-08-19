@@ -127,27 +127,28 @@ export function Content() {
         contentType
       });
 
+      const resData = response?.data || response || {};
       const pkg: GeneratedPackage = {
-        title: response.title || `${finalTopic}: Comprehensive Guide`,
-        meta_description: response.meta_description || `Discover expert insights on ${finalTopic}. Fast, reliable local service. Schedule your appointment today!`,
-        slug: response.slug || finalTopic.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-        h1: response.title || finalTopic,
-        outline: [
+        title: resData.title || `${finalTopic}: Comprehensive Guide`,
+        meta_description: resData.metaDescription || resData.meta_description || `Discover expert insights on ${finalTopic}. Fast, reliable local service. Schedule your appointment today!`,
+        slug: resData.slug || finalTopic.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        h1: resData.title || finalTopic,
+        outline: resData.outline || resData.keyTakeaways || [
           'Overview & Importance in Your Local Area',
           'Key Symptoms & What to Look For',
           'Step-by-Step Treatment / Service Process',
           'Cost, Financing & Value Breakdown',
           'Frequently Asked Questions & Next Steps'
         ],
-        html_content: response.html_content || `<h2>Introduction</h2><p>When searching for trusted services, finding an experienced provider is paramount...</p>`,
-        read_time_minutes: response.read_time_minutes || 4,
-        focus_keywords: response.focus_keywords || [finalTopic, 'local service', 'pricing guide'],
-        faqs: [
+        html_content: resData.content || resData.html_content || `<h2>Introduction</h2><p>When searching for trusted services, finding an experienced provider is paramount...</p>`,
+        read_time_minutes: resData.read_time_minutes || 4,
+        focus_keywords: resData.focus_keywords || [finalTopic, 'local service', 'pricing guide'],
+        faqs: resData.faqs || [
           { question: `How much does ${finalTopic.toLowerCase()} typically cost?`, answer: 'Costs vary depending on individual requirements. We offer transparent estimates during your baseline consultation.' },
           { question: 'How quickly can I schedule an appointment?', answer: 'We offer same-day and next-day availability for urgent local inquiries.' }
         ],
-        internalLinks: ['/services/primary-care', '/contact', '/pricing'],
-        ctaText: 'Schedule Your Confidential Consultation Today'
+        internalLinks: resData.internalLinks || ['/services/primary-care', '/contact', '/pricing'],
+        ctaText: resData.ctaText || 'Schedule Your Confidential Consultation Today'
       };
 
       setGeneratedPackage(pkg);

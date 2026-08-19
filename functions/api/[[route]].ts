@@ -1961,17 +1961,13 @@ export const onRequest = async (context: any) => {
 
         if (!business) return errorResponse("Business not found", 404);
 
-        if (!env.NVIDIA_API_KEY) {
-          return errorResponse("AI is not configured on the server.", 500);
-        }
-
         try {
           const { generateBlogWithNVIDIA } = await import('./auditEngine');
           const businessName = (business.name as string) || "Our Local Business";
           const city = (business.city as string) || "our city";
           const businessType = (business.type as string) || "Local Service";
 
-          const blogData = await generateBlogWithNVIDIA(env.NVIDIA_API_KEY, businessName, city, topic, businessType);
+          const blogData = await generateBlogWithNVIDIA(env.NVIDIA_API_KEY || '', businessName, city, topic, businessType);
           
           return jsonResponse({ success: true, data: blogData });
         } catch (error: any) {
@@ -2235,6 +2231,35 @@ export const onRequest = async (context: any) => {
           return jsonResponse({ success: true, data: analysis });
         } catch (err: any) {
           return errorResponse("Failed deep competitor analysis: " + err.message, 500);
+        }
+      }
+
+      // --- COMPETITORS: EXTRACT REAL KEYWORD OPPORTUNITIES ---
+      if (url.pathname === '/api/competitors/keywords/extract' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        let payload: any;
+        try { payload = await request.json(); } catch { return errorResponse("Invalid JSON", 400); }
+        if (!payload.competitorUrl) return errorResponse("Competitor URL is required", 400);
+
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business || !business.website_url) return errorResponse("You must have a business website configured", 400);
+
+        try {
+          const { extractCompetitorKeywords } = await import('./competitorEngine');
+          const result = await extractCompetitorKeywords(business, payload.competitorUrl, env.NVIDIA_API_KEY || null, env.DB);
+          return jsonResponse({ success: true, data: result });
+        } catch (err: any) {
+          return errorResponse("Failed to extract competitor keyword opportunities: " + err.message, 500);
         }
       }
 
@@ -4648,6 +4673,146 @@ export const onRequest = async (context: any) => {
             competitors: serpResult?.competitors || [],
             lastCheckedAt: new Date().toISOString(),
             providerError: serpError
+          }
+        });
+      }
+
+      // POST /api/rankings/keywords/bulk — Bulk add multiple keyword opportunities to tracking with real SERP checks
+      if (url.pathname === '/api/rankings/keywords/bulk' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const payload = await request.json().catch(() => ({})) as any;
+        const rawKeywords = Array.isArray(payload.keywords) ? payload.keywords : [];
+        if (rawKeywords.length === 0) {
+          return errorResponse("Keywords array cannot be empty", 400);
+        }
+
+        const targetBizId = payload.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const targetDomain = (business.website_url || '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+        const defaultLocation = (payload.location || business.city || 'United States').trim();
+        const defaultCountryCode = (payload.countryCode || 'US').toUpperCase();
+        const defaultLanguageCode = (payload.languageCode || 'en').toLowerCase();
+
+        // Get currently tracked keywords to prevent duplicates
+        const existingKws = await env.DB.prepare("SELECT keyword FROM ranking_keywords WHERE business_id = ?").bind(business.id).all().catch(() => ({ results: [] }));
+        const existingSet = new Set<string>();
+        if (Array.isArray(existingKws?.results)) {
+          existingKws.results.forEach((r: any) => {
+            if (r.keyword) existingSet.add(r.keyword.toLowerCase().trim());
+          });
+        }
+
+        const { executeSERPSearch, calculateRankingMovement } = await import('./rankingEngine');
+        const processedList: any[] = [];
+        let addedCount = 0;
+
+        for (const item of rawKeywords) {
+          const kwStr = typeof item === 'string' ? item : item.keyword;
+          if (!kwStr || typeof kwStr !== 'string') continue;
+          const cleanKw = kwStr.trim();
+          const normalized = cleanKw.toLowerCase();
+          if (existingSet.has(normalized)) continue;
+          existingSet.add(normalized);
+
+          const location = (item.location || defaultLocation).trim();
+          const countryCode = (item.countryCode || defaultCountryCode).toUpperCase();
+          const languageCode = (item.languageCode || defaultLanguageCode).toLowerCase();
+          const device = item.device === 'mobile' ? 'mobile' : 'desktop';
+          const keywordId = crypto.randomUUID();
+
+          // 1. Save to ranking_keywords
+          await env.DB.prepare(`
+            INSERT INTO ranking_keywords (id, business_id, keyword, location, country_code, language_code, device, target_domain, is_active, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          `).bind(keywordId, business.id, cleanKw, location, countryCode, languageCode, device, targetDomain).run();
+
+          // 2. Perform live SERP search
+          let serpResult: any = null;
+          let serpError: string | null = null;
+          try {
+            serpResult = await executeSERPSearch(env, {
+              keyword: cleanKw,
+              location,
+              countryCode,
+              languageCode,
+              device,
+              targetDomain
+            });
+          } catch (err: any) {
+            serpError = err.message || 'SERP search failed';
+          }
+
+          const currentPos = serpResult?.position || null;
+          const movement = calculateRankingMovement(null, currentPos);
+          const rankingUrl = serpResult?.rankingUrl || null;
+          const found = currentPos !== null ? 1 : 0;
+          const status = serpResult ? movement.status : 'NOT_RANKING';
+
+          // 3. Save to ranking_results
+          const resultId = crypto.randomUUID();
+          await env.DB.prepare(`
+            INSERT INTO ranking_results (id, business_id, keyword_id, keyword, location, country_code, device, position, previous_position, position_change, ranking_url, found, status, checked_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          `).bind(resultId, business.id, keywordId, cleanKw, location, countryCode, device, currentPos, rankingUrl, found, status).run();
+
+          if (currentPos !== null) {
+            await env.DB.prepare(`
+              INSERT INTO ranking_snapshots (id, business_id, keyword_id, position, ranking_url, device, checked_at)
+              VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            `).bind(crypto.randomUUID(), business.id, keywordId, currentPos, rankingUrl, device).run().catch(() => {});
+          }
+
+          // Backward compatibility sync into `keywords` table
+          await env.DB.prepare(`
+            INSERT OR REPLACE INTO keywords (id, business_id, keyword, location, zip_code, intent, current_position, previous_position, local_pack_position, status, data_source, best_competitor, competitor_position, last_checked_at)
+            VALUES (?, ?, ?, ?, ?, 'LOCAL', ?, NULL, ?, ?, 'serp_engine', ?, ?, CURRENT_TIMESTAMP)
+          `).bind(
+            keywordId,
+            business.id,
+            cleanKw,
+            location,
+            '',
+            currentPos,
+            serpResult?.localPackPosition || null,
+            currentPos ? 'UP' : 'NOT FOUND',
+            serpResult?.competitors?.[0]?.title || 'Competitor',
+            serpResult?.competitors?.[0]?.position || 1
+          ).run().catch(() => {});
+
+          addedCount++;
+          processedList.push({
+            id: keywordId,
+            keyword: cleanKw,
+            location,
+            countryCode,
+            device,
+            currentPosition: currentPos,
+            status,
+            rankingUrl,
+            found: found === 1,
+            competitors: serpResult?.competitors || [],
+            lastCheckedAt: new Date().toISOString(),
+            providerError: serpError
+          });
+        }
+
+        return jsonResponse({
+          success: true,
+          data: {
+            addedCount,
+            keywords: processedList,
+            message: `Successfully added ${addedCount} keywords to active tracking.`
           }
         });
       }

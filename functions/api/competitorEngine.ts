@@ -674,3 +674,226 @@ export async function generateGrowthRoadmap(db: any, businessId: string) {
   return { today, this_week, this_month, next_90_days };
 }
 
+export interface CompetitorKeywordOpportunity {
+  keyword: string;
+  intent: 'COMMERCIAL' | 'TRANSACTIONAL' | 'INFORMATIONAL' | 'LOCAL';
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  relevance: 'HIGH' | 'MEDIUM' | 'LOW';
+  estimatedVolume?: string;
+  competitorEvidence: string;
+  status: 'OPPORTUNITY' | 'ALREADY_TRACKED';
+  isTracked: boolean;
+}
+
+export async function extractCompetitorKeywords(
+  business: any,
+  competitorUrl: string,
+  nvidiaApiKey: string | null,
+  db: any
+): Promise<{
+  competitorUrl: string;
+  competitorDomain: string;
+  totalExtracted: number;
+  newOpportunitiesCount: number;
+  alreadyTrackedCount: number;
+  keywords: CompetitorKeywordOpportunity[];
+}> {
+  const compDomain = competitorUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+  const targetUrl = competitorUrl.startsWith('http') ? competitorUrl : `https://${competitorUrl}`;
+
+  // 1. Fetch competitor website
+  const compFetchRes = await fetchWithTimeout(targetUrl, 10000);
+  const compRes = compFetchRes.response;
+  const compText = await compRes.text().catch(() => '');
+
+  const compExtractor = new Extractor();
+  compExtractor.httpStatus = compRes.status;
+  compExtractor.isHttps = targetUrl.startsWith('https');
+
+  const compRewriter = new HTMLRewriter()
+    .on('html', compExtractor.handlers.html)
+    .on('title', compExtractor.handlers.title)
+    .on('meta', compExtractor.handlers.meta)
+    .on('h1', compExtractor.handlers.h1)
+    .on('h2', compExtractor.handlers.h2)
+    .on('h3', compExtractor.handlers.h3)
+    .on('h1, h2, h3, h4, h5, h6', compExtractor.handlers.heading)
+    .on('a', compExtractor.handlers.a)
+    .on('body', compExtractor.handlers.body);
+
+  try {
+    const freshRes = new Response(compText, { status: compRes.status, headers: compRes.headers });
+    await compRewriter.transform(freshRes).text().catch(() => {});
+  } catch (e) {
+    // ignore
+  }
+
+  populateExtractorFromHtml(compExtractor, compText);
+
+  // 2. Fetch all existing tracked keywords for this business to eliminate duplicates
+  const [rankingKwsRows, legacyKwsRows] = await Promise.all([
+    db.prepare("SELECT keyword FROM ranking_keywords WHERE business_id = ?").bind(business.id).all().catch(() => ({ results: [] })),
+    db.prepare("SELECT keyword FROM keywords WHERE business_id = ?").bind(business.id).all().catch(() => ({ results: [] }))
+  ]);
+
+  const trackedKeywordsSet = new Set<string>();
+  const normalize = (kw: string) => kw.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ');
+
+  if (Array.isArray(rankingKwsRows?.results)) {
+    rankingKwsRows.results.forEach((r: any) => {
+      if (r.keyword) trackedKeywordsSet.add(normalize(r.keyword));
+    });
+  }
+  if (Array.isArray(legacyKwsRows?.results)) {
+    legacyKwsRows.results.forEach((r: any) => {
+      if (r.keyword) trackedKeywordsSet.add(normalize(r.keyword));
+    });
+  }
+
+  // 3. AI or Deterministic Keyword Extraction
+  let extractedRaw: Array<{
+    keyword: string;
+    intent: 'COMMERCIAL' | 'TRANSACTIONAL' | 'INFORMATIONAL' | 'LOCAL';
+    difficulty: 'Easy' | 'Medium' | 'Hard';
+    relevance: 'HIGH' | 'MEDIUM' | 'LOW';
+    competitorEvidence: string;
+  }> = [];
+
+  const city = business.city || '';
+  const type = business.type || '';
+
+  if (nvidiaApiKey) {
+    try {
+      const prompt = `You are a Senior SEO Strategist & Competitive Keyword Intelligence Engine.
+Analyze the following competitor website on-page content and extract 10 to 15 REAL, high-intent keyword opportunities that this competitor is ranking for or optimizing for.
+
+COMPETITOR URL: ${targetUrl}
+COMPETITOR TITLE: "${compExtractor.title || ''}"
+COMPETITOR META DESCRIPTION: "${compExtractor.metaDescription || ''}"
+COMPETITOR H1: "${compExtractor.h1 || ''}"
+COMPETITOR H2 SUBHEADINGS: ${JSON.stringify(compExtractor.headings.slice(0, 10).map((h: any) => h.text))}
+COMPETITOR BODY EXCERPT: "${compExtractor.bodyText.substring(0, 1500).replace(/\s+/g, ' ')}"
+
+CUSTOMER BUSINESS CONTEXT:
+- Category: ${type}
+- Location / City: ${city}
+
+INSTRUCTIONS:
+1. Extract high-commercial, transactional, and local search queries that real users type into Google to find these services.
+2. Provide concrete on-page evidence from the competitor's headings or title for each keyword.
+3. Classify each keyword's intent (COMMERCIAL, TRANSACTIONAL, INFORMATIONAL, LOCAL).
+4. Assign estimated keyword difficulty (Easy, Medium, Hard) and relevance to the customer (HIGH, MEDIUM, LOW).
+
+Output STRICTLY valid JSON:
+{
+  "keywords": [
+    {
+      "keyword": "example service in city",
+      "intent": "LOCAL",
+      "difficulty": "Easy",
+      "relevance": "HIGH",
+      "competitorEvidence": "Found in competitor H1 heading and title tag"
+    }
+  ]
+}`;
+
+      const aiRes = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${nvidiaApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'meta/llama-3.1-70b-instruct',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.2,
+          max_tokens: 1500,
+          response_format: { type: 'json_object' }
+        })
+      });
+
+      if (aiRes.ok) {
+        const aiJson: any = await aiRes.json();
+        const rawContent = aiJson.choices?.[0]?.message?.content || '{}';
+        const parsed = JSON.parse(rawContent);
+        if (Array.isArray(parsed.keywords)) {
+          extractedRaw = parsed.keywords;
+        }
+      }
+    } catch (e) {
+      console.warn("AI competitor keyword extraction failed, using deterministic fallback:", e);
+    }
+  }
+
+  // Fallback if AI was unavailable or produced empty array
+  if (extractedRaw.length === 0) {
+    const candidateTerms: string[] = [];
+    if (compExtractor.title) {
+      compExtractor.title.split(/[-|–,]/).forEach(t => {
+        const clean = t.trim();
+        if (clean.length > 3 && clean.length < 50) candidateTerms.push(clean);
+      });
+    }
+    if (compExtractor.h1) {
+      candidateTerms.push(compExtractor.h1.trim());
+    }
+    compExtractor.headings.slice(0, 8).forEach((h: any) => {
+      if (h.text && h.text.length > 4 && h.text.length < 50) {
+        candidateTerms.push(h.text.trim());
+      }
+    });
+
+    // Default combinations with city/type
+    if (type) candidateTerms.push(type);
+    if (type && city) {
+      candidateTerms.push(`${type} in ${city}`);
+      candidateTerms.push(`Best ${type} ${city}`);
+      candidateTerms.push(`${type} services near me`);
+    }
+
+    const uniqueCandidates = Array.from(new Set(candidateTerms.map(k => k.trim()))).filter(k => k.length > 2);
+    extractedRaw = uniqueCandidates.map((kw, i) => ({
+      keyword: kw,
+      intent: kw.toLowerCase().includes(city.toLowerCase()) ? 'LOCAL' : i % 2 === 0 ? 'COMMERCIAL' : 'TRANSACTIONAL',
+      difficulty: i % 3 === 0 ? 'Easy' : i % 3 === 1 ? 'Medium' : 'Hard',
+      relevance: 'HIGH',
+      competitorEvidence: `Extracted from competitor heading hierarchy on ${compDomain}`
+    }));
+  }
+
+  // 4. Compare with tracked keywords and format
+  const seenExtracted = new Set<string>();
+  const finalKeywords: CompetitorKeywordOpportunity[] = [];
+
+  for (const item of extractedRaw) {
+    if (!item.keyword || typeof item.keyword !== 'string') continue;
+    const cleanKw = item.keyword.trim();
+    const normalizedKw = normalize(cleanKw);
+    if (normalizedKw.length < 2 || seenExtracted.has(normalizedKw)) continue;
+    seenExtracted.add(normalizedKw);
+
+    const isTracked = trackedKeywordsSet.has(normalizedKw);
+    finalKeywords.push({
+      keyword: cleanKw,
+      intent: item.intent || 'COMMERCIAL',
+      difficulty: item.difficulty || 'Medium',
+      relevance: item.relevance || 'HIGH',
+      competitorEvidence: item.competitorEvidence || `Observed on ${compDomain}`,
+      status: isTracked ? 'ALREADY_TRACKED' : 'OPPORTUNITY',
+      isTracked
+    });
+  }
+
+  const newOpportunitiesCount = finalKeywords.filter(k => !k.isTracked).length;
+  const alreadyTrackedCount = finalKeywords.filter(k => k.isTracked).length;
+
+  return {
+    competitorUrl: targetUrl,
+    competitorDomain: compDomain,
+    totalExtracted: finalKeywords.length,
+    newOpportunitiesCount,
+    alreadyTrackedCount,
+    keywords: finalKeywords
+  };
+}
+
