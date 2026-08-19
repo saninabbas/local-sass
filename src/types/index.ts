@@ -5,6 +5,7 @@ export interface User {
   name: string;
   email: string;
   role?: 'admin' | 'user' | string;
+  avatar_url?: string;
   subscription_status?: string;
   subscription_tier?: string;
   trial_status?: string;
@@ -397,3 +398,30 @@ export interface ReviewItem {
   source: string;
   created_at: string;
 }
+
+export type NotificationType = 
+  | 'ranking' 
+  | 'review' 
+  | 'audit' 
+  | 'authority' 
+  | 'execution' 
+  | 'connection' 
+  | 'billing' 
+  | 'system';
+
+export type NotificationSeverity = 'info' | 'success' | 'warning' | 'error';
+
+export interface NotificationItem {
+  id: string;
+  user_id: string;
+  business_id?: string | null;
+  type: NotificationType;
+  title: string;
+  message: string;
+  severity: NotificationSeverity;
+  read: boolean;
+  action_url?: string | null;
+  metadata?: Record<string, any> | null;
+  created_at: string;
+}
+

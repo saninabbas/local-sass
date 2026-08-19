@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
 import { useAuth } from '../../contexts/AuthContext';
+import { useBusiness } from '../../context/BusinessContext';
 import { 
   fetchDiscoveredCompetitors, 
   discoverCompetitors, 
@@ -103,7 +104,12 @@ export interface CompetitorKeywordItem {
 export function Competitors() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { activeBusiness } = useBusiness();
   const [dashboardData, setDashboardData] = useState<any>(null);
+
+  const myBusiness = activeBusiness || dashboardData?.business;
+  const myGrowthScore = dashboardData?.growthScore?.overall ?? 65;
+
   const [discoveredList, setDiscoveredList] = useState<DiscoveredCompetitor[]>([]);
   const [reputationData, setReputationData] = useState<any | null>(null);
   
@@ -290,9 +296,6 @@ export function Competitors() {
     }
     return true;
   });
-
-  const myBusiness = dashboardData?.business;
-  const myGrowthScore = dashboardData?.growthScore?.overall || 65;
 
   return (
     <DashboardLayout>

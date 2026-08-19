@@ -2,13 +2,15 @@ import { useState, useRef, useEffect } from 'react';
 import { DashboardLayout } from '../../components/dashboard/DashboardLayout';
 import { sendCopilotMessage, runAudit } from '../../lib/api';
 import { 
-  Bot, 
   Send, 
-  Sparkles, 
   ArrowRight, 
   RefreshCw, 
-  Compass,
-  Zap
+  Radio,
+  TrendingUp,
+  Layers,
+  ShieldCheck,
+  Activity,
+  Wrench
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
@@ -23,24 +25,24 @@ interface Message {
 
 const STARTER_PROMPTS = [
   {
-    title: "Why am I not ranking in Google Maps?",
-    prompt: "Why am I not ranking in the Google Maps Local 3-Pack in my city, and what are my biggest local SEO problems?",
-    icon: Compass
+    title: "Google Maps 3-Pack Gap",
+    prompt: "Why am I not ranking in the Google Maps Local 3-Pack in my target city, and what are my biggest local SEO bottlenecks?",
+    icon: Radio
   },
   {
     title: "Competitor Ranking Advantage",
-    prompt: "Why are my competitors ranking above me and what are they doing differently?",
-    icon: Sparkles
+    prompt: "Why are my top competitors ranking above me and what are they doing differently?",
+    icon: TrendingUp
   },
   {
-    title: "30-Day Growth Plan",
+    title: "Prioritized 30-Day Growth Roadmap",
     prompt: "Give me a prioritized 30-day tactical growth plan based on my actual audit data.",
-    icon: ArrowRight
+    icon: Layers
   },
   {
-    title: "Missing High-Intent Pages",
-    prompt: "Which local service pages and location guides should I create first to capture ready-to-buy customers?",
-    icon: Zap
+    title: "Missing Local Service Pages",
+    prompt: "Which local service pages and location guides should I create first to capture high-intent search traffic?",
+    icon: ShieldCheck
   }
 ];
 
@@ -49,11 +51,11 @@ export function Copilot() {
     {
       id: 'welcome',
       role: 'assistant',
-      content: "👋 Hello! I am your **Rankora AI Growth Agent**.\n\nI have direct, real-time access to your live website crawl, 11 Growth Score dimensions, local competitors, tracked keywords, and reviews. Ask me anything about how to improve your rankings, fix technical bottlenecks, or beat local competitors.",
+      content: "**RANKORA GROWTH INTELLIGENCE CONSOLE**\n\nSynchronized with live website crawl, Growth Score dimensions, local competitors, tracked keywords, and reviews telemetry. Select an operational query below or enter a prompt.",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       actions: [
-        { type: 'view_module', label: 'View 30-Day Roadmap', target: '/dashboard/actions' },
-        { type: 'run_audit', label: 'Run Diagnostic Audit', target: '/dashboard/score' }
+        { type: 'view_module', label: 'View Action Roadmap', target: '/dashboard/actions' },
+        { type: 'run_audit', label: 'Run Diagnostic Audit', target: '/dashboard/website' }
       ]
     }
   ]);
@@ -90,7 +92,7 @@ export function Copilot() {
       const assistantMsg: Message = {
         id: 'assistant-' + Date.now(),
         role: 'assistant',
-        content: res.reply,
+        content: res.reply || 'Telemetry evaluated and roadmap updated.',
         actions: res.actions,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
@@ -101,7 +103,7 @@ export function Copilot() {
         {
           id: 'err-' + Date.now(),
           role: 'assistant',
-          content: "I encountered an issue querying your live telemetry: " + (err.message || "Please make sure your website is configured."),
+          content: "Unable to retrieve verified telemetry for this query: " + (err.message || "Please make sure your website is configured."),
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -122,7 +124,7 @@ export function Copilot() {
           {
             id: 'audit-done-' + Date.now(),
             role: 'assistant',
-            content: "✓ **Diagnostic Audit Completed!** Your 11 Growth Scores and competitive telemetry have been refreshed.",
+            content: "✓ **Diagnostic Audit Completed!** Growth Scores and competitive telemetry have been refreshed.",
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
         ]);
@@ -139,127 +141,128 @@ export function Copilot() {
       {/* Header */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-primary tracking-tight flex items-center gap-2.5">
-            <Bot className="text-primary-accent" size={26} />
-            Rankora AI Growth Agent
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-2 h-2 rounded-full bg-[#5db872] animate-pulse" />
+            <span className="text-[11px] font-mono text-[#5db872] uppercase font-bold tracking-wider">LIVE OPERATIONS CONSOLE</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-serif font-normal text-[#141413] tracking-tight flex items-center gap-2.5">
+            Rankora Growth Intelligence
           </h1>
-          <p className="text-xs text-secondary mt-1">
-            Dedicated local business growth assistant with direct access to your live telemetry and competitor data.
+          <p className="text-xs text-[#6c6a64] font-sans mt-1">
+            Business intelligence and operational SEO console with real-time telemetry from D1 database engine.
           </p>
         </div>
       </div>
 
-      {/* Starter Prompts */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        {STARTER_PROMPTS.map((p, idx) => (
-          <button
-            key={idx}
-            onClick={() => handleSend(p.prompt)}
-            className="p-3.5 bg-white hover:bg-blue-50/50 rounded-2xl border border-gray-200 hover:border-blue-200 text-left transition-all shadow-xs cursor-pointer flex flex-col justify-between group"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-primary group-hover:text-primary-accent transition-colors">
-                {p.title}
-              </span>
-              <p.icon size={14} className="text-secondary group-hover:text-primary-accent" />
-            </div>
-            <p className="text-[11px] text-secondary line-clamp-2 leading-relaxed">
-              "{p.prompt}"
-            </p>
-          </button>
-        ))}
-      </div>
-
-      {/* Chat Container */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col h-[600px] overflow-hidden mb-8">
-        
-        {/* Messages Feed */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {messages.map((m) => {
-            const isAssistant = m.role === 'assistant';
-            return (
-              <div
-                key={m.id}
-                className={`flex gap-3 ${isAssistant ? 'justify-start' : 'justify-end'}`}
-              >
-                {isAssistant && (
-                  <div className="w-8 h-8 rounded-full bg-blue-50 text-primary-accent border border-blue-100 flex items-center justify-center shrink-0 mt-1">
-                    <Bot size={16} />
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Starter Prompts Sidebar */}
+        <div className="lg:col-span-1 space-y-3">
+          <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#6c6a64] px-1">
+            Operational Telemetry Queries
+          </h2>
+          <div className="space-y-2">
+            {STARTER_PROMPTS.map((prompt, idx) => {
+              const Icon = prompt.icon;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => handleSend(prompt.prompt)}
+                  disabled={loading}
+                  className="w-full text-left p-3.5 rounded-xl bg-[#efe9de] hover:bg-[#e6dfd8] border border-[#e6dfd8] transition-colors cursor-pointer group shadow-2xs"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Icon size={14} className="text-[#cc785c]" />
+                    <span className="text-xs font-serif font-bold text-[#141413]">
+                      {prompt.title}
+                    </span>
                   </div>
-                )}
+                  <p className="text-[11px] text-[#6c6a64] line-clamp-2 font-sans">
+                    {prompt.prompt}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Chat Terminal Area */}
+        <div className="lg:col-span-3 flex flex-col h-[640px] bg-[#faf9f5] rounded-2xl border border-[#e6dfd8] shadow-xs overflow-hidden">
+          {/* Messages Stream */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 font-sans text-xs">
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
+              >
                 <div
-                  className={`max-w-2xl rounded-2xl p-4 text-xs leading-relaxed ${
-                    isAssistant
-                      ? 'bg-gray-50 border border-gray-200 text-primary space-y-2'
-                      : 'bg-primary-accent text-white font-medium'
+                  className={`max-w-[90%] p-4 rounded-2xl leading-relaxed whitespace-pre-wrap ${
+                    msg.role === 'user'
+                      ? 'bg-[#141413] text-[#faf9f5] rounded-br-none shadow-xs font-medium'
+                      : 'bg-[#efe9de] text-[#141413] border border-[#e6dfd8] rounded-bl-none shadow-xs'
                   }`}
                 >
-                  <div className="whitespace-pre-wrap font-sans">{m.content}</div>
-                  
-                  {/* Action Buttons */}
-                  {isAssistant && m.actions && m.actions.length > 0 && (
-                    <div className="pt-2 border-t border-gray-200/60 flex items-center gap-2 flex-wrap mt-2">
-                      {m.actions.map((act, aIdx) => (
+                  <div className="prose prose-xs max-w-none prose-headings:font-serif prose-headings:text-[#141413] prose-headings:font-bold prose-p:my-1 prose-strong:text-[#141413]">
+                    {msg.content}
+                  </div>
+
+                  {msg.actions && msg.actions.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-[#e6dfd8] flex flex-wrap gap-2">
+                      {msg.actions.map((act, i) => (
                         <button
-                          key={aIdx}
+                          key={i}
                           onClick={() => handleActionClick(act)}
-                          className="px-3 py-1.5 rounded-lg bg-white hover:bg-gray-100 text-primary font-semibold text-xs border border-gray-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#faf9f5] hover:bg-[#141413] text-[#141413] hover:text-white font-sans font-bold rounded-xl text-[11px] border border-[#e6dfd8] transition-all shadow-xs cursor-pointer"
                         >
-                          <Sparkles size={11} className="text-primary-accent" />
+                          {act.type === 'run_audit' ? <RefreshCw size={11} className="text-[#cc785c]" /> : 
+                           act.type === 'fix_with_ai' ? <Wrench size={11} className="text-[#cc785c]" /> : 
+                           <Layers size={11} className="text-[#cc785c]" />}
                           <span>{act.label}</span>
+                          <ArrowRight size={11} />
                         </button>
                       ))}
                     </div>
                   )}
-
-                  <span className={`text-[9px] block text-right font-mono mt-1 ${isAssistant ? 'text-secondary' : 'text-blue-100'}`}>
-                    {m.timestamp}
-                  </span>
                 </div>
+                <span className="text-[9px] font-mono text-[#8e8b82] mt-1 px-1">{msg.timestamp}</span>
               </div>
-            );
-          })}
+            ))}
 
-          {loading && (
-            <div className="flex gap-3 items-center">
-              <div className="w-8 h-8 rounded-full bg-blue-50 text-primary-accent border border-blue-100 flex items-center justify-center shrink-0">
-                <Bot size={16} />
+            {loading && (
+              <div className="flex items-center gap-2.5 p-3.5 bg-[#efe9de] rounded-xl border border-[#e6dfd8] text-[#6c6a64] max-w-md">
+                <RefreshCw size={14} className="animate-spin text-[#cc785c]" />
+                <span className="text-xs font-mono">Evaluating live database telemetry...</span>
               </div>
-              <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-xs text-secondary flex items-center gap-2">
-                <RefreshCw size={12} className="animate-spin text-primary-accent" />
-                <span>Consulting live telemetry & formulating strategic advice...</span>
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
 
-        {/* Input Bar */}
-        <div className="p-4 border-t border-gray-100 bg-gray-50/50">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-            }}
-            className="flex items-center gap-2"
-          >
-            <input
-              type="text"
-              placeholder="Ask Rankora AI (e.g. 'Why is competitor X ranking above me?', 'What should I fix first?')..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              className="flex-1 px-4 py-2.5 text-xs rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-primary-accent text-primary"
-            />
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={!input.trim() || loading}
-              className="bg-primary-accent hover:bg-blue-700 text-white font-semibold text-xs h-10 px-5 flex items-center gap-1.5 shrink-0"
+          {/* Chat Input */}
+          <div className="p-4 bg-[#faf9f5] border-t border-[#e6dfd8]">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSend();
+              }}
+              className="flex items-center gap-2"
             >
-              <Send size={13} />
-              <span>Send</span>
-            </Button>
-          </form>
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask Growth Intelligence about rankings, competitors, or technical SEO..."
+                className="flex-1 px-4 py-3 rounded-xl border border-[#e6dfd8] bg-[#faf9f5] focus:outline-none focus:ring-1 focus:ring-[#cc785c] text-xs text-[#141413] font-sans"
+              />
+              <button
+                type="submit"
+                disabled={!input.trim() || loading}
+                className="px-4 py-3 bg-[#141413] hover:bg-[#252320] text-white rounded-xl disabled:opacity-40 transition-colors shadow-xs cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+                aria-label="Send Query"
+              >
+                <span>Send</span>
+                <Send size={13} className="text-[#cc785c]" />
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </DashboardLayout>

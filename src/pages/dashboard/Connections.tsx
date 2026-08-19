@@ -20,6 +20,7 @@ import {
   getGitHubFile,
   testConnectionHealth
 } from '../../lib/api';
+import { TechnologyIcon } from '../../components/ui/TechnologyIcon';
 import { 
   GitBranch, 
   Folder, 
@@ -518,7 +519,7 @@ export const Connections: React.FC = () => {
 
         {/* Provider Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
+
           {/* 1. GITHUB */}
           <div className={`rounded-2xl p-6 border transition-all flex flex-col justify-between ${
             activeGitHubConnection 
@@ -528,7 +529,7 @@ export const Connections: React.FC = () => {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div className="w-10 h-10 rounded-xl bg-[#141413] text-white flex items-center justify-center font-bold text-sm">
-                  GH
+                  <TechnologyIcon name="github" size={22} />
                 </div>
                 {activeGitHubConnection ? (
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
@@ -616,7 +617,7 @@ export const Connections: React.FC = () => {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div className="w-10 h-10 rounded-xl bg-[#0073aa] text-white flex items-center justify-center font-bold text-sm">
-                  WP
+                  <TechnologyIcon name="wordpress" size={22} />
                 </div>
                 {activeWpConnection ? (
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
@@ -708,7 +709,7 @@ export const Connections: React.FC = () => {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div className="w-10 h-10 rounded-xl bg-[#96bf48] text-white flex items-center justify-center font-bold text-sm">
-                  SH
+                  <TechnologyIcon name="shopify" size={22} />
                 </div>
                 {activeShopifyConnection ? (
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">

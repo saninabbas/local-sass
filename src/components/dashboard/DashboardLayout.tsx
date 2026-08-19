@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
 import { useState } from 'react';
+import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { GrowthCopilot } from './GrowthCopilot';
 import { AddWebsiteModal } from './AddWebsiteModal';
 
 interface DashboardLayoutProps {
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -30,7 +31,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <Topbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
           <div className="max-w-6xl mx-auto">
-            {children}
+            {children || <Outlet />}
           </div>
         </main>
       </div>

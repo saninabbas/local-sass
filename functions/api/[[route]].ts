@@ -32,6 +32,14 @@ import {
   createPolarCheckoutSession,
   createPolarCustomerPortalSession
 } from './billingEngine';
+import {
+  createNotification,
+  getNotificationsForUser,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  deleteNotificationForUser,
+  ensureNotificationTable
+} from './notificationEngine';
 
 export interface Env {
   DB: D1Database;
@@ -506,6 +514,24 @@ export const onRequest = async (context: any) => {
           ).bind(auditResult.overallScore, auditId).run();
         });
 
+        // Dispatch real audit completion notification
+        if (business && business.user_id) {
+          try {
+            await createNotification(env.DB, {
+              userId: business.user_id,
+              businessId: business.id,
+              type: 'audit',
+              title: 'Website Audit Completed',
+              message: `Diagnostic audit for ${business.name || business.website_url} finished with Growth Score ${auditResult.overallScore}/100.`,
+              severity: auditResult.overallScore < 50 ? 'warning' : 'success',
+              actionUrl: '/dashboard/website',
+              metadata: { score: auditResult.overallScore, auditId }
+            });
+          } catch (notifErr) {
+            console.warn("Audit notification failed:", notifErr);
+          }
+        }
+
         return { auditId, auditResult, scores: auditResult.vectors, overallScore: auditResult.overallScore };
       } catch (err: any) {
         await env.DB.prepare(
@@ -880,6 +906,10 @@ export const onRequest = async (context: any) => {
         await db.prepare("CREATE INDEX IF NOT EXISTS idx_reviews_rating ON reviews(business_id, rating)").run().catch(() => {});
         await db.prepare("CREATE INDEX IF NOT EXISTS idx_reviews_replied ON reviews(business_id, is_replied)").run().catch(() => {});
         await db.prepare("CREATE INDEX IF NOT EXISTS idx_gbp_loc_biz ON gbp_locations(business_id, is_connected)").run().catch(() => {});
+        
+        // Notifications schema
+        await ensureNotificationTable(db);
+
         isD1SchemaEnsured = true;
       } catch (err) {
         console.warn("Auto-migration notice:", err);
@@ -1113,8 +1143,7 @@ export const onRequest = async (context: any) => {
           await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_backlink_opps_biz ON backlink_opportunities(business_id, priority, ai_score DESC)").run().catch(() => {});
           await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_backlinks_biz_status ON backlinks(business_id, status)").run().catch(() => {});
           await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_backlinks_source_domain ON backlinks(business_id, source_domain)").run().catch(() => {});
-          await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_backlinks_target_domain ON backlinks(business_id, target_domain)").run().catch(() => {});
-
+          await ensureNotificationTable(env.DB);
           await ensureAdminUser();
 
           return jsonResponse({ success: true, message: "Database schema updated and admin seeded successfully!" });
@@ -1546,11 +1575,130 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const { name } = await request.json() as any;
-        if (!name || !name.trim()) return errorResponse("Name is required", 400);
+        const { name, avatar_url } = await request.json().catch(() => ({})) as any;
+        
+        await env.DB.prepare("ALTER TABLE users ADD COLUMN avatar_url TEXT").run().catch(() => {});
 
-        await env.DB.prepare("UPDATE users SET name = ? WHERE id = ?").bind(name.trim(), user.id).run();
-        return jsonResponse({ success: true, message: "Profile updated successfully" });
+        if (name && name.trim()) {
+          await env.DB.prepare("UPDATE users SET name = ? WHERE id = ?").bind(name.trim(), user.id).run();
+        }
+        if (avatar_url !== undefined) {
+          await env.DB.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").bind(avatar_url || null, user.id).run();
+        }
+
+        const updatedUser = await env.DB.prepare("SELECT id, name, email, role, avatar_url, subscription_status, subscription_tier FROM users WHERE id = ?").bind(user.id).first();
+        return jsonResponse({ success: true, message: "Profile updated successfully", data: updatedUser });
+      }
+
+      // --- AUTH: UPLOAD AVATAR ---
+      if (url.pathname === '/api/auth/avatar' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const body = await request.json().catch(() => ({})) as any;
+        let base64Data = body.image || body.data || '';
+        let contentType = body.contentType || 'image/jpeg';
+
+        if (base64Data.startsWith('data:')) {
+          const match = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+          if (match) {
+            contentType = match[1];
+            base64Data = match[2];
+          }
+        }
+
+        const validMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        if (!validMimes.includes(contentType.toLowerCase())) {
+          return errorResponse("Invalid image format. Supported formats: JPG, PNG, WEBP.", 400);
+        }
+
+        if (base64Data.length > 2.8 * 1024 * 1024) {
+          return errorResponse("Image exceeds maximum size limit of 2 MB.", 400);
+        }
+
+        await env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS user_avatars (
+            user_id TEXT PRIMARY KEY,
+            content_type TEXT NOT NULL,
+            image_data TEXT NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )
+        `).run().catch(() => {});
+
+        await env.DB.prepare(`
+          INSERT INTO user_avatars (user_id, content_type, image_data, updated_at)
+          VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(user_id) DO UPDATE SET
+            content_type = excluded.content_type,
+            image_data = excluded.image_data,
+            updated_at = CURRENT_TIMESTAMP
+        `).bind(user.id, contentType, base64Data).run();
+
+        const avatarUrl = `/api/auth/avatar/${user.id}?t=${Date.now()}`;
+        await env.DB.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").bind(avatarUrl, user.id).run();
+
+        const updatedUser = await env.DB.prepare(
+          "SELECT id, name, email, role, avatar_url, subscription_status, subscription_tier FROM users WHERE id = ?"
+        ).bind(user.id).first();
+
+        return jsonResponse({
+          success: true,
+          message: "Profile photo updated successfully",
+          avatar_url: avatarUrl,
+          data: updatedUser
+        });
+      }
+
+      // --- AUTH: SERVE AVATAR (GET) ---
+      if (url.pathname.startsWith('/api/auth/avatar/') && request.method === 'GET') {
+        const targetUserId = url.pathname.replace('/api/auth/avatar/', '').split('?')[0];
+        if (!targetUserId) return errorResponse("User ID required", 400);
+
+        try {
+          const row: any = await env.DB.prepare(
+            "SELECT content_type, image_data FROM user_avatars WHERE user_id = ?"
+          ).bind(targetUserId).first();
+
+          if (!row || !row.image_data) {
+            return errorResponse("Avatar not found", 404);
+          }
+
+          const binary = atob(row.image_data);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+
+          return new Response(bytes, {
+            headers: {
+              'Content-Type': row.content_type || 'image/jpeg',
+              'Cache-Control': 'public, max-age=86400',
+              'Access-Control-Allow-Origin': '*'
+            }
+          });
+        } catch {
+          return errorResponse("Failed to load avatar", 500);
+        }
+      }
+
+      // --- AUTH: DELETE AVATAR ---
+      if (url.pathname === '/api/auth/avatar' && request.method === 'DELETE') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        await env.DB.prepare("DELETE FROM user_avatars WHERE user_id = ?").bind(user.id).run().catch(() => {});
+        await env.DB.prepare("UPDATE users SET avatar_url = NULL WHERE id = ?").bind(user.id).run();
+
+        const updatedUser = await env.DB.prepare(
+          "SELECT id, name, email, role, avatar_url, subscription_status, subscription_tier FROM users WHERE id = ?"
+        ).bind(user.id).first();
+
+        return jsonResponse({
+          success: true,
+          message: "Profile photo removed",
+          avatar_url: null,
+          data: updatedUser
+        });
       }
 
       // --- MULTI-WEBSITE / BUSINESSES: LIST & CREATE ---
@@ -5023,6 +5171,24 @@ export const onRequest = async (context: any) => {
           WHERE id = ? AND business_id = ?
         `).bind(prevPos, newPos, serpResult.localPackPosition || null, movement.status, keywordId, business.id).run().catch(() => {});
 
+        // Dispatch ranking movement notification on real position changes
+        if (prevPos !== null && newPos !== null && prevPos !== newPos) {
+          const improved = newPos < prevPos;
+          const enteredTop10 = newPos <= 10 && prevPos > 10;
+          try {
+            await createNotification(env.DB, {
+              userId: user.id,
+              businessId: business.id,
+              type: 'ranking',
+              title: enteredTop10 ? 'Entered Local Top 10!' : (improved ? 'Ranking Improved' : 'Ranking Declined'),
+              message: `"${keyword}" moved from #${prevPos} to #${newPos} in local search results.`,
+              severity: enteredTop10 ? 'success' : (improved ? 'success' : 'warning'),
+              actionUrl: '/dashboard/keywords',
+              metadata: { keyword, previousPosition: prevPos, currentPosition: newPos }
+            });
+          } catch (e) {}
+        }
+
         return jsonResponse({
           success: true,
           data: {
@@ -5709,6 +5875,22 @@ export const onRequest = async (context: any) => {
         try {
           const { syncLocationReviews } = await import('./gbp/reviewSyncEngine');
           const syncResult = await syncLocationReviews(env.DB, user.id as string, business.id, locationId, connection.access_token as string);
+
+          if (syncResult && ((syncResult as any).syncedCount || (syncResult as any).newReviewsCount)) {
+            const count = (syncResult as any).newReviewsCount || (syncResult as any).syncedCount;
+            try {
+              await createNotification(env.DB, {
+                userId: user.id,
+                businessId: business.id,
+                type: 'review',
+                title: 'Customer Reviews Synced',
+                message: `Successfully synchronized ${count} review${count > 1 ? 's' : ''} from Google Business Profile.`,
+                severity: 'info',
+                actionUrl: '/dashboard/reviews'
+              });
+            } catch {}
+          }
+
           return jsonResponse({ success: true, message: "Reviews synced successfully", data: syncResult });
         } catch (e: any) {
           return errorResponse("Failed to sync Google reviews: " + e.message, 500, "PROVIDER_ERROR");
@@ -8068,6 +8250,87 @@ export const onRequest = async (context: any) => {
           return jsonResponse({ success: true, data: result });
         } catch (err: any) {
           return errorResponse(err.message || "Failed to execute SEO fix via router", 400);
+        }
+      }
+
+      // =========================================================================
+      // NOTIFICATION API (TENANT SCOPED)
+      // =========================================================================
+      // GET /api/notifications — Retrieve notifications & unread count
+      if (url.pathname === '/api/notifications' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        const limit = parseInt(url.searchParams.get('limit') || '30', 10);
+
+        try {
+          const result = await getNotificationsForUser(env.DB, user.id, targetBizId, limit);
+          return jsonResponse({
+            success: true,
+            notifications: result.notifications,
+            unreadCount: result.unreadCount
+          });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to retrieve notifications", 500);
+        }
+      }
+
+      // POST /api/notifications/read-all — Mark all notifications as read
+      if (url.pathname === '/api/notifications/read-all' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+
+        try {
+          const updatedCount = await markAllNotificationsAsRead(env.DB, user.id, targetBizId);
+          return jsonResponse({
+            success: true,
+            updatedCount
+          });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to mark all notifications as read", 500);
+        }
+      }
+
+      // POST /api/notifications/:id/read — Mark single notification read
+      if (url.pathname.startsWith('/api/notifications/') && url.pathname.endsWith('/read') && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const notifId = url.pathname.replace('/api/notifications/', '').replace('/read', '');
+        if (!notifId) return errorResponse("Notification ID is required", 400);
+
+        try {
+          const ok = await markNotificationAsRead(env.DB, user.id, notifId);
+          return jsonResponse({
+            success: true,
+            id: notifId,
+            read: ok
+          });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to mark notification as read", 500);
+        }
+      }
+
+      // DELETE /api/notifications/:id — Delete single notification
+      if (url.pathname.startsWith('/api/notifications/') && !url.pathname.endsWith('/read') && !url.pathname.endsWith('/read-all') && request.method === 'DELETE') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const notifId = url.pathname.replace('/api/notifications/', '');
+        if (!notifId) return errorResponse("Notification ID is required", 400);
+
+        try {
+          const ok = await deleteNotificationForUser(env.DB, user.id, notifId);
+          return jsonResponse({
+            success: true,
+            id: notifId,
+            deleted: ok
+          });
+        } catch (err: any) {
+          return errorResponse(err.message || "Failed to delete notification", 500);
         }
       }
 

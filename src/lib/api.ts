@@ -66,7 +66,9 @@ export const signup = (data: any) => fetchApi('/api/auth/signup', { method: 'POS
 export const login = (data: any) => fetchApi('/api/auth/login', { method: 'POST', body: JSON.stringify(data) });
 export const logout = () => fetchApi('/api/auth/logout', { method: 'POST' });
 export const getCurrentUser = () => fetchApi('/api/auth/me');
-export const updateProfile = (data: { name: string }) => fetchApi('/api/auth/profile', { method: 'PUT', body: JSON.stringify(data) });
+export const updateProfile = (data: { name?: string; avatar_url?: string | null }) => fetchApi('/api/auth/profile', { method: 'PUT', body: JSON.stringify(data) });
+export const uploadAvatar = (imageData: string, contentType: string) => fetchApi('/api/auth/avatar', { method: 'POST', body: JSON.stringify({ image: imageData, contentType }) });
+export const deleteAvatar = () => fetchApi('/api/auth/avatar', { method: 'DELETE' });
 export const forgotPassword = (email: string) => fetchApi('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) });
 export const resetPassword = (data: { email: string; token: string; password: string }) => fetchApi('/api/auth/reset-password', { method: 'POST', body: JSON.stringify(data) });
 
@@ -759,6 +761,37 @@ export async function bulkAddRankingKeywords(keywords: Array<{
     body: JSON.stringify({ keywords, business_id: businessId })
   });
 }
+
+// -----------------------------------------------------------------------------
+// NOTIFICATIONS SYSTEM
+// -----------------------------------------------------------------------------
+export async function getNotifications(businessId?: string, limit = 30): Promise<{ success: boolean; notifications: any[]; unreadCount: number }> {
+  const query = new URLSearchParams();
+  if (businessId) query.set('business_id', businessId);
+  if (limit) query.set('limit', limit.toString());
+  const queryString = query.toString() ? `?${query.toString()}` : '';
+  return fetchApi(`/api/notifications${queryString}`);
+}
+
+export async function markNotificationRead(id: string): Promise<any> {
+  return fetchApi(`/api/notifications/${id}/read`, {
+    method: 'POST'
+  });
+}
+
+export async function markAllNotificationsRead(businessId?: string): Promise<any> {
+  const query = businessId ? `?business_id=${encodeURIComponent(businessId)}` : '';
+  return fetchApi(`/api/notifications/read-all${query}`, {
+    method: 'POST'
+  });
+}
+
+export async function deleteNotification(id: string): Promise<any> {
+  return fetchApi(`/api/notifications/${id}`, {
+    method: 'DELETE'
+  });
+}
+
 
 
 
