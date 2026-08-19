@@ -416,6 +416,16 @@ export async function fetchGbpHealth(): Promise<any> {
   return fetchApi('/api/gbp/health');
 }
 
+export async function fetchGbpLocalScore(businessId?: string): Promise<any> {
+  const query = businessId ? `?business_id=${encodeURIComponent(businessId)}` : '';
+  return fetchApi(`/api/gbp/local-score${query}`);
+}
+
+export async function fetchGbpRecommendations(businessId?: string): Promise<any> {
+  const query = businessId ? `?business_id=${encodeURIComponent(businessId)}` : '';
+  return fetchApi(`/api/gbp/recommendations${query}`);
+}
+
 export async function fetchCompetitorsReputation(): Promise<any> {
   return fetchApi('/api/competitors/reputation');
 }
@@ -716,7 +726,7 @@ export async function executeUniversalFix(changeId: string, options: {
   });
 }
 
-export async function testConnectionHealth(provider: 'github' | 'wordpress' | 'shopify' | 'serp'): Promise<any> {
+export async function testConnectionHealth(provider: 'github' | 'wordpress' | 'shopify' | 'serp' | 'google_business' | 'gbp'): Promise<any> {
   return fetchApi('/api/connections/health', {
     method: 'POST',
     body: JSON.stringify({ provider })

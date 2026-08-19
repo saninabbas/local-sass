@@ -36,7 +36,26 @@ export async function getProjectConnections(db: any, userId: string, projectId: 
     "SELECT id, user_id, project_id, provider, installation_id, repository_id, repository_name, repository_owner, default_branch, status, created_at, updated_at FROM connections WHERE user_id = ? AND project_id = ? ORDER BY created_at DESC"
   ).bind(userId, projectId).all();
 
-  return (results || []) as ConnectionRecord[];
+  const connList = ((results || []) as ConnectionRecord[]);
+
+  // Include active Google Business Profile connection if present
+  try {
+    const gbpConn: any = await db.prepare(
+      "SELECT id, business_id as project_id, user_id, 'google_business' as provider, location_id as repository_id, location_name as repository_name, business_name as repository_owner, 'main' as default_branch, 'CONNECTED' as status, created_at, updated_at FROM google_connections WHERE (business_id = ? OR user_id = ?) AND status = 'connected' LIMIT 1"
+    ).bind(projectId, userId).first().catch(async () => {
+      return await db.prepare(
+        "SELECT id, ? as project_id, user_id, 'google_business' as provider, location_id as repository_id, location_name as repository_name, '' as repository_owner, 'main' as default_branch, 'CONNECTED' as status, created_at, updated_at FROM review_connections WHERE user_id = ? AND status = 'connected' LIMIT 1"
+      ).bind(projectId, userId).first().catch(() => null);
+    });
+
+    if (gbpConn && !connList.some(c => c.provider === 'google_business' || c.provider === 'google')) {
+      connList.push(gbpConn);
+    }
+  } catch (err) {
+    console.warn("Error resolving gbp connection:", err);
+  }
+
+  return connList;
 }
 
 export async function deleteConnection(db: any, userId: string, projectId: string, connectionId: string): Promise<boolean> {
@@ -44,7 +63,15 @@ export async function deleteConnection(db: any, userId: string, projectId: strin
     "DELETE FROM connections WHERE id = ? AND user_id = ? AND project_id = ?"
   ).bind(connectionId, userId, projectId).run();
 
-  return (res?.meta?.changes || 0) > 0;
+  await db.prepare(
+    "UPDATE google_connections SET status = 'disconnected', updated_at = CURRENT_TIMESTAMP WHERE (id = ? OR business_id = ?) AND user_id = ?"
+  ).bind(connectionId, projectId, userId).run().catch(() => {});
+
+  await db.prepare(
+    "UPDATE review_connections SET status = 'disconnected', updated_at = CURRENT_TIMESTAMP WHERE (id = ? OR user_id = ?)"
+  ).bind(connectionId, userId).run().catch(() => {});
+
+  return ((res?.meta?.changes || 0) > 0);
 }
 
 // =========================================================================

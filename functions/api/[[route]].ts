@@ -47,6 +47,8 @@ import {
   updateAuthorityTaskStatus,
   ensureAuthorityTables
 } from './authorityEngine';
+import { calculateLocalSeoScore } from './gbp/googleBusinessEngine';
+
 
 
 export interface Env {
@@ -919,8 +921,68 @@ export const onRequest = async (context: any) => {
         await db.prepare("CREATE INDEX IF NOT EXISTS idx_reviews_location ON reviews(google_location_id)").run().catch(() => {});
         await db.prepare("CREATE INDEX IF NOT EXISTS idx_reviews_rating ON reviews(business_id, rating)").run().catch(() => {});
         await db.prepare("CREATE INDEX IF NOT EXISTS idx_reviews_replied ON reviews(business_id, is_replied)").run().catch(() => {});
-        await db.prepare("CREATE INDEX IF NOT EXISTS idx_gbp_loc_biz ON gbp_locations(business_id, is_connected)").run().catch(() => {});
-        
+        // Google Connections table
+        await db.prepare(`CREATE TABLE IF NOT EXISTS google_connections (
+          id TEXT PRIMARY KEY,
+          business_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          google_account_id TEXT,
+          location_id TEXT,
+          location_name TEXT,
+          business_name TEXT,
+          access_token_encrypted TEXT,
+          refresh_token_encrypted TEXT,
+          status TEXT DEFAULT 'connected',
+          connected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+
+        // Google Reviews table
+        await db.prepare(`CREATE TABLE IF NOT EXISTS google_reviews (
+          id TEXT PRIMARY KEY,
+          business_id TEXT NOT NULL,
+          user_id TEXT,
+          review_id TEXT NOT NULL UNIQUE,
+          customer_name TEXT NOT NULL,
+          reviewer_photo_url TEXT,
+          rating INTEGER NOT NULL,
+          review_text TEXT,
+          review_date TEXT,
+          owner_reply TEXT,
+          reply_status TEXT DEFAULT 'unanswered',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+
+        // Google Location Profiles table
+        await db.prepare(`CREATE TABLE IF NOT EXISTS google_location_profiles (
+          id TEXT PRIMARY KEY,
+          business_id TEXT NOT NULL UNIQUE,
+          location_id TEXT NOT NULL,
+          title TEXT,
+          address TEXT,
+          phone TEXT,
+          website_uri TEXT,
+          primary_category TEXT,
+          additional_categories TEXT,
+          regular_hours TEXT,
+          has_description INTEGER DEFAULT 0,
+          description TEXT,
+          photo_count INTEGER DEFAULT 0,
+          total_reviews INTEGER DEFAULT 0,
+          average_rating REAL DEFAULT 0.0,
+          local_seo_score INTEGER DEFAULT 50,
+          audit_problems TEXT,
+          last_synced_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_google_conn_biz ON google_connections(business_id)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_google_rev_biz ON google_reviews(business_id)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_google_rev_reply ON google_reviews(reply_status)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_google_loc_biz ON google_location_profiles(business_id)").run().catch(() => {});
+
         // Notifications schema
         await ensureNotificationTable(db);
 
@@ -6431,6 +6493,121 @@ export const onRequest = async (context: any) => {
 
         const health = computeGbpHealth(locData, { total, avgRating, unanswered });
         return jsonResponse({ success: true, data: health, connection: connection || null });
+      }
+
+      // --- GBP: LOCAL SEO SCORE & AUDIT ---
+      if (url.pathname === '/api/gbp/local-score' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch {
+          // Fallback
+        }
+
+        const bizId = business?.id || '';
+
+        const profile: any = await env.DB.prepare(
+          "SELECT * FROM google_location_profiles WHERE business_id = ? LIMIT 1"
+        ).bind(bizId).first().catch(() => null);
+
+        const { results: rawReviews } = await env.DB.prepare(
+          "SELECT rating, reply_status, is_replied, review_text, comment FROM google_reviews WHERE business_id = ?"
+        ).bind(bizId).all().catch(async () => {
+          return await env.DB.prepare("SELECT rating, reply_status, is_replied, comment as review_text FROM reviews WHERE business_id = ? OR user_id = ?").bind(bizId, user.id).all();
+        });
+
+        const reviews = Array.isArray(rawReviews) ? rawReviews : [];
+        const totalReviews = reviews.length;
+        const avgRating = totalReviews > 0 ? parseFloat((reviews.reduce((acc: number, r: any) => acc + (r.rating || 5), 0) / totalReviews).toFixed(1)) : 0.0;
+        const unanswered = reviews.filter((r: any) => r.reply_status === 'unanswered' || (!r.reply_comment && !r.owner_reply && r.is_replied !== 1)).length;
+
+        const locInfo = profile ? {
+          title: profile.title,
+          address: profile.address,
+          phone: profile.phone,
+          website: profile.website_uri,
+          category: profile.primary_category,
+          hours: profile.regular_hours,
+          hasDescription: profile.has_description === 1
+        } : {};
+
+        const audit = calculateLocalSeoScore(locInfo, reviews.map((r: any) => ({
+          reviewId: r.review_id || r.id,
+          reviewerName: r.customer_name || r.reviewer_name || 'Customer',
+          rating: r.rating || 5,
+          comment: r.review_text || r.comment || '',
+          createTime: r.review_date || new Date().toISOString(),
+          updateTime: r.review_date || new Date().toISOString(),
+          replyComment: r.owner_reply || r.reply_comment,
+          isReplied: r.reply_status === 'answered' || r.is_replied === 1
+        })));
+
+        return jsonResponse({
+          success: true,
+          data: {
+            localSeoScore: profile?.local_seo_score ?? audit.score,
+            problems: profile?.audit_problems ? JSON.parse(profile.audit_problems) : audit.problems,
+            strengths: audit.strengths,
+            breakdown: audit.breakdown,
+            metrics: {
+              totalReviews,
+              averageRating: avgRating,
+              unansweredReviews: unanswered,
+              responseRate: totalReviews > 0 ? parseFloat((((totalReviews - unanswered) / totalReviews) * 100).toFixed(0)) : 100
+            },
+            profile: profile || null
+          }
+        });
+      }
+
+      // --- GBP: AI LOCAL RECOMMENDATIONS ---
+      if (url.pathname === '/api/gbp/recommendations' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch {
+          // Fallback
+        }
+
+        const bizId = business?.id || '';
+        const bizName = business?.name || 'Local Business';
+        const city = business?.city || 'Local Market';
+
+        const profile: any = await env.DB.prepare(
+          "SELECT * FROM google_location_profiles WHERE business_id = ? LIMIT 1"
+        ).bind(bizId).first().catch(() => null);
+
+        const { results: rawReviews } = await env.DB.prepare(
+          "SELECT rating FROM google_reviews WHERE business_id = ?"
+        ).bind(bizId).all().catch(async () => {
+          return await env.DB.prepare("SELECT rating FROM reviews WHERE business_id = ? OR user_id = ?").bind(bizId, user.id).all();
+        });
+
+        const reviews = Array.isArray(rawReviews) ? rawReviews : [];
+        const total = reviews.length;
+        const avg = total > 0 ? reviews.reduce((a: number, b: any) => a + (b.rating || 5), 0) / total : 0;
+        const problems = profile?.audit_problems ? JSON.parse(profile.audit_problems) : [];
+
+        const { generateLocalAiRecommendations } = await import('./gbp/googleBusinessEngine');
+        const recommendations = await generateLocalAiRecommendations(
+          env.NVIDIA_API_KEY,
+          bizName,
+          city,
+          profile?.local_seo_score ?? 70,
+          total,
+          parseFloat(avg.toFixed(1)),
+          problems
+        );
+
+        return jsonResponse({ success: true, data: recommendations });
       }
 
       // --- COMPETITORS: REPUTATION BENCHMARK ---

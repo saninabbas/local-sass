@@ -109,6 +109,12 @@ export const Connections: React.FC = () => {
   const activeGitHubConnection = connections.find(c => c.provider === 'github' && c.status === 'CONNECTED');
   const activeWpConnection = connections.find(c => c.provider === 'wordpress' && c.status === 'CONNECTED');
   const activeShopifyConnection = connections.find(c => c.provider === 'shopify' && c.status === 'CONNECTED');
+  const activeGbpConnection = connections.find(c => (c.provider === 'google_business' || c.provider === 'google') && (c.status === 'CONNECTED' || c.status === 'connected' || c.status === 'active'));
+
+  const handleConnectGoogleBusiness = () => {
+    const bizId = activeBusiness?.id || '';
+    window.location.href = `/api/auth/googleBusiness?business_id=${encodeURIComponent(bizId)}`;
+  };
 
   const loadConnections = async () => {
     try {
@@ -215,7 +221,7 @@ export const Connections: React.FC = () => {
     }
   };
 
-  const handleTestLiveHealth = async (provider: 'github' | 'wordpress' | 'shopify') => {
+  const handleTestLiveHealth = async (provider: 'github' | 'wordpress' | 'shopify' | 'google_business' | 'gbp') => {
     try {
       setTestingHealthProvider(provider);
       const res = await testConnectionHealth(provider);
@@ -523,7 +529,7 @@ export const Connections: React.FC = () => {
         )}
 
         {/* Provider Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 
           {/* 1. GITHUB */}
           <div className={`rounded-2xl p-6 border transition-all flex flex-col justify-between ${
@@ -792,6 +798,94 @@ export const Connections: React.FC = () => {
                 >
                   <ShoppingBag size={13} className="text-[#96bf48]" />
                   <span>Connect Shopify</span>
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* 4. GOOGLE BUSINESS PROFILE (Phase 1) */}
+          <div className={`rounded-2xl p-6 border transition-all flex flex-col justify-between ${
+            activeGbpConnection 
+              ? 'bg-white border-[#4285F4]/40 shadow-xs' 
+              : 'bg-white border-[#e6dfd8] shadow-2xs hover:border-[#4285F4]/30'
+          }`}>
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 rounded-xl bg-white border border-[#e6dfd8] text-[#4285F4] flex items-center justify-center font-bold text-sm shadow-2xs">
+                  <TechnologyIcon name="google" size={22} />
+                </div>
+                {activeGbpConnection ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    CONNECTED
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#efe9de] text-[#8e8b82] border border-[#e6dfd8]">
+                    AVAILABLE
+                  </span>
+                )}
+              </div>
+
+              <h2 className="text-lg font-serif font-bold text-[#141413] mb-1">Google Business Profile</h2>
+              <p className="text-xs text-[#6c6a64] font-sans leading-relaxed mb-4">
+                Direct OAuth 2.0 connection for local search visibility, customer reviews sync, and AI reply automation.
+              </p>
+
+              {activeGbpConnection && (
+                <div className="p-3 bg-[#faf9f5] border border-[#e6dfd8] rounded-xl space-y-1.5 mb-4 text-xs font-mono">
+                  <div className="flex justify-between">
+                    <span className="text-[#8e8b82]">Location:</span>
+                    <span className="font-bold text-[#141413] truncate max-w-[140px]">
+                      {activeGbpConnection.repository_name || activeGbpConnection.repository_id || 'Connected Profile'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#8e8b82]">Status:</span>
+                    <span className="font-bold text-[#4285F4]">Live Sync Active</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-[#e6dfd8]/60 space-y-2">
+              {activeGbpConnection ? (
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => handleDisconnect(activeGbpConnection.id)}
+                    className="text-xs font-sans font-medium text-rose-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Trash2 size={13} />
+                    <span>Disconnect</span>
+                  </button>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleTestLiveHealth('google_business')}
+                      disabled={testingHealthProvider === 'google_business'}
+                      className="text-[11px] font-semibold flex items-center gap-1 py-1"
+                    >
+                      {testingHealthProvider === 'google_business' ? <RefreshCw size={11} className="animate-spin text-[#4285F4]" /> : <Activity size={11} className="text-[#4285F4]" />}
+                      <span>Test Health</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => window.location.href = '/dashboard/reviews'}
+                      className="bg-[#faf9f5] border border-[#e6dfd8] text-[#141413] hover:bg-[#efe9de] text-xs font-semibold"
+                    >
+                      Manage
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={handleConnectGoogleBusiness}
+                  className="w-full bg-[#141413] hover:bg-[#252320] text-[#faf9f5] text-xs font-semibold flex items-center justify-center gap-2"
+                >
+                  <TechnologyIcon name="google" size={13} />
+                  <span>Connect Google Business</span>
                 </Button>
               )}
             </div>
