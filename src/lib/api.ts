@@ -210,6 +210,11 @@ export async function fetchAuthorityCompetitors(businessId?: string): Promise<{ 
   return fetchApi(`/api/authority/competitors${query}`);
 }
 
+export async function fetchBacklinkIntelligence(businessId?: string): Promise<any> {
+  const query = businessId ? `?business_id=${encodeURIComponent(businessId)}` : '';
+  return fetchApi(`/api/authority/backlinks-intelligence${query}`);
+}
+
 export async function addAuthorityCompetitor(domain: string, businessId?: string): Promise<any> {
   return fetchApi('/api/authority/competitors', {
     method: 'POST',
@@ -246,6 +251,42 @@ export async function updateOpportunityStatus(id: string, status: string): Promi
 export async function fetchAuthorityHealth(): Promise<any> {
   return fetchApi('/api/authority/health', { method: 'POST' });
 }
+
+export async function fetchAuthorityScore(businessId?: string): Promise<any> {
+  const qs = businessId ? `?business_id=${encodeURIComponent(businessId)}` : '';
+  return fetchApi(`/api/authority/score${qs}`);
+}
+
+export async function fetchAuthorityTasks(businessId?: string): Promise<{
+  tasks: any[];
+  progress: { total: number; completed: number; inProgress: number; pending: number; completionRate: number };
+}> {
+  const qs = businessId ? `?business_id=${encodeURIComponent(businessId)}` : '';
+  return fetchApi(`/api/authority/tasks${qs}`);
+}
+
+export async function generateAuthorityTasks(businessId?: string): Promise<{
+  tasks: any[];
+  progress: { total: number; completed: number; inProgress: number; pending: number; completionRate: number };
+  message: string;
+}> {
+  return fetchApi('/api/authority/tasks/generate', {
+    method: 'POST',
+    body: JSON.stringify({ business_id: businessId })
+  });
+}
+
+export async function updateAuthorityTaskStatus(
+  taskId: string,
+  status: 'pending' | 'in_progress' | 'completed',
+  businessId?: string
+): Promise<any> {
+  return fetchApi(`/api/authority/tasks/${encodeURIComponent(taskId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status, business_id: businessId })
+  });
+}
+
 
 // -----------------------------------------------------------------------------
 // KEYWORDS & VISIBILITY

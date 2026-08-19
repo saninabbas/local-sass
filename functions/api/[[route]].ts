@@ -40,6 +40,14 @@ import {
   deleteNotificationForUser,
   ensureNotificationTable
 } from './notificationEngine';
+import {
+  calculateAuthorityScore,
+  generateAuthorityTasks,
+  getAuthorityTasks,
+  updateAuthorityTaskStatus,
+  ensureAuthorityTables
+} from './authorityEngine';
+
 
 export interface Env {
   DB: D1Database;
@@ -1150,6 +1158,7 @@ export const onRequest = async (context: any) => {
           await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_backlink_opps_biz ON backlink_opportunities(business_id, priority, ai_score DESC)").run().catch(() => {});
           await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_backlinks_biz_status ON backlinks(business_id, status)").run().catch(() => {});
           await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_backlinks_source_domain ON backlinks(business_id, source_domain)").run().catch(() => {});
+          await ensureAuthorityTables(env.DB);
           await ensureNotificationTable(env.DB);
           await ensureAdminUser();
 
@@ -4265,6 +4274,46 @@ export const onRequest = async (context: any) => {
         }
       }
 
+      // --- AUTHORITY: BACKLINK INTELLIGENCE & GAP ENGINE ---
+      if (url.pathname === '/api/authority/backlinks-intelligence' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        try {
+          const { results: compRows } = await env.DB.prepare(
+            "SELECT domain FROM competitor_domains WHERE business_id = ?"
+          ).bind(business.id).all().catch(() => ({ results: [] }));
+
+          const competitorList = (compRows || []).map((r: any) => r.domain).filter(Boolean);
+
+          const { evaluateBacklinkOpportunities } = await import('./backlinkOpportunityEngine');
+          const summary = await evaluateBacklinkOpportunities(
+            (business.website_url as string) || 'mybusiness.com',
+            competitorList,
+            75,
+            env.NVIDIA_API_KEY
+          );
+
+          return jsonResponse({
+            success: true,
+            data: summary
+          });
+        } catch (e: any) {
+          return errorResponse("Failed to evaluate backlink intelligence: " + e.message, 500);
+        }
+      }
+
       // --- AUTHORITY: GET OPPORTUNITIES LIST ---
       if (url.pathname === '/api/authority/opportunities' && request.method === 'GET') {
         const user = await authenticate();
@@ -4353,6 +4402,136 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true, data: { id: oppId, status } });
       }
 
+      // --- PHASE 4: GET /api/authority/tasks ---
+      if (url.pathname === '/api/authority/tasks' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        try {
+          const taskData = await getAuthorityTasks(env.DB, business.id);
+          // If no tasks exist yet, automatically generate initial set
+          if (taskData.tasks.length === 0) {
+            const initialTasks = await generateAuthorityTasks(env.DB, business, env.NVIDIA_API_KEY);
+            const freshData = await getAuthorityTasks(env.DB, business.id);
+            return jsonResponse({ success: true, ...freshData });
+          }
+          return jsonResponse({ success: true, ...taskData });
+        } catch (e: any) {
+          return errorResponse("Failed to load authority tasks: " + e.message, 500);
+        }
+      }
+
+      // --- PHASE 4: POST /api/authority/tasks/generate ---
+      if (url.pathname === '/api/authority/tasks/generate' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        let bodyJson: any = {};
+        try { bodyJson = await request.clone().json(); } catch {}
+        const targetBizId = bodyJson?.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        try {
+          const tasks = await generateAuthorityTasks(env.DB, business, env.NVIDIA_API_KEY);
+          const taskData = await getAuthorityTasks(env.DB, business.id);
+          return jsonResponse({
+            success: true,
+            message: "AI Authority tasks generated successfully",
+            ...taskData
+          });
+        } catch (e: any) {
+          return errorResponse("Failed to generate authority tasks: " + e.message, 500);
+        }
+      }
+
+      // --- PHASE 4: PATCH /api/authority/tasks/:id ---
+      if (url.pathname.startsWith('/api/authority/tasks/') && request.method === 'PATCH') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const taskId = url.pathname.replace('/api/authority/tasks/', '').split('/')[0];
+        const body: any = await request.json().catch(() => ({}));
+        const targetBizId = body?.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const validStatuses = ['pending', 'in_progress', 'completed'];
+        const newStatus = (body.status || '').toLowerCase();
+        if (!validStatuses.includes(newStatus)) {
+          return errorResponse("Invalid status. Expected: 'pending', 'in_progress', or 'completed'", 400);
+        }
+
+        try {
+          const updated = await updateAuthorityTaskStatus(env.DB, business.id, taskId, newStatus);
+          if (!updated) {
+            return errorResponse("Task not found or update failed", 404);
+          }
+          const taskData = await getAuthorityTasks(env.DB, business.id);
+          return jsonResponse({
+            success: true,
+            message: `Task status updated to '${newStatus}'`,
+            data: { taskId, status: newStatus },
+            progress: taskData.progress
+          });
+        } catch (e: any) {
+          return errorResponse("Failed to update task: " + e.message, 500);
+        }
+      }
+
+      // --- PHASE 5: GET /api/authority/score ---
+      if (url.pathname === '/api/authority/score' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        try {
+          const scoreData = await calculateAuthorityScore(env.DB, business.id);
+          return jsonResponse({
+            success: true,
+            data: scoreData
+          });
+        } catch (e: any) {
+          return errorResponse("Failed to calculate authority score: " + e.message, 500);
+        }
+      }
 
       if (url.pathname === '/api/reviews/status' && request.method === 'GET') {
         const user = await authenticate();
