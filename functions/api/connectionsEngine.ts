@@ -51,10 +51,42 @@ export async function deleteConnection(db: any, userId: string, projectId: strin
 // GITHUB PROVIDER INTEGRATION (PHASES 1 & 2)
 // =========================================================================
 
+export function cleanGitHubOwnerAndRepo(rawOwner: string, rawRepo: string): { owner: string; repo: string } {
+  let combined = `${rawOwner || ''}/${rawRepo || ''}`.trim();
+
+  // Strip common CLI/git commands & prefixes
+  combined = combined
+    .replace(/^(gh\s+repo\s+clone\s+|git\s+clone\s+)/i, '')
+    .replace(/^https?:\/\/github\.com\//i, '')
+    .replace(/^git@github\.com:/i, '')
+    .replace(/\.git$/i, '')
+    .trim();
+
+  const parts = combined.split('/').map(p => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const owner = parts[parts.length - 2].replace(/^(gh\s+repo\s+clone\s+|git\s+clone\s+)/i, '').trim();
+    const repo = parts[parts.length - 1].replace(/\.git$/i, '').trim();
+    return { owner, repo };
+  } else if (parts.length === 1) {
+    const cleanOwner = (rawOwner || '').replace(/^(gh\s+repo\s+clone\s+|git\s+clone\s+)/i, '').trim();
+    return { owner: cleanOwner, repo: parts[0] };
+  }
+  return {
+    owner: (rawOwner || '').replace(/^(gh\s+repo\s+clone\s+|git\s+clone\s+)/i, '').trim(),
+    repo: (rawRepo || '').replace(/\.git$/i, '').trim()
+  };
+}
+
 export async function getActiveGitHubConnection(db: any, userId: string, projectId: string) {
   const row: any = await db.prepare(
     "SELECT * FROM connections WHERE user_id = ? AND project_id = ? AND provider = 'github' AND status = 'CONNECTED' ORDER BY updated_at DESC LIMIT 1"
   ).bind(userId, projectId).first();
+
+  if (row) {
+    const { owner, repo } = cleanGitHubOwnerAndRepo(row.repository_owner, row.repository_name);
+    row.repository_owner = owner;
+    row.repository_name = repo;
+  }
 
   return row;
 }
@@ -74,6 +106,7 @@ export async function saveGitHubConnection(
 ): Promise<ConnectionRecord> {
   const id = `conn_gh_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const defaultBranch = data.defaultBranch || 'main';
+  const { owner: cleanOwner, repo: cleanRepo } = cleanGitHubOwnerAndRepo(data.repositoryOwner, data.repositoryName);
 
   // Check if connection already exists for this project + repo
   const existing: any = await db.prepare(
@@ -88,9 +121,9 @@ export async function saveGitHubConnection(
       SET repository_name = ?, repository_owner = ?, repository_id = ?, default_branch = ?, installation_id = ?, auth_token = ?, status = 'CONNECTED', updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND user_id = ?
     `).bind(
-      data.repositoryName,
-      data.repositoryOwner,
-      data.repositoryId || '',
+      cleanRepo,
+      cleanOwner,
+      `${cleanOwner}/${cleanRepo}`,
       defaultBranch,
       data.installationId || '',
       tokenToSave,
@@ -104,9 +137,9 @@ export async function saveGitHubConnection(
       project_id: projectId,
       provider: 'github',
       installation_id: data.installationId,
-      repository_id: data.repositoryId,
-      repository_name: data.repositoryName,
-      repository_owner: data.repositoryOwner,
+      repository_id: `${cleanOwner}/${cleanRepo}`,
+      repository_name: cleanRepo,
+      repository_owner: cleanOwner,
       default_branch: defaultBranch,
       status: 'CONNECTED',
       created_at: new Date().toISOString(),
@@ -123,9 +156,9 @@ export async function saveGitHubConnection(
     userId,
     projectId,
     data.installationId || '',
-    data.repositoryId || '',
-    data.repositoryName,
-    data.repositoryOwner,
+    `${cleanOwner}/${cleanRepo}`,
+    cleanRepo,
+    cleanOwner,
     defaultBranch,
     tokenToSave
   ).run();
@@ -136,9 +169,9 @@ export async function saveGitHubConnection(
     project_id: projectId,
     provider: 'github',
     installation_id: data.installationId,
-    repository_id: data.repositoryId,
-    repository_name: data.repositoryName,
-    repository_owner: data.repositoryOwner,
+    repository_id: `${cleanOwner}/${cleanRepo}`,
+    repository_name: cleanRepo,
+    repository_owner: cleanOwner,
     default_branch: defaultBranch,
     status: 'CONNECTED',
     created_at: new Date().toISOString(),

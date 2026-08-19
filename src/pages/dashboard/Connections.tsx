@@ -242,14 +242,19 @@ export const Connections: React.FC = () => {
   const parseGitHubRepoInput = (input: string): { owner?: string; repo?: string; fullName?: string } | null => {
     if (!input || !input.trim()) return null;
     let clean = input.trim()
+      .replace(/^(gh\s+repo\s+clone\s+|git\s+clone\s+)/i, '')
       .replace(/^https?:\/\/github\.com\//i, '')
+      .replace(/^git@github\.com:/i, '')
       .replace(/\.git$/i, '')
       .replace(/^\/+|\/+$/g, '');
     const parts = clean.split('/');
     if (parts.length >= 2 && parts[0] && parts[1]) {
-      return { owner: parts[0], repo: parts[1], fullName: `${parts[0]}/${parts[1]}` };
+      const owner = parts[0].trim().replace(/^(gh\s+repo\s+clone\s+|git\s+clone\s+)/i, '');
+      const repo = parts[1].trim().replace(/\.git$/i, '');
+      return { owner, repo, fullName: `${owner}/${repo}` };
     } else if (parts.length === 1 && parts[0]) {
-      return { repo: parts[0], fullName: parts[0] };
+      const repo = parts[0].trim().replace(/\.git$/i, '');
+      return { repo, fullName: repo };
     }
     return null;
   };

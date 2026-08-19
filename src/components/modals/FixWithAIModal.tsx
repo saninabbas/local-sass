@@ -372,19 +372,46 @@ export function FixWithAIModal({
                   </div>
                 )}
 
+                {/* Provider Connection Callout Banner if Manual */}
+                {!activeGitHubConnection && !activeWpConnection && !activeShopifyConnection && (
+                  <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200/90 text-amber-950 space-y-2 font-sans">
+                    <div className="flex items-start gap-2.5">
+                      <Zap size={18} className="text-[#cc785c] shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <strong className="block font-bold text-xs text-[#141413]">Want 1-Click Automated Fix Deployment to Your Live Website?</strong>
+                        <p className="text-[11px] text-amber-900 leading-relaxed">
+                          Rankora can push code patches, meta tags, and schema updates directly to your domain via <strong>GitHub (PR)</strong>, <strong>WordPress (REST API)</strong>, or <strong>Shopify (Admin API)</strong>.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="pt-2 flex items-center justify-between border-t border-amber-200/60">
+                      <span className="text-[10px] font-mono text-amber-800">No integration connected for {context.websiteUrl || 'this domain'} yet.</span>
+                      <a
+                        href="/dashboard/connections"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#141413] text-[#faf9f5] hover:bg-[#252320] text-[11px] font-semibold transition-colors cursor-pointer"
+                      >
+                        <span>Connect Website Provider</span>
+                        <ExternalLink size={11} className="text-[#cc785c]" />
+                      </a>
+                    </div>
+                  </div>
+                )}
+
                 {/* Explicit Safety Notice */}
-                <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 flex items-start gap-2.5 text-xs text-amber-900 font-sans">
-                  <AlertTriangle size={15} className="text-amber-700 shrink-0 mt-0.5" />
+                <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200/80 flex items-start gap-2.5 text-xs text-emerald-950 font-sans">
+                  <ShieldCheck size={16} className="text-emerald-700 shrink-0 mt-0.5" />
                   <div>
                     <strong className="block font-semibold">Pre-Execution Safety Verification:</strong>
                     <span>
                       {providerName === 'GitHub' 
-                        ? 'This action will create a safe, isolated feature branch and submit a GitHub Pull Request.'
+                        ? 'This action will create an isolated feature branch and submit a GitHub Pull Request.'
                         : providerName === 'Shopify'
-                        ? 'This action will update the connected Shopify store metadata upon explicit execution.'
+                        ? 'This action will update the connected Shopify store metadata directly via Admin API.'
                         : providerName === 'WordPress'
-                        ? 'This action will apply the approved update directly via WordPress REST API.'
-                        : 'This action will prepare a manual deployment package for your live site.'}
+                        ? 'This action will apply the approved update directly to your site via WordPress REST API.'
+                        : 'This action will generate the verified code snippet for your site.'}
                     </span>
                   </div>
                 </div>
@@ -575,10 +602,15 @@ export function FixWithAIModal({
                 size="sm"
                 onClick={handleApproveAndExecute}
                 disabled={loading}
-                className="bg-[#141413] hover:bg-[#252320] text-[#faf9f5] flex items-center gap-1.5 text-xs font-semibold"
+                className="bg-[#141413] hover:bg-[#252320] text-[#faf9f5] flex items-center gap-1.5 text-xs font-semibold shadow-xs"
               >
                 <Check size={13} className="text-emerald-400" />
-                <span>Approve & Execute Fix</span>
+                <span>
+                  {providerName === 'GitHub' ? 'Create PR & Push to GitHub' :
+                   providerName === 'WordPress' ? 'Push Fix Live via WordPress API' :
+                   providerName === 'Shopify' ? 'Apply Update to Shopify Store' :
+                   'Approve & View Code Snippet'}
+                </span>
               </Button>
             )}
 
