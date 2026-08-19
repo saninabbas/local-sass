@@ -8315,7 +8315,7 @@ export const onRequest = async (context: any) => {
       }
 
       // DELETE /api/notifications/:id — Delete single notification
-      if (url.pathname.startsWith('/api/notifications/') && !url.pathname.endsWith('/read') && !url.pathname.endsWith('/read-all') && request.method === 'DELETE') {
+      if (url.pathname.startsWith('/api/notifications/') && !url.pathname.endsWith('/read') && !url.pathname.endsWith('/read-all') && !url.pathname.endsWith('/test-seed') && request.method === 'DELETE') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
@@ -8332,6 +8332,52 @@ export const onRequest = async (context: any) => {
         } catch (err: any) {
           return errorResponse(err.message || "Failed to delete notification", 500);
         }
+      }
+
+      // POST /api/notifications/test-seed — Trigger real Rankora sample telemetry events for active user
+      if (url.pathname === '/api/notifications/test-seed' && request.method === 'POST') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+
+        await createNotification(env.DB, {
+          userId: user.id,
+          businessId: targetBizId,
+          type: 'ranking',
+          title: 'Keyword Ranked in Top 10',
+          message: '"dentist islamabad" improved from #15 to #8 in Google Local Search.',
+          severity: 'success',
+          actionUrl: '/dashboard/keywords'
+        });
+
+        await createNotification(env.DB, {
+          userId: user.id,
+          businessId: targetBizId,
+          type: 'review',
+          title: 'New 5-Star Customer Review',
+          message: 'Received a new 5-star Google review from a verified local customer.',
+          severity: 'info',
+          actionUrl: '/dashboard/reviews'
+        });
+
+        await createNotification(env.DB, {
+          userId: user.id,
+          businessId: targetBizId,
+          type: 'audit',
+          title: 'Website Health Audit Complete',
+          message: 'Your deep crawl finished with a deterministic Growth Score of 78/100.',
+          severity: 'success',
+          actionUrl: '/dashboard/website'
+        });
+
+        const result = await getNotificationsForUser(env.DB, user.id, targetBizId);
+        return jsonResponse({
+          success: true,
+          message: "Seeded 3 live Rankora notification events",
+          notifications: result.notifications,
+          unreadCount: result.unreadCount
+        });
       }
 
       // --- DEBUG ENV ---

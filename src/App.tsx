@@ -124,11 +124,7 @@ function App() {
                 </ProtectedRoute>
               } />
 
-              <Route element={
-                <ProtectedRoute>
-                  <DashboardLayout />
-                </ProtectedRoute>
-              }>
+              <Route element={<ProtectedRoute />}>
                 <Route path="/dashboard" element={<DashboardSuspense><Dashboard /></DashboardSuspense>} />
                 <Route path="/dashboard/businesses" element={<DashboardSuspense><Businesses /></DashboardSuspense>} />
                 <Route path="/dashboard/score" element={<DashboardSuspense><Score /></DashboardSuspense>} />
