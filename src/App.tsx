@@ -131,6 +131,7 @@ function App() {
                 <Route path="/dashboard/website" element={<DashboardSuspense><Website /></DashboardSuspense>} />
                 <Route path="/dashboard/competitors" element={<DashboardSuspense><Competitors /></DashboardSuspense>} />
                 <Route path="/dashboard/keywords" element={<DashboardSuspense><Keywords /></DashboardSuspense>} />
+                <Route path="/dashboard/rankings" element={<DashboardSuspense><Keywords /></DashboardSuspense>} />
                 <Route path="/dashboard/reviews" element={<DashboardSuspense><Reviews /></DashboardSuspense>} />
                 <Route path="/dashboard/actions" element={<DashboardSuspense><ActionPlan /></DashboardSuspense>} />
                 <Route path="/dashboard/reports" element={<DashboardSuspense><Reports /></DashboardSuspense>} />

@@ -793,6 +793,27 @@ export async function fetchRankingHistory(keywordId: string, days: number = 30, 
   return fetchApi(`/api/rankings/${keywordId}/history?days=${days}${businessId ? `&business_id=${businessId}` : ''}`);
 }
 
+export async function fetchSerpStatus(): Promise<{ success: boolean; data: { providerName: string; providerStatus: string; latencyMs: number; message: string } }> {
+  return fetchApi('/api/rankings/status');
+}
+
+export async function fetchCompetitorRankings(businessId?: string): Promise<{ success: boolean; data: { competitors: any[] } }> {
+  return fetchApi(`/api/rankings/competitors${businessId ? `?business_id=${businessId}` : ''}`);
+}
+
+export async function patchRankingKeyword(id: string, params: { active?: boolean; targetUrl?: string; location?: string; device?: 'desktop' | 'mobile'; businessId?: string }): Promise<any> {
+  return fetchApi(`/api/rankings/keywords/${id}${params.businessId ? `?business_id=${params.businessId}` : ''}`, {
+    method: 'PATCH',
+    body: JSON.stringify(params)
+  });
+}
+
+export async function triggerCronRankings(): Promise<any> {
+  return fetchApi('/api/cron/rankings', {
+    method: 'POST'
+  });
+}
+
 export async function extractCompetitorKeywords(competitorUrl: string, businessId?: string): Promise<any> {
   return fetchApi('/api/competitors/keywords/extract', {
     method: 'POST',

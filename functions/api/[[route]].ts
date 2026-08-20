@@ -833,22 +833,55 @@ export const onRequest = async (context: any) => {
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`).run().catch(() => {});
 
+        await db.prepare(`CREATE TABLE IF NOT EXISTS tracked_keywords (
+          id TEXT PRIMARY KEY,
+          business_id TEXT NOT NULL,
+          keyword TEXT NOT NULL,
+          location TEXT,
+          language TEXT DEFAULT 'en',
+          device TEXT DEFAULT 'desktop',
+          search_engine TEXT DEFAULT 'google',
+          target_url TEXT,
+          active INTEGER DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+
         await db.prepare(`CREATE TABLE IF NOT EXISTS ranking_results (
           id TEXT PRIMARY KEY,
           business_id TEXT NOT NULL,
           keyword_id TEXT NOT NULL,
           keyword TEXT NOT NULL,
-          location TEXT NOT NULL,
-          country_code TEXT NOT NULL DEFAULT 'US',
-          device TEXT NOT NULL DEFAULT 'desktop',
+          target_domain TEXT,
+          target_url TEXT,
           position INTEGER,
-          previous_position INTEGER,
-          position_change INTEGER,
-          ranking_url TEXT,
-          found INTEGER NOT NULL DEFAULT 0,
-          status TEXT NOT NULL DEFAULT 'NOT_RANKING',
-          checked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          ranking_type TEXT DEFAULT 'organic',
+          location TEXT,
+          competitor_domain TEXT,
+          search_date DATE DEFAULT (DATE('now')),
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+
+        await db.prepare(`CREATE TABLE IF NOT EXISTS ranking_history (
+          id TEXT PRIMARY KEY,
+          business_id TEXT NOT NULL,
+          keyword_id TEXT NOT NULL,
+          previous_position INTEGER,
+          current_position INTEGER,
+          position_change INTEGER,
+          visibility_change REAL DEFAULT 0.0,
+          recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+
+        await db.prepare(`CREATE TABLE IF NOT EXISTS competitor_rankings (
+          id TEXT PRIMARY KEY,
+          business_id TEXT NOT NULL,
+          competitor_domain TEXT NOT NULL,
+          keyword TEXT NOT NULL,
+          position INTEGER,
+          ranking_type TEXT DEFAULT 'organic',
+          location TEXT,
+          recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`).run().catch(() => {});
 
         await db.prepare(`CREATE TABLE IF NOT EXISTS ranking_snapshots (
@@ -861,10 +894,12 @@ export const onRequest = async (context: any) => {
           checked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         )`).run().catch(() => {});
 
-        await db.prepare("CREATE INDEX IF NOT EXISTS idx_ranking_kw_biz ON ranking_keywords(business_id, is_active)").run().catch(() => {});
-        await db.prepare("CREATE INDEX IF NOT EXISTS idx_ranking_res_biz ON ranking_results(business_id, checked_at DESC)").run().catch(() => {});
-        await db.prepare("CREATE INDEX IF NOT EXISTS idx_ranking_res_kw ON ranking_results(keyword_id, checked_at DESC)").run().catch(() => {});
-        await db.prepare("CREATE INDEX IF NOT EXISTS idx_ranking_snap_kw ON ranking_snapshots(keyword_id, checked_at DESC)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_tracked_kw_biz ON tracked_keywords(business_id, active)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_rank_res_biz ON ranking_results(business_id, search_date DESC)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_rank_res_kw ON ranking_results(keyword_id, search_date DESC)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_rank_hist_kw ON ranking_history(keyword_id, recorded_at DESC)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_rank_hist_biz ON ranking_history(business_id, recorded_at DESC)").run().catch(() => {});
+        await db.prepare("CREATE INDEX IF NOT EXISTS idx_comp_rank_biz ON competitor_rankings(business_id, competitor_domain)").run().catch(() => {});
 
         // GBP Accounts table
         await db.prepare(`CREATE TABLE IF NOT EXISTS gbp_accounts (
@@ -5602,40 +5637,147 @@ export const onRequest = async (context: any) => {
 
         if (!business) return errorResponse("Business not found", 404);
 
-        const { results: kwResults } = await env.DB.prepare(`
-          SELECT 
-            k.id,
-            k.keyword,
-            k.location,
-            k.country_code,
-            k.device,
-            k.target_domain,
-            r.position as current_position,
-            r.previous_position,
-            r.position_change,
-            r.status,
-            r.ranking_url,
-            r.checked_at as last_checked_at
-          FROM ranking_keywords k
-          LEFT JOIN ranking_results r ON r.keyword_id = k.id AND r.id = (
-            SELECT id FROM ranking_results WHERE keyword_id = k.id ORDER BY checked_at DESC LIMIT 1
-          )
-          WHERE k.business_id = ? AND k.is_active = 1
-          ORDER BY k.created_at DESC
-        `).bind(business.id).all();
+        const { getRankingOverview } = await import('./rankingEngine');
+        const overview = await getRankingOverview(env.DB, business.id as string, env);
 
-        const { calculateRankingKPIs, calculateLocalVisibilityScore } = await import('./rankingEngine');
-        const items = kwResults || [];
-        const kpis = calculateRankingKPIs(items);
-        const visibilityScore = calculateLocalVisibilityScore(items);
+        return jsonResponse({
+          success: true,
+          data: overview
+        });
+      }
+
+      // GET /api/rankings/status — Check configured SERP provider status
+      if (url.pathname === '/api/rankings/status' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const { getSerpProvider } = await import('./services/serpProvider');
+        const provider = getSerpProvider(env);
+        const health = await provider.testConnection();
 
         return jsonResponse({
           success: true,
           data: {
-            kpis,
-            visibilityScore,
-            keywords: items
+            providerName: provider.name,
+            providerStatus: provider.status,
+            latencyMs: health.latencyMs,
+            message: health.message
           }
+        });
+      }
+
+      // GET /api/rankings/competitors — Competitor ranking gaps
+      if (url.pathname === '/api/rankings/competitors' && request.method === 'GET') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const { getCompetitorRankingGaps } = await import('./rankingEngine');
+        const gaps = await getCompetitorRankingGaps(env.DB, business.id as string);
+
+        return jsonResponse({ success: true, data: gaps });
+      }
+
+      // PATCH /api/rankings/keywords/:id — Update keyword tracking settings
+      if (url.pathname.startsWith('/api/rankings/keywords/') && request.method === 'PATCH') {
+        const user = await authenticate();
+        if (!user) return errorResponse("Unauthorized", 401);
+
+        const kwId = url.pathname.replace('/api/rankings/keywords/', '');
+        const targetBizId = url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
+        let business;
+        try {
+          business = await resolveTargetBusiness(user.id, targetBizId);
+        } catch (err: any) {
+          if (err.status === 403) return errorResponse("Forbidden: Cross-tenant business access denied", 403);
+          throw err;
+        }
+
+        if (!business) return errorResponse("Business not found", 404);
+
+        const payload = await request.json().catch(() => ({})) as any;
+        const active = payload.active !== undefined ? (payload.active ? 1 : 0) : null;
+        const targetUrl = payload.targetUrl !== undefined ? payload.targetUrl : null;
+        const location = payload.location !== undefined ? payload.location : null;
+        const device = payload.device !== undefined ? payload.device : null;
+
+        if (active !== null) {
+          await env.DB.prepare("UPDATE tracked_keywords SET active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND business_id = ?").bind(active, kwId, business.id).run().catch(() => {});
+          await env.DB.prepare("UPDATE ranking_keywords SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND business_id = ?").bind(active, kwId, business.id).run().catch(() => {});
+        }
+        if (targetUrl !== null) {
+          await env.DB.prepare("UPDATE tracked_keywords SET target_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND business_id = ?").bind(targetUrl, kwId, business.id).run().catch(() => {});
+        }
+        if (location !== null) {
+          await env.DB.prepare("UPDATE tracked_keywords SET location = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND business_id = ?").bind(location, kwId, business.id).run().catch(() => {});
+        }
+        if (device !== null) {
+          await env.DB.prepare("UPDATE tracked_keywords SET device = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND business_id = ?").bind(device, kwId, business.id).run().catch(() => {});
+        }
+
+        return jsonResponse({ success: true, message: "Keyword updated successfully" });
+      }
+
+      // POST /api/cron/rankings — Scheduled ranking update job
+      if (url.pathname === '/api/cron/rankings' && request.method === 'POST') {
+        const authHeader = request.headers.get('Authorization') || '';
+        const cronSecret = env.CRON_SECRET || env.ADMIN_SECRET || 'rankora-cron-secret';
+        const isSecretValid = authHeader === `Bearer ${cronSecret}`;
+
+        if (!isSecretValid) {
+          const user = await authenticate();
+          if (!user || user.role !== 'admin') {
+            return errorResponse("Unauthorized: Cron token or admin privilege required", 401);
+          }
+        }
+
+        const { fetchRanking } = await import('./rankingEngine');
+        const { getSerpProvider } = await import('./services/serpProvider');
+        const provider = getSerpProvider(env);
+
+        if (provider.status === 'NOT_CONFIGURED') {
+          return jsonResponse({
+            success: false,
+            providerStatus: 'NOT_CONFIGURED',
+            message: 'No SERP provider configured. Cron skipped.'
+          });
+        }
+
+        const { results: activeKeywords } = await env.DB.prepare(`
+          SELECT id, business_id, keyword FROM tracked_keywords
+          WHERE active = 1
+          ORDER BY updated_at ASC
+          LIMIT 30
+        `).all().catch(() => ({ results: [] }));
+
+        let processed = 0;
+        let errors = 0;
+
+        for (const kw of activeKeywords || []) {
+          try {
+            await fetchRanking(env.DB, kw.business_id, kw.id, env);
+            processed++;
+          } catch (err) {
+            errors++;
+            console.warn(`Cron ranking check error for keyword ${kw.id}:`, err);
+          }
+        }
+
+        return jsonResponse({
+          success: true,
+          message: `Cron ranking run complete. Processed ${processed} keywords (${errors} errors).`,
+          processed,
+          errors
         });
       }
 
@@ -5657,20 +5799,28 @@ export const onRequest = async (context: any) => {
         if (!business) return errorResponse("Business not found", 404);
 
         const days = parseInt(url.searchParams.get('days') || '30', 10);
-        const { results: snapshots } = await env.DB.prepare(`
-          SELECT position, ranking_url, device, checked_at
-          FROM ranking_snapshots
+        const { results: history } = await env.DB.prepare(`
+          SELECT previous_position, current_position, position_change, visibility_change, recorded_at
+          FROM ranking_history
           WHERE keyword_id = ? AND business_id = ?
-          ORDER BY checked_at ASC
+          ORDER BY recorded_at ASC
           LIMIT 100
-        `).bind(keywordId, business.id).all();
+        `).bind(keywordId, business.id).all().catch(async () => {
+          return await env.DB.prepare(`
+            SELECT position as current_position, NULL as previous_position, 0 as position_change, 0.0 as visibility_change, checked_at as recorded_at
+            FROM ranking_snapshots
+            WHERE keyword_id = ? AND business_id = ?
+            ORDER BY checked_at ASC
+            LIMIT 100
+          `).bind(keywordId, business.id).all();
+        });
 
         return jsonResponse({
           success: true,
           data: {
             keywordId,
             days,
-            snapshots: snapshots || []
+            snapshots: history || []
           }
         });
       }

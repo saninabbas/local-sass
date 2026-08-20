@@ -52,6 +52,8 @@ export interface TrackedRankingKeyword {
 
 export function Keywords() {
   const [keywords, setKeywords] = useState<TrackedRankingKeyword[]>([]);
+  const [providerStatus, setProviderStatus] = useState<string>('NOT_CONFIGURED');
+  const [providerName, setProviderName] = useState<string>('Unconfigured');
   const [kpis, setKpis] = useState<any>({
     totalKeywords: 0,
     top3: 0,
@@ -94,6 +96,8 @@ export function Keywords() {
       
       setDashboardData(dash);
       if (rankingOverview && rankingOverview.data) {
+        setProviderStatus(rankingOverview.data.providerStatus || 'NOT_CONFIGURED');
+        setProviderName(rankingOverview.data.providerName || 'Unconfigured');
         setKpis(rankingOverview.data.kpis || {});
         setVisibilityScore(rankingOverview.data.visibilityScore || 0);
         
@@ -286,6 +290,26 @@ export function Keywords() {
             </Button>
           </div>
         </div>
+
+        {/* SERP Provider Status Alert when Unconfigured */}
+        {providerStatus === 'NOT_CONFIGURED' && (
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-900 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+                <AlertCircle size={18} className="text-amber-600" />
+              </div>
+              <div>
+                <div className="font-bold flex items-center gap-2">
+                  <span>SERP Status: NOT_CONFIGURED</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] uppercase font-mono bg-amber-500/20 text-amber-800">Real Provider Needed</span>
+                </div>
+                <p className="text-[#6c6a64] mt-0.5">
+                  Connect a SERP provider (e.g. Serper, DataForSEO, BrightLocal, Semrush) to enable real live Google search ranking telemetry. No fake rankings are displayed.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Feedback Alert */}
         {feedback && (
