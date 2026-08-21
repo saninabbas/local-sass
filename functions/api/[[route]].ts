@@ -4022,7 +4022,7 @@ export const onRequest = async (context: any) => {
       }
 
       // --- AUTHORITY: OVERVIEW & METRICS ---
-      if (url.pathname === '/api/authority/overview' && request.method === 'GET') {
+      if ((url.pathname === '/api/authority/overview' || url.pathname === '/api/authority/dashboard') && request.method === 'GET') {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
