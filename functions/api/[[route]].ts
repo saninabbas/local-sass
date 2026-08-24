@@ -174,12 +174,15 @@ export const onRequest = async (context: any) => {
         const adminEmail = (env.ADMIN_EMAIL || "saninabbas@gmail.com").toLowerCase().trim();
         const existing = await env.DB.prepare("SELECT id, role, password_hash, email_verified FROM users WHERE LOWER(email) = ?").bind(adminEmail).first();
         if (!existing) {
-          const initialPassword = env.ADMIN_INITIAL_PASSWORD || "Rankora@Admin2026!";
-          const adminPasswordHash = await hashPassword(initialPassword);
-          const adminId = "usr_admin_sanin";
-          await env.DB.prepare(
-            "INSERT INTO users (id, name, email, password_hash, email_verified, role, subscription_status) VALUES (?, ?, ?, ?, 1, 'admin', 'enterprise')"
-          ).bind(adminId, "Sanin Abbas", adminEmail, adminPasswordHash).run();
+          if (env.ADMIN_INITIAL_PASSWORD) {
+            const adminPasswordHash = await hashPassword(env.ADMIN_INITIAL_PASSWORD);
+            const adminId = "usr_admin_sanin";
+            await env.DB.prepare(
+              "INSERT INTO users (id, name, email, password_hash, email_verified, role, subscription_status) VALUES (?, ?, ?, ?, 1, 'admin', 'enterprise')"
+            ).bind(adminId, "Sanin Abbas", adminEmail, adminPasswordHash).run();
+          } else {
+            console.warn("ADMIN_INITIAL_PASSWORD environment variable missing. Skipping automatic admin creation.");
+          }
         } else if (existing.role !== 'admin' || !existing.email_verified) {
           // Admin exists in DB: never overwrite password, only ensure role and email_verified
           await env.DB.prepare(

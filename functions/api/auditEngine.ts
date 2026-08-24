@@ -135,7 +135,6 @@ export function validateAndNormalizeUrl(rawUrl: string): { valid: boolean; url: 
   }
 
   // Reject Localhost / Loopback / Private Network / Link-Local IPs (SSRF protection)
-  // Reject Localhost / Loopback / Private Network / Link-Local IPs (SSRF protection)
   const isPrivateOrLocal = (host: string): boolean => {
     const cleanHost = host.replace(/^\[/, '').replace(/\]$/, '').toLowerCase();
     
