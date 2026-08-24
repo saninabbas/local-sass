@@ -11,10 +11,9 @@ export function About() {
               Rankora was founded on a simple premise: local businesses deserve access to the same high-end digital growth tools that large corporations use, but without the complexity and enterprise pricing.
             </p>
           </div>
-          
-          <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
-            <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-12 lg:max-w-none lg:grid-cols-3">
-              <div className="flex flex-col bg-[#efe9de] p-8 rounded-xl border border-[#e6dfd8]">
+          <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 md:max-w-none">
+            <dl className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+              <div className="flex flex-col bg-[#efe9de] p-6 sm:p-8 rounded-xl border border-[#e6dfd8]">
                 <dt className="text-base font-serif font-medium text-[#141413]">
                   Our Mission
                 </dt>
@@ -22,7 +21,7 @@ export function About() {
                   <p className="flex-auto">To empower local business owners with AI-driven insights that translate directly into foot traffic, online visibility, and revenue growth.</p>
                 </dd>
               </div>
-              <div className="flex flex-col bg-[#efe9de] p-8 rounded-xl border border-[#e6dfd8]">
+              <div className="flex flex-col bg-[#efe9de] p-6 sm:p-8 rounded-xl border border-[#e6dfd8]">
                 <dt className="text-base font-serif font-medium text-[#141413]">
                   Data-Driven
                 </dt>
@@ -30,7 +29,7 @@ export function About() {
                   <p className="flex-auto">We don't believe in guesswork. Our audit engine analyzes hundreds of specific signals across SEO, website performance, and local directories to build your Growth Score.</p>
                 </dd>
               </div>
-              <div className="flex flex-col bg-[#efe9de] p-8 rounded-xl border border-[#e6dfd8]">
+              <div className="flex flex-col bg-[#efe9de] p-6 sm:p-8 rounded-xl border border-[#e6dfd8]">
                 <dt className="text-base font-serif font-medium text-[#141413]">
                   Action-Oriented
                 </dt>

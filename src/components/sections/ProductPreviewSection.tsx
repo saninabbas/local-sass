@@ -27,29 +27,29 @@ export function ProductPreviewSection() {
                   <div className="w-2.5 h-2.5 rounded-full bg-[#5db872]"></div>
                 </div>
               </div>
-              <div className="flex bg-[#141413] rounded-md px-3.5 py-1 border border-[#252320]">
+              <div className="hidden sm:flex bg-[#141413] rounded-md px-3.5 py-1 border border-[#252320]">
                 <span className="text-xs font-mono text-[#a09d96]">app.rankora.com/dashboard</span>
               </div>
-              <div className="text-xs font-mono text-[#5db872] flex items-center gap-1.5">
+              <div className="text-xs font-mono text-[#5db872] flex items-center gap-1.5 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#5db872] animate-pulse"></span>
                 <span>Live Data</span>
               </div>
             </div>
 
             {/* App Content */}
-            <div className="p-8 bg-[#1f1e1b] flex flex-col gap-8">
+            <div className="p-4 sm:p-8 bg-[#1f1e1b] flex flex-col gap-6 sm:gap-8">
               
-              <div className="flex items-center justify-between pb-4 border-b border-[#252320]">
+              <div className="flex items-center justify-between pb-4 border-b border-[#252320] flex-wrap gap-2">
                 <div>
-                  <h3 className="text-2xl font-serif font-normal text-[#faf9f5]">ABC Dental</h3>
-                  <p className="text-xs text-[#a09d96] font-sans mt-1">Growth Score and Recommendations</p>
+                  <h3 className="text-xl sm:text-2xl font-serif font-normal text-[#faf9f5]">ABC Dental</h3>
+                  <p className="text-xs text-[#a09d96] font-sans mt-0.5">Growth Score and Recommendations</p>
                 </div>
-                <button className="px-4 py-2 bg-[#252320] hover:bg-[#2e2c28] text-xs font-sans font-medium text-[#faf9f5] rounded-lg border border-[#252320]">
+                <button className="px-3.5 py-1.5 bg-[#252320] hover:bg-[#2e2c28] text-xs font-sans font-medium text-[#faf9f5] rounded-lg border border-[#252320]">
                   Download Report
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
                 {/* Score Card */}
                 <div className="col-span-1 bg-[#181715] p-6 rounded-xl border border-[#252320] shadow-sm flex flex-col justify-center items-center">
@@ -70,7 +70,7 @@ export function ProductPreviewSection() {
                 </div>
 
                 {/* Sub Scores */}
-                <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4">
+                <div className="col-span-1 lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[
                     { name: 'SEO', score: 82, change: '+4' },
                     { name: 'Reviews', score: 74, change: '+8' },

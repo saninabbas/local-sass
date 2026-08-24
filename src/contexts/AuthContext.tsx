@@ -5,8 +5,8 @@ import type { User } from '../types';
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (data: any) => Promise<void>;
-  signup: (data: any) => Promise<void>;
+  login: (data: any) => Promise<any>;
+  signup: (data: any) => Promise<any>;
   logout: () => Promise<void>;
   updateUser: (data: Partial<User>) => void;
   refreshUser: () => Promise<void>;
@@ -42,12 +42,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleLogin = async (data: any) => {
+    if (data && data.id && data.email) {
+      setUser(data);
+      return data;
+    }
     const authData = await login(data);
-    setUser(authData);
+    if (authData && !authData.require2FA) {
+      setUser(authData);
+    }
+    return authData;
   };
 
   const handleSignup = async (data: any) => {
-    return await signup(data);
+    const res = await signup(data);
+    if (res && res.data) {
+      setUser(res.data);
+    }
+    return res;
   };
 
   const handleLogout = async () => {

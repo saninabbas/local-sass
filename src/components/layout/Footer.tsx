@@ -26,7 +26,7 @@ export function Footer() {
         Footer
       </h2>
       <div className="mx-auto max-w-7xl">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
           {/* Logo & Bio */}
           <div className="space-y-4 md:col-span-1">
             <Link to="/" className="inline-flex items-center">

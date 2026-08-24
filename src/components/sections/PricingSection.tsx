@@ -46,10 +46,10 @@ export function PricingSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto items-stretch">
           
           {/* Starter Plan */}
-          <div className="bg-[#faf9f5] rounded-2xl p-8 border border-[#e6dfd8] flex flex-col justify-between shadow-xs transition-all hover:border-[#cc785c]/40">
+          <div className="bg-[#faf9f5] rounded-2xl p-6 sm:p-8 border border-[#e6dfd8] flex flex-col justify-between shadow-xs transition-all hover:border-[#cc785c]/40">
             <div>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-mono text-[#6c6a64] uppercase tracking-wider">Single Location</span>
@@ -101,15 +101,15 @@ export function PricingSection() {
           </div>
 
           {/* Growth Plan (Featured Tier in Dark Navy/Ink) */}
-          <div className="bg-[#181715] text-[#faf9f5] rounded-2xl p-8 border border-[#252320] shadow-xl flex flex-col justify-between relative overflow-hidden">
+          <div className="bg-[#181715] text-[#faf9f5] rounded-2xl p-6 sm:p-8 border border-[#252320] shadow-xl flex flex-col justify-between relative overflow-hidden">
             <div className="absolute top-0 right-0 bg-[#cc785c] text-white text-[10px] font-mono font-bold uppercase tracking-wider px-3.5 py-1 rounded-bl-xl shadow-xs">
               RECOMMENDED
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-1 gap-2 flex-wrap sm:flex-nowrap">
                 <span className="text-xs font-mono text-[#cc785c] uppercase tracking-wider font-semibold">Local Dominance</span>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#cc785c]/20 text-[#cc785c] border border-[#cc785c]/40 uppercase mr-24">
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#cc785c]/20 text-[#cc785c] border border-[#cc785c]/40 uppercase">
                   5 Websites
                 </span>
               </div>
@@ -158,7 +158,7 @@ export function PricingSection() {
           </div>
           
           {/* Agency Pro Plan */}
-          <div className="bg-[#faf9f5] rounded-2xl p-8 border border-[#e6dfd8] flex flex-col justify-between shadow-xs transition-all hover:border-[#cc785c]/40">
+          <div className="bg-[#faf9f5] rounded-2xl p-6 sm:p-8 border border-[#e6dfd8] flex flex-col justify-between shadow-xs transition-all hover:border-[#cc785c]/40">
             <div>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-mono text-[#6c6a64] uppercase tracking-wider">Multi-Location & Agency</span>

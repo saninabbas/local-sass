@@ -433,10 +433,10 @@ export function AuthorityBuilder() {
         )}
 
         {/* High-Level Authority Score Ribbon */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           
           {/* Main Score Box */}
-          <div className="md:col-span-2 p-5 bg-white border border-[#e6dfd8] rounded-2xl shadow-2xs flex flex-col justify-between">
+          <div className="sm:col-span-2 lg:col-span-2 p-5 bg-white border border-[#e6dfd8] rounded-2xl shadow-2xs flex flex-col justify-between">
             <div className="flex items-start justify-between">
               <div>
                 <span className="text-[10px] font-mono uppercase tracking-wider text-[#8e8b82] block mb-1">

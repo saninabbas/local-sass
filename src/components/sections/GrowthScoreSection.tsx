@@ -35,14 +35,14 @@ export function GrowthScoreSection() {
           </div>
           
           <div className="relative mx-auto w-full max-w-md lg:max-w-none lg:pl-10">
-            <div className="rounded-2xl bg-[#efe9de] p-8 sm:p-10 shadow-lg border border-[#e6dfd8]">
+            <div className="rounded-2xl bg-[#efe9de] p-5 sm:p-10 shadow-lg border border-[#e6dfd8]">
               <div className="text-center mb-8">
                 <h4 className="text-xs font-mono uppercase tracking-widest text-[#6c6a64] mb-4">
                   Growth Score Diagnostic
                 </h4>
                 
                 {/* Circular Visualization Concept */}
-                <div className="relative w-44 h-44 mx-auto mb-4">
+                <div className="relative w-36 h-36 sm:w-44 sm:h-44 mx-auto mb-4">
                   <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                     <circle cx="50" cy="50" r="45" fill="none" stroke="#e6dfd8" strokeWidth="7" />
                     <circle 
@@ -58,7 +58,7 @@ export function GrowthScoreSection() {
                     />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-5xl font-serif font-normal text-[#141413] tracking-tight">84</span>
+                    <span className="text-4xl sm:text-5xl font-serif font-normal text-[#141413] tracking-tight">84</span>
                     <span className="text-xs font-mono text-[#6c6a64]">/ 100</span>
                   </div>
                 </div>
@@ -67,7 +67,7 @@ export function GrowthScoreSection() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {[
                   { label: 'Local Maps Pack', score: 88, color: 'bg-[#5db872]' },
                   { label: 'Review Velocity', score: 76, color: 'bg-[#e8a55a]' },

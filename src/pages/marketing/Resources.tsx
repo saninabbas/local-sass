@@ -13,8 +13,8 @@ export function Resources() {
               Everything you need to master local SEO and grow your business online.
             </p>
           </div>
-          <div className="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-6 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3 lg:gap-8">
-            <div className="flex flex-col justify-between rounded-xl bg-[#efe9de] p-8 border border-[#e6dfd8] shadow-sm hover:shadow-md transition-shadow">
+          <div className="mx-auto mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:mt-20 lg:gap-8">
+            <div className="flex flex-col justify-between rounded-xl bg-[#efe9de] p-6 sm:p-8 border border-[#e6dfd8] shadow-sm hover:shadow-md transition-shadow">
               <div className="space-y-3">
                 <div className="w-10 h-10 rounded-lg bg-[#faf9f5] text-[#cc785c] flex items-center justify-center border border-[#e6dfd8]">
                   <BookOpen size={20} />
@@ -29,7 +29,7 @@ export function Resources() {
               </Link>
             </div>
 
-            <div className="flex flex-col justify-between rounded-xl bg-[#efe9de] p-8 border border-[#e6dfd8] shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex flex-col justify-between rounded-xl bg-[#efe9de] p-6 sm:p-8 border border-[#e6dfd8] shadow-sm hover:shadow-md transition-shadow">
               <div className="space-y-3">
                 <div className="w-10 h-10 rounded-lg bg-[#faf9f5] text-[#cc785c] flex items-center justify-center border border-[#e6dfd8]">
                   <Video size={20} />
@@ -44,7 +44,7 @@ export function Resources() {
               </Link>
             </div>
 
-            <div className="flex flex-col justify-between rounded-xl bg-[#efe9de] p-8 border border-[#e6dfd8] shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex flex-col justify-between rounded-xl bg-[#efe9de] p-6 sm:p-8 border border-[#e6dfd8] shadow-sm hover:shadow-md transition-shadow">
               <div className="space-y-3">
                 <div className="w-10 h-10 rounded-lg bg-[#faf9f5] text-[#cc785c] flex items-center justify-center border border-[#e6dfd8]">
                   <FileText size={20} />

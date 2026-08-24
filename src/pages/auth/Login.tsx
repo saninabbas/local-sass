@@ -49,7 +49,7 @@ export function Login() {
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({ email: email.trim(), password })
         });
         const data = await res.json();
         if (data.success) {
@@ -57,7 +57,7 @@ export function Login() {
             setRequires2FA(true);
             setTempToken(data.tempToken);
           } else {
-            await login({ email, password });
+            await login(data.data || { email: email.trim(), password });
             navigate('/dashboard');
           }
         } else {

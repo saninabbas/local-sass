@@ -174,9 +174,9 @@ export function Account() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           {/* Profile Card */}
-          <div className="col-span-1 md:col-span-2 bg-[#efe9de] rounded-2xl shadow-xs border border-[#e6dfd8] p-6">
+          <div className="col-span-1 lg:col-span-2 bg-[#efe9de] rounded-2xl shadow-xs border border-[#e6dfd8] p-6">
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#e6dfd8]">
               <h2 className="text-base font-serif font-medium text-[#141413] flex items-center gap-2">
                 <User className="text-[#cc785c]" size={18} />

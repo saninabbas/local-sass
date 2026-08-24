@@ -5,7 +5,7 @@ export function CTASection() {
   return (
     <section className="py-20 sm:py-28 bg-[#faf9f5]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="p-12 sm:p-16 rounded-2xl bg-[#cc785c] text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-xl">
+        <div className="p-6 sm:p-16 rounded-2xl bg-[#cc785c] text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-xl">
           <div className="space-y-4 text-center md:text-left max-w-xl">
             <h2 className="font-serif text-3xl sm:text-4xl lg:text-[40px] font-normal leading-tight">
               See what is holding your local business back.

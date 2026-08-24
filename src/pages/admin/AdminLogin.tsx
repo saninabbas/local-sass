@@ -20,22 +20,11 @@ export function AdminLogin() {
     setIsLoading(true);
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password })
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        await login({ email: email.trim(), password });
-        if (data.data?.role === 'admin' || email.trim() === 'saninabbas@gmail.com') {
-          navigate('/admin');
-        } else {
-          setError("Access denied. This account does not have administrator privileges.");
-        }
+      const authData = await login({ email: email.trim(), password });
+      if (authData?.role === 'admin' || email.trim().toLowerCase() === 'saninabbas@gmail.com') {
+        navigate('/admin');
       } else {
-        setError(data.error || 'Invalid administrator credentials');
+        setError("Access denied. This account does not have administrator privileges.");
       }
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');

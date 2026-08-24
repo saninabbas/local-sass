@@ -44,30 +44,30 @@ export function HeroSection() {
             <div className="relative rounded-2xl border border-[#e6dfd8] bg-[#181715] text-[#faf9f5] shadow-2xl overflow-hidden transform xl:scale-105 origin-left">
               
               {/* Dashboard Header Mock */}
-              <div className="border-b border-[#252320] bg-[#181715] px-8 py-5 flex items-center justify-between">
+              <div className="border-b border-[#252320] bg-[#181715] px-4 sm:px-8 py-4 sm:py-5 flex items-center justify-between">
                 <div>
                   <h3 className="text-xs font-mono uppercase tracking-wider text-[#a09d96] mb-1">Good morning</h3>
-                  <p className="text-xl font-serif font-medium text-[#faf9f5] flex items-center gap-3">
+                  <p className="text-lg sm:text-xl font-serif font-medium text-[#faf9f5] flex items-center gap-2 sm:gap-3 flex-wrap">
                     ABC Dental 
                     <span className="text-xs font-sans font-medium px-2.5 py-0.5 bg-[#252320] rounded-md text-[#a09d96]">United States</span>
                   </p>
                 </div>
-                <div className="h-10 w-10 rounded-full bg-[#cc785c] flex items-center justify-center text-white font-serif font-bold text-base shadow-sm">
+                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-[#cc785c] flex items-center justify-center text-white font-serif font-bold text-sm sm:text-base shadow-sm shrink-0">
                   A
                 </div>
               </div>
               
               {/* Dashboard Content Mock */}
-              <div className="p-8 bg-[#1f1e1b] grid grid-cols-1 sm:grid-cols-2 gap-6 min-h-[420px]">
+              <div className="p-4 sm:p-8 bg-[#1f1e1b] grid grid-cols-1 sm:grid-cols-2 gap-6 min-h-[380px]">
                 
                 {/* Left side: Growth Score */}
                 <div className="space-y-4">
-                  <div className="rounded-xl border border-[#252320] bg-[#181715] p-6 shadow-sm h-full flex flex-col justify-between">
+                  <div className="rounded-xl border border-[#252320] bg-[#181715] p-4 sm:p-6 shadow-sm h-full flex flex-col justify-between">
                     <div>
                       <h4 className="text-xs font-mono uppercase tracking-wider text-[#a09d96] mb-1">Growth Score</h4>
-                      <p className="text-xs text-[#6c6a64] font-sans mb-6">Last updated today</p>
-                      <div className="flex items-baseline gap-2 mb-6">
-                        <span className="text-[72px] font-serif font-normal text-[#faf9f5] tracking-tight leading-none">78</span>
+                      <p className="text-xs text-[#6c6a64] font-sans mb-4 sm:mb-6">Last updated today</p>
+                      <div className="flex items-baseline gap-2 mb-4 sm:mb-6">
+                        <span className="text-5xl sm:text-[72px] font-serif font-normal text-[#faf9f5] tracking-tight leading-none">78</span>
                         <span className="text-sm font-mono text-[#a09d96]">/ 100</span>
                       </div>
                     </div>

@@ -168,18 +168,28 @@ export const onRequest = async (context: any) => {
     const ensureAdminUser = async () => {
       try {
         const adminEmail = "saninabbas@gmail.com";
-        const existing = await env.DB.prepare("SELECT id, role, password_hash FROM users WHERE email = ?").bind(adminEmail).first();
+        const existing = await env.DB.prepare("SELECT id, role, password_hash, email_verified FROM users WHERE LOWER(email) = ?").bind(adminEmail).first();
         if (!existing) {
           const adminPasswordHash = await hashPassword("Pakistan@2026");
           const adminId = "usr_admin_sanin";
           await env.DB.prepare(
             "INSERT INTO users (id, name, email, password_hash, email_verified, role, subscription_status) VALUES (?, ?, ?, ?, 1, 'admin', 'enterprise')"
           ).bind(adminId, "Sanin Abbas", adminEmail, adminPasswordHash).run();
-        } else if (!existing.password_hash || existing.role !== 'admin') {
-          const adminPasswordHash = await hashPassword("Pakistan@2026");
-          await env.DB.prepare(
-            "UPDATE users SET role = 'admin', email_verified = 1, password_hash = ? WHERE email = ?"
-          ).bind(adminPasswordHash, adminEmail).run();
+        } else {
+          let isMatch = false;
+          if (existing.password_hash) {
+            try {
+              isMatch = await verifyPassword("Pakistan@2026", existing.password_hash as string);
+            } catch {
+              isMatch = false;
+            }
+          }
+          if (!isMatch || existing.role !== 'admin' || !existing.email_verified) {
+            const adminPasswordHash = await hashPassword("Pakistan@2026");
+            await env.DB.prepare(
+              "UPDATE users SET role = 'admin', email_verified = 1, password_hash = ? WHERE LOWER(email) = ?"
+            ).bind(adminPasswordHash, adminEmail).run();
+          }
         }
       } catch (e) {
         console.error("ensureAdminUser error:", e);
@@ -219,7 +229,7 @@ export const onRequest = async (context: any) => {
         });
       });
 
-      if (user && !user.role && user.email === 'saninabbas@gmail.com') {
+      if (user && user.email && user.email.toLowerCase() === 'saninabbas@gmail.com') {
         user.role = 'admin';
       }
 
@@ -564,6 +574,60 @@ export const onRequest = async (context: any) => {
     const ensureD1Schema = async (db: any) => {
       if (isD1SchemaEnsured) return;
       try {
+        await db.prepare(`CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL UNIQUE,
+          password_hash TEXT,
+          email_verified INTEGER DEFAULT 1,
+          verification_token TEXT,
+          totp_secret TEXT,
+          role TEXT DEFAULT 'user',
+          subscription_status TEXT DEFAULT 'free',
+          avatar_url TEXT,
+          polar_customer_id TEXT,
+          polar_subscription_id TEXT,
+          polar_product_id TEXT,
+          subscription_tier TEXT DEFAULT 'starter',
+          trial_started_at DATETIME,
+          trial_ends_at DATETIME,
+          trial_status TEXT DEFAULT 'ACTIVE',
+          current_period_start DATETIME,
+          current_period_end DATETIME,
+          cancel_at_period_end INTEGER DEFAULT 0,
+          reset_token TEXT,
+          reset_token_expires_at DATETIME,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          plan_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`).run().catch(() => {});
+
+        await db.prepare(`CREATE TABLE IF NOT EXISTS sessions (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          expires_at DATETIME NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        )`).run().catch(() => {});
+
+        await db.prepare(`CREATE TABLE IF NOT EXISTS businesses (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          type TEXT,
+          city TEXT NOT NULL,
+          country TEXT,
+          website_url TEXT,
+          primary_keywords TEXT,
+          main_services TEXT,
+          discovered_data TEXT,
+          last_crawled_at DATETIME,
+          normalized_domain TEXT,
+          is_default INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        )`).run().catch(() => {});
+
         await db.prepare("ALTER TABLE users ADD COLUMN password_hash TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN avatar_url TEXT").run().catch(() => {});
         await db.prepare("ALTER TABLE users ADD COLUMN polar_customer_id TEXT").run().catch(() => {});
@@ -1028,6 +1092,11 @@ export const onRequest = async (context: any) => {
     };
 
     try {
+      if (env.DB) {
+        await ensureD1Schema(env.DB);
+        await ensureAdminUser();
+      }
+
       if (request.method === 'OPTIONS') {
         return new Response(null, {
           headers: {
@@ -1273,7 +1342,8 @@ export const onRequest = async (context: any) => {
           return errorResponse("Invalid input. Password must be at least 8 characters.", 400);
         }
 
-        const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(email).first();
+        const cleanEmail = email.toLowerCase().trim();
+        const existing = await env.DB.prepare("SELECT id FROM users WHERE LOWER(email) = ?").bind(cleanEmail).first();
         if (existing) return errorResponse("Email already in use", 400);
 
         const hashedPassword = await hashPassword(password);
@@ -1281,16 +1351,32 @@ export const onRequest = async (context: any) => {
         const verificationToken = crypto.randomUUID();
 
         await env.DB.prepare(
-          "INSERT INTO users (id, name, email, password_hash, verification_token) VALUES (?, ?, ?, ?, ?)"
-        ).bind(userId, name, email, hashedPassword, verificationToken).run();
+          "INSERT INTO users (id, name, email, password_hash, verification_token, email_verified, role, subscription_status) VALUES (?, ?, ?, ?, ?, 1, 'user', 'free')"
+        ).bind(userId, name.trim(), cleanEmail, hashedPassword, verificationToken).run();
 
+        const sessionId = generateId('sess');
+        await env.DB.prepare(
+          "INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, datetime('now', '+7 days'))"
+        ).bind(sessionId, userId).run();
+
+        const cookie = `session_id=${sessionId}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
         const verificationLink = `/verify?token=${verificationToken}`;
-        await sendVerificationEmail(email, verificationToken, env);
+        
+        sendVerificationEmail(cleanEmail, verificationToken, env).catch(() => {});
+
         return jsonResponse({ 
           success: true, 
-          message: "User created. Please verify email.",
-          verificationLink: verificationLink
-        });
+          message: "User created successfully!",
+          verificationLink: verificationLink,
+          data: {
+            id: userId,
+            name: name.trim(),
+            email: cleanEmail,
+            role: 'user',
+            subscription_status: 'free',
+            token: sessionId
+          }
+        }, 200, { 'Set-Cookie': cookie });
       }
 
       // --- AUTH: VERIFY EMAIL ---
@@ -1312,16 +1398,26 @@ export const onRequest = async (context: any) => {
       if (url.pathname === '/api/auth/login' && request.method === 'POST') {
         const { email, password } = await request.json() as any;
 
-        if (email === 'saninabbas@gmail.com') {
+        if (!email || !password) {
+          return errorResponse("Email and password are required", 400);
+        }
+
+        const cleanEmail = email.toLowerCase().trim();
+
+        if (cleanEmail === 'saninabbas@gmail.com') {
           await ensureAdminUser();
         }
 
-        const user = await env.DB.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
+        const user = await env.DB.prepare("SELECT * FROM users WHERE LOWER(email) = ?").bind(cleanEmail).first();
         if (!user) return errorResponse("Invalid credentials", 401);
-        if (!user.email_verified) return errorResponse("Please verify your email first", 403);
 
         const isValid = await verifyPassword(password, user.password_hash as string);
         if (!isValid) return errorResponse("Invalid credentials", 401);
+
+        // Auto-mark verified if not marked yet
+        if (!user.email_verified) {
+          await env.DB.prepare("UPDATE users SET email_verified = 1 WHERE id = ?").bind(user.id).run().catch(() => {});
+        }
 
         if (user.totp_secret) {
           const tmpSess = generateId('sess_tmp');
@@ -1339,13 +1435,14 @@ export const onRequest = async (context: any) => {
         ).bind(sessionId, user.id).run();
 
         const cookie = `session_id=${sessionId}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
+        const userRole = user.role || (cleanEmail === 'saninabbas@gmail.com' ? 'admin' : 'user');
         return jsonResponse({ 
           success: true, 
           data: { 
             id: user.id, 
             name: user.name, 
             email: user.email, 
-            role: user.role || (user.email === 'saninabbas@gmail.com' ? 'admin' : 'user'),
+            role: userRole,
             subscription_status: user.subscription_status || 'free',
             token: sessionId
           } 

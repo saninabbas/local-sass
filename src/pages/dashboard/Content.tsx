@@ -285,7 +285,7 @@ export function Content() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div>
                 <label className="block text-[10px] font-mono font-bold uppercase text-[#6c6a64] mb-1">Target Keyword / Procedure</label>
                 <input

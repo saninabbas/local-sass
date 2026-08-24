@@ -48,9 +48,9 @@ export function AIRecommendationsSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
           {recommendations.map((rec, index) => (
-            <div key={index} className="bg-[#faf9f5] rounded-xl p-8 border border-[#e6dfd8] shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div key={index} className="bg-[#faf9f5] rounded-xl p-5 sm:p-8 border border-[#e6dfd8] shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
               <div className="space-y-3">
                 <span className={`inline-block text-[11px] font-mono font-bold uppercase tracking-wider px-2.5 py-1 rounded border ${rec.priorityColor}`}>
                   {rec.priority}

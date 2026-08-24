@@ -211,9 +211,9 @@ console.log(message.content);`;
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Feature Card 1 */}
-            <div className="p-8 rounded-xl bg-[#faf9f5] border border-[#e6dfd8] space-y-4 hover:shadow-md transition-shadow">
+            <div className="p-6 sm:p-8 rounded-xl bg-[#faf9f5] border border-[#e6dfd8] space-y-4 hover:shadow-md transition-shadow">
               <div className="w-10 h-10 rounded-lg bg-[#efe9de] flex items-center justify-center text-[#cc785c]">
                 <Cpu size={22} />
               </div>
@@ -362,7 +362,7 @@ console.log(message.content);`;
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {/* Claude 3.7 Sonnet (Featured Tier Card in Dark Navy) */}
           <div className="p-8 rounded-xl bg-[#181715] text-[#faf9f5] border border-[#252320] flex flex-col justify-between shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 bg-[#cc785c] text-white text-[11px] font-mono font-bold uppercase tracking-wider px-3 py-1 rounded-bl-lg">
@@ -506,8 +506,8 @@ console.log(message.content);`;
       {/* 7. DARK NAVY FOOTER (`footer` #181715) */}
       <footer className="bg-[#181715] text-[#a09d96] border-t border-[#252320] py-16 px-6 lg:px-12">
         <div className="max-w-7xl mx-auto space-y-12">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
-            <div className="col-span-2 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8">
+            <div className="sm:col-span-2 space-y-4">
               <AnthropicLogo size={24} color="#cc785c" showWordmark={true} wordmarkColor="#faf9f5" brandName="Anthropic" />
               <p className="text-xs text-[#a09d96] max-w-xs font-sans leading-relaxed">
                 Anthropic is an AI safety and research company creating reliable, beneficial, and steerable AI systems.

@@ -105,11 +105,11 @@ export function Pricing() {
 
         {/* Pricing Cards */}
         <section className="py-20 px-6 sm:px-8 max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {plansList.map((plan) => (
               <div
                 key={plan.name}
-                className={`p-8 rounded-2xl border transition-all flex flex-col justify-between ${
+                className={`p-6 sm:p-8 rounded-2xl border transition-all flex flex-col justify-between ${
                   plan.popular
                     ? 'bg-[#efe9de] border-[#cc785c] shadow-md relative'
                     : 'bg-[#faf9f5] border-[#e6dfd8] shadow-xs'

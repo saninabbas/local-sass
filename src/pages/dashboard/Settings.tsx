@@ -447,7 +447,7 @@ export function Settings() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
             {/* Starter Tier */}
             <div className={`p-6 rounded-2xl border transition-all flex flex-col justify-between ${
               currentPlan === 'starter' ? 'border-[#cc785c] bg-[#efe9de]/40' : 'border-[#e6dfd8] bg-white'
