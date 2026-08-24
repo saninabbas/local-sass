@@ -121,7 +121,39 @@ function parseCookies(cookieHeader: string | null) {
   );
 }
 
-let isD1SchemaEnsured = false;
+let dbInitPromise: Promise<void> | null = null;
+
+const ensureDbAndAdminSingleton = (env: any): Promise<void> => {
+  if (!dbInitPromise && env.DB) {
+    dbInitPromise = (async () => {
+      try {
+        await ensureD1Schema(env.DB);
+        // Ensure Admin user strictly with env.ADMIN_INITIAL_PASSWORD
+        const adminEmail = (env.ADMIN_EMAIL || "saninabbas@gmail.com").toLowerCase().trim();
+        const existing = await env.DB.prepare("SELECT id, role, password_hash, email_verified FROM users WHERE LOWER(email) = ?").bind(adminEmail).first();
+        if (!existing) {
+          if (env.ADMIN_INITIAL_PASSWORD) {
+            const adminPasswordHash = await hashPassword(env.ADMIN_INITIAL_PASSWORD);
+            const adminId = "usr_admin_sanin";
+            await env.DB.prepare(
+              "INSERT INTO users (id, name, email, password_hash, email_verified, role, subscription_status) VALUES (?, ?, ?, ?, 1, 'admin', 'enterprise')"
+            ).bind(adminId, "Sanin Abbas", adminEmail, adminPasswordHash).run();
+          } else {
+            console.warn("ADMIN_INITIAL_PASSWORD environment variable missing. Skipping automatic admin creation.");
+          }
+        } else if (existing.role !== 'admin' || !existing.email_verified) {
+          // Admin exists in DB: never overwrite password, only ensure role and email_verified
+          await env.DB.prepare(
+            "UPDATE users SET role = 'admin', email_verified = 1 WHERE LOWER(email) = ?"
+          ).bind(adminEmail).run();
+        }
+      } catch (err) {
+        console.warn("D1 singleton init notice:", err);
+      }
+    })();
+  }
+  return dbInitPromise || Promise.resolve();
+};
 
 // -----------------------------------------------------------------------------
 // MAIN WORKER
@@ -130,11 +162,17 @@ export const onRequest = async (context: any) => {
     const { request, env } = context;
     const url = new URL(request.url);
 
-    const jsonResponse = (data: any, status = 200, headers: HeadersInit = {}) => 
-      new Response(JSON.stringify(data), { 
-        status, 
-        headers: { 'Content-Type': 'application/json', ...headers } 
-      });
+    const requestOrigin = request.headers.get('Origin') || '*';
+
+    const jsonResponse = (data: any, status = 200, customHeaders: HeadersInit = {}) => {
+      const headers = new Headers(customHeaders);
+      if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+      if (!headers.has('Access-Control-Allow-Origin')) headers.set('Access-Control-Allow-Origin', requestOrigin);
+      if (!headers.has('Access-Control-Allow-Credentials')) headers.set('Access-Control-Allow-Credentials', 'true');
+      if (!headers.has('X-Content-Type-Options')) headers.set('X-Content-Type-Options', 'nosniff');
+      if (!headers.has('X-Frame-Options')) headers.set('X-Frame-Options', 'DENY');
+      return new Response(JSON.stringify(data), { status, headers });
+    };
       
     const errorResponse = (error: string, status = 500, code?: string) => {
       const derivedCode = code || (
@@ -162,36 +200,6 @@ export const onRequest = async (context: any) => {
       }
       entry.count++;
       return true;
-    };
-
-    let isAdminUserEnsured = false;
-
-    // Helper to ensure initial admin user exists without overwriting existing password
-    const ensureAdminUser = async () => {
-      if (isAdminUserEnsured) return;
-      isAdminUserEnsured = true;
-      try {
-        const adminEmail = (env.ADMIN_EMAIL || "saninabbas@gmail.com").toLowerCase().trim();
-        const existing = await env.DB.prepare("SELECT id, role, password_hash, email_verified FROM users WHERE LOWER(email) = ?").bind(adminEmail).first();
-        if (!existing) {
-          if (env.ADMIN_INITIAL_PASSWORD) {
-            const adminPasswordHash = await hashPassword(env.ADMIN_INITIAL_PASSWORD);
-            const adminId = "usr_admin_sanin";
-            await env.DB.prepare(
-              "INSERT INTO users (id, name, email, password_hash, email_verified, role, subscription_status) VALUES (?, ?, ?, ?, 1, 'admin', 'enterprise')"
-            ).bind(adminId, "Sanin Abbas", adminEmail, adminPasswordHash).run();
-          } else {
-            console.warn("ADMIN_INITIAL_PASSWORD environment variable missing. Skipping automatic admin creation.");
-          }
-        } else if (existing.role !== 'admin' || !existing.email_verified) {
-          // Admin exists in DB: never overwrite password, only ensure role and email_verified
-          await env.DB.prepare(
-            "UPDATE users SET role = 'admin', email_verified = 1 WHERE LOWER(email) = ?"
-          ).bind(adminEmail).run();
-        }
-      } catch (e) {
-        console.error("ensureAdminUser error:", e);
-      }
     };
 
     // Helper to get authenticated user
@@ -1089,9 +1097,11 @@ export const onRequest = async (context: any) => {
       if (request.method === 'OPTIONS') {
         return new Response(null, {
           headers: {
-            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Origin': requestOrigin,
             'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Business-Id',
+            'Access-Control-Allow-Credentials': 'true',
+            'Access-Control-Max-Age': '86400',
           }
         });
       }
@@ -1104,17 +1114,11 @@ export const onRequest = async (context: any) => {
         return jsonResponse({ success: true, worker: "ok", database: env.DB ? "ok" : "unbound" });
       }
 
-      if (env.DB && !isD1SchemaEnsured) {
-        isD1SchemaEnsured = true;
+      // D1 Singleton Migration Guard
+      if (env.DB && !dbInitPromise) {
+        const initPromise = ensureDbAndAdminSingleton(env);
         if (context.waitUntil) {
-          context.waitUntil(
-            ensureD1Schema(env.DB)
-              .then(() => ensureAdminUser())
-              .catch(err => console.warn("Background schema init:", err))
-          );
-        } else {
-          await ensureD1Schema(env.DB).catch(() => {});
-          await ensureAdminUser().catch(() => {});
+          context.waitUntil(initPromise);
         }
       }
 
@@ -1439,8 +1443,9 @@ export const onRequest = async (context: any) => {
           "INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, datetime('now', '+7 days'))"
         ).bind(sessionId, user.id).run();
 
-        const cookie = `session_id=${sessionId}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
-        const userRole = user.role || (cleanEmail === 'saninabbas@gmail.com' ? 'admin' : 'user');
+        const isHttps = url.protocol === 'https:' || request.headers.get('x-forwarded-proto') === 'https';
+        const cookie = `session_id=${sessionId}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}${isHttps ? '; Secure' : ''}`;
+        const userRole = user.role || 'user';
         return jsonResponse({ 
           success: true, 
           data: { 
@@ -3796,14 +3801,18 @@ export const onRequest = async (context: any) => {
       }
 
       // --- BILLING: POLAR WEBHOOK ---
-      if (url.pathname === '/api/webhooks/polar' && request.method === 'POST') {
+      if ((url.pathname === '/api/webhooks/polar' || url.pathname === '/api/billing/webhook') && request.method === 'POST') {
         const rawBody = await request.text();
         
         // 1. Signature Verification
-        const verification = await verifyPolarWebhookSignature(rawBody, request.headers, env.POLAR_WEBHOOK_SECRET);
-        if (!verification.isValid) {
-          console.warn("Polar webhook signature rejected:", verification.reason);
-          return errorResponse("Invalid webhook signature: " + verification.reason, 401);
+        if (env.POLAR_WEBHOOK_SECRET) {
+          const verification = await verifyPolarWebhookSignature(rawBody, request.headers, env.POLAR_WEBHOOK_SECRET);
+          if (!verification.isValid) {
+            console.warn("Polar webhook signature rejected:", verification.reason);
+            return errorResponse("Invalid webhook signature: " + verification.reason, 401);
+          }
+        } else {
+          console.warn("POLAR_WEBHOOK_SECRET not configured. Webhook handled in sandbox mode.");
         }
 
         let payload: any;

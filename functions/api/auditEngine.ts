@@ -175,9 +175,9 @@ export function validateAndNormalizeUrl(rawUrl: string): { valid: boolean; url: 
 }
 
 // -----------------------------------------------------------------------------
-// 2. HTTP CRAWLER WITH TIMEOUT & REDIRECT SSRF VALIDATION
+// 2. HTTP CRAWLER WITH TIMEOUT & RECURSIVE SSRF MULTI-HOP REDIRECT VALIDATION
 // -----------------------------------------------------------------------------
-export async function fetchWithTimeout(url: string, timeoutMs: number = 5000, maxRedirects: number = 3): Promise<{ response: Response; durationMs: number }> {
+export async function fetchWithSafeRedirects(url: string, timeoutMs: number = 5000, maxRedirects: number = 5): Promise<{ response: Response; durationMs: number }> {
   let currentUrl = url;
   const start = Date.now();
 
@@ -219,8 +219,10 @@ export async function fetchWithTimeout(url: string, timeoutMs: number = 5000, ma
     }
   }
 
-  throw new Error("TOO_MANY_REDIRECTS: Exceeded maximum redirect hops.");
+  throw new Error("TOO_MANY_REDIRECTS: Exceeded maximum redirect hops (5).");
 }
+
+export const fetchWithTimeout = fetchWithSafeRedirects;
 
 // -----------------------------------------------------------------------------
 // 3. HTML DOM EXTRACTOR
