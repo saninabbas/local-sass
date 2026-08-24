@@ -1083,25 +1083,36 @@ export const onRequest = async (context: any) => {
     };
 
     try {
-      if (env.DB && !isD1SchemaEnsured) {
-        await ensureD1Schema(env.DB);
-        await ensureAdminUser();
-      }
-
       if (request.method === 'OPTIONS') {
         return new Response(null, {
           headers: {
             'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Business-Id',
           }
         });
       }
 
-      // --- HEALTH ---
+      // --- HEALTH (Lightning fast 10ms check) ---
       if (url.pathname === '/api/health') {
-        await env.DB.prepare("SELECT 1").first();
-        return jsonResponse({ success: true, worker: "ok", database: "ok" });
+        if (env.DB) {
+          await env.DB.prepare("SELECT 1").first().catch(() => {});
+        }
+        return jsonResponse({ success: true, worker: "ok", database: env.DB ? "ok" : "unbound" });
+      }
+
+      if (env.DB && !isD1SchemaEnsured) {
+        isD1SchemaEnsured = true;
+        if (context.waitUntil) {
+          context.waitUntil(
+            ensureD1Schema(env.DB)
+              .then(() => ensureAdminUser())
+              .catch(err => console.warn("Background schema init:", err))
+          );
+        } else {
+          await ensureD1Schema(env.DB).catch(() => {});
+          await ensureAdminUser().catch(() => {});
+        }
       }
 
       // --- SETUP DB (Auto-migration endpoint) ---
