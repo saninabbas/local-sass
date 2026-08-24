@@ -9,8 +9,8 @@ export function AdminLogin() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [email, setEmail] = useState('saninabbas@gmail.com');
-  const [password, setPassword] = useState('Pakistan@2026');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -21,7 +21,7 @@ export function AdminLogin() {
 
     try {
       const authData = await login({ email: email.trim(), password });
-      if (authData?.role === 'admin' || email.trim().toLowerCase() === 'saninabbas@gmail.com') {
+      if (authData?.role === 'admin') {
         navigate('/admin');
       } else {
         setError("Access denied. This account does not have administrator privileges.");

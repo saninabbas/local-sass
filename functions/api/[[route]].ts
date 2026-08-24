@@ -164,32 +164,27 @@ export const onRequest = async (context: any) => {
       return true;
     };
 
-    // Helper to ensure admin user exists and schema is up to date
+    let isAdminUserEnsured = false;
+
+    // Helper to ensure initial admin user exists without overwriting existing password
     const ensureAdminUser = async () => {
+      if (isAdminUserEnsured) return;
+      isAdminUserEnsured = true;
       try {
-        const adminEmail = "saninabbas@gmail.com";
+        const adminEmail = (env.ADMIN_EMAIL || "saninabbas@gmail.com").toLowerCase().trim();
         const existing = await env.DB.prepare("SELECT id, role, password_hash, email_verified FROM users WHERE LOWER(email) = ?").bind(adminEmail).first();
         if (!existing) {
-          const adminPasswordHash = await hashPassword("Pakistan@2026");
+          const initialPassword = env.ADMIN_INITIAL_PASSWORD || "Rankora@Admin2026!";
+          const adminPasswordHash = await hashPassword(initialPassword);
           const adminId = "usr_admin_sanin";
           await env.DB.prepare(
             "INSERT INTO users (id, name, email, password_hash, email_verified, role, subscription_status) VALUES (?, ?, ?, ?, 1, 'admin', 'enterprise')"
           ).bind(adminId, "Sanin Abbas", adminEmail, adminPasswordHash).run();
-        } else {
-          let isMatch = false;
-          if (existing.password_hash) {
-            try {
-              isMatch = await verifyPassword("Pakistan@2026", existing.password_hash as string);
-            } catch {
-              isMatch = false;
-            }
-          }
-          if (!isMatch || existing.role !== 'admin' || !existing.email_verified) {
-            const adminPasswordHash = await hashPassword("Pakistan@2026");
-            await env.DB.prepare(
-              "UPDATE users SET role = 'admin', email_verified = 1, password_hash = ? WHERE LOWER(email) = ?"
-            ).bind(adminPasswordHash, adminEmail).run();
-          }
+        } else if (existing.role !== 'admin' || !existing.email_verified) {
+          // Admin exists in DB: never overwrite password, only ensure role and email_verified
+          await env.DB.prepare(
+            "UPDATE users SET role = 'admin', email_verified = 1 WHERE LOWER(email) = ?"
+          ).bind(adminEmail).run();
         }
       } catch (e) {
         console.error("ensureAdminUser error:", e);
@@ -228,10 +223,6 @@ export const onRequest = async (context: any) => {
           ).bind(session.user_id).first();
         });
       });
-
-      if (user && user.email && user.email.toLowerCase() === 'saninabbas@gmail.com') {
-        user.role = 'admin';
-      }
 
       return user;
     };
@@ -332,12 +323,12 @@ export const onRequest = async (context: any) => {
         const urlObj = new URL(websiteUrl);
         const origin = urlObj.origin;
 
-        // Concurrently fetch website, robots.txt, and sitemap.xml
+        // 1. Fetch website HTML with strict 5000ms timeout
         let websiteFetchRes;
         try {
-          websiteFetchRes = await fetchWithTimeout(websiteUrl, 10000);
-        } catch {
-          throw new Error("Website crawl failed or timed out. (CRAWL_FAILED)");
+          websiteFetchRes = await fetchWithTimeout(websiteUrl, 5000);
+        } catch (e: any) {
+          throw new Error("Website crawl failed or timed out (CRAWL_FAILED). Please ensure your site is reachable and responding within 5s.");
         }
 
         const { response: websiteResponse, durationMs } = websiteFetchRes;
@@ -346,14 +337,14 @@ export const onRequest = async (context: any) => {
           throw new Error(`Website returned HTTP ${websiteResponse.status} or non-HTML content.`);
         }
 
-        // Fetch robots.txt and sitemap.xml in background
-        const robotsPromise = fetch(`${origin}/robots.txt`, { headers: { 'User-Agent': 'Rankora-Auditor/2.0' } })
-          .then(r => ({ exists: r.ok, status: r.status }))
-          .catch(() => ({ exists: false, status: 404 }));
+        // 2. Concurrently fetch robots.txt and sitemap.xml with 3000ms timeout without blocking main audit
+        const robotsPromise = fetchWithTimeout(`${origin}/robots.txt`, 3000)
+          .then(r => ({ exists: r.response.ok, status: r.response.status }))
+          .catch(() => ({ exists: false, status: 404, timedOut: true }));
 
-        const sitemapPromise = fetch(`${origin}/sitemap.xml`, { headers: { 'User-Agent': 'Rankora-Auditor/2.0' } })
-          .then(r => ({ exists: r.ok, status: r.status, url: `${origin}/sitemap.xml` }))
-          .catch(() => ({ exists: false, status: 404 }));
+        const sitemapPromise = fetchWithTimeout(`${origin}/sitemap.xml`, 3000)
+          .then(r => ({ exists: r.response.ok, status: r.response.status, url: `${origin}/sitemap.xml` }))
+          .catch(() => ({ exists: false, status: 404, timedOut: true }));
 
         const [robotsInfo, sitemapInfo] = await Promise.all([robotsPromise, sitemapPromise]);
 
@@ -1092,7 +1083,7 @@ export const onRequest = async (context: any) => {
     };
 
     try {
-      if (env.DB) {
+      if (env.DB && !isD1SchemaEnsured) {
         await ensureD1Schema(env.DB);
         await ensureAdminUser();
       }

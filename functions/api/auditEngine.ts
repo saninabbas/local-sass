@@ -135,24 +135,34 @@ export function validateAndNormalizeUrl(rawUrl: string): { valid: boolean; url: 
   }
 
   // Reject Localhost / Loopback / Private Network / Link-Local IPs (SSRF protection)
+  // Reject Localhost / Loopback / Private Network / Link-Local IPs (SSRF protection)
   const isPrivateOrLocal = (host: string): boolean => {
-    if (host === 'localhost' || host.endsWith('.localhost') || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1' || host === '[::1]') {
+    const cleanHost = host.replace(/^\[/, '').replace(/\]$/, '').toLowerCase();
+    
+    if (cleanHost === 'localhost' || cleanHost.endsWith('.localhost') || cleanHost === '127.0.0.1' || cleanHost === '0.0.0.0' || cleanHost === '::1') {
       return true;
     }
-    // IPv4 private ranges: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16
-    const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    // IPv6 private & loopback ranges
+    if (cleanHost.startsWith('fe80:') || cleanHost.startsWith('fc00:') || cleanHost.startsWith('fd00:') || cleanHost.startsWith('::ffff:')) {
+      return true;
+    }
+    // Integer / Decimal / Hex single-value IP formats (e.g. 2130706433 or 0x7f000001)
+    if (/^\d+$/.test(cleanHost) || /^0x[0-9a-f]+$/i.test(cleanHost)) {
+      return true;
+    }
+    // IPv4 ranges: 10.0.0.0/8, 127.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 100.64.0.0/10, 0.0.0.0/8
+    const ipv4Match = cleanHost.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
     if (ipv4Match) {
       const oct1 = parseInt(ipv4Match[1], 10);
       const oct2 = parseInt(ipv4Match[2], 10);
-      if (oct1 === 10) return true;
-      if (oct1 === 127) return true;
-      if (oct1 === 0) return true;
+      if (oct1 === 0 || oct1 === 10 || oct1 === 127) return true;
       if (oct1 === 172 && oct2 >= 16 && oct2 <= 31) return true;
       if (oct1 === 192 && oct2 === 168) return true;
       if (oct1 === 169 && oct2 === 254) return true;
+      if (oct1 === 100 && oct2 >= 64 && oct2 <= 127) return true;
     }
     // Internal TLDs / local networks
-    if (host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.lan') || host.endsWith('.home') || host.endsWith('.corp')) {
+    if (cleanHost.endsWith('.local') || cleanHost.endsWith('.internal') || cleanHost.endsWith('.lan') || cleanHost.endsWith('.home') || cleanHost.endsWith('.corp') || cleanHost.endsWith('.test') || cleanHost.endsWith('.example')) {
       return true;
     }
     return false;
@@ -166,30 +176,51 @@ export function validateAndNormalizeUrl(rawUrl: string): { valid: boolean; url: 
 }
 
 // -----------------------------------------------------------------------------
-// 2. HTTP CRAWLER WITH TIMEOUT
+// 2. HTTP CRAWLER WITH TIMEOUT & REDIRECT SSRF VALIDATION
 // -----------------------------------------------------------------------------
-export async function fetchWithTimeout(url: string, timeoutMs: number = 8000): Promise<{ response: Response; durationMs: number }> {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeoutMs);
+export async function fetchWithTimeout(url: string, timeoutMs: number = 5000, maxRedirects: number = 3): Promise<{ response: Response; durationMs: number }> {
+  let currentUrl = url;
   const start = Date.now();
-  
-  try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { 
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9'
-      },
-      redirect: 'follow'
-    });
-    const durationMs = Date.now() - start;
-    clearTimeout(id);
-    return { response: res, durationMs };
-  } catch (error) {
-    clearTimeout(id);
-    throw error;
+
+  for (let hop = 0; hop <= maxRedirects; hop++) {
+    const validated = validateAndNormalizeUrl(currentUrl);
+    if (!validated.valid) {
+      throw new Error(`SSRF_BLOCKED: Redirected to disallowed destination: ${validated.error}`);
+    }
+
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(validated.url, {
+        signal: controller.signal,
+        headers: { 
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9'
+        },
+        redirect: 'manual'
+      });
+      clearTimeout(id);
+
+      // Check if redirect
+      if ([301, 302, 303, 307, 308].includes(res.status)) {
+        const location = res.headers.get('location');
+        if (!location) {
+          return { response: res, durationMs: Date.now() - start };
+        }
+        currentUrl = new URL(location, currentUrl).href;
+        continue;
+      }
+
+      return { response: res, durationMs: Date.now() - start };
+    } catch (error) {
+      clearTimeout(id);
+      throw error;
+    }
   }
+
+  throw new Error("TOO_MANY_REDIRECTS: Exceeded maximum redirect hops.");
 }
 
 // -----------------------------------------------------------------------------

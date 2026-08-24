@@ -1,4 +1,4 @@
-import { Extractor, fetchWithTimeout, computeScores, populateExtractorFromHtml } from './auditEngine';
+import { Extractor, fetchWithTimeout, computeScores, populateExtractorFromHtml, validateAndNormalizeUrl } from './auditEngine';
 
 export interface DiscoveredCompetitor {
   domain: string;
@@ -698,8 +698,12 @@ export async function extractCompetitorKeywords(
   alreadyTrackedCount: number;
   keywords: CompetitorKeywordOpportunity[];
 }> {
-  const compDomain = competitorUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
-  const targetUrl = competitorUrl.startsWith('http') ? competitorUrl : `https://${competitorUrl}`;
+  const norm = validateAndNormalizeUrl(competitorUrl);
+  if (!norm.valid) {
+    throw new Error(`INVALID_TARGET_URL: ${norm.error}`);
+  }
+  const targetUrl = norm.url;
+  const compDomain = new URL(targetUrl).hostname.replace(/^www\./, '');
 
   // 1. Fetch competitor website
   const compFetchRes = await fetchWithTimeout(targetUrl, 10000);

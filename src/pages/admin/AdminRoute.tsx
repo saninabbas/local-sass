@@ -19,7 +19,7 @@ export function AdminRoute() {
   }
 
   // If not logged in or role is not admin, show Admin Login page at /admin
-  const isAdmin = user && (user.role === 'admin' || user.email?.toLowerCase() === 'saninabbas@gmail.com');
+  const isAdmin = Boolean(user && user.role === 'admin');
   if (!isAdmin) {
     return <AdminLogin />;
   }
