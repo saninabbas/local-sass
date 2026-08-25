@@ -1,4 +1,4 @@
-import { sendVerificationEmail } from '../../src/lib/email';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../../src/lib/email';
 import { verifyTOTP } from '../../src/lib/totp';
 import { 
   getProjectConnections, 
@@ -1521,9 +1521,14 @@ export const onRequest = async (context: any) => {
 
         const resetLink = `${url.origin}/reset-password?token=${resetToken}&email=${encodeURIComponent(user.email as string)}`;
 
+        // Dispatch branded password reset email from hi@seoranko.site (Resend/SendGrid)
+        sendPasswordResetEmail(cleanEmail, resetLink, env).catch((err) => {
+          console.error("Failed to dispatch password reset email:", err);
+        });
+
         return jsonResponse({
           success: true,
-          message: "Password reset link generated successfully.",
+          message: "Password reset link generated and sent to your email address.",
           resetLink
         });
       }
