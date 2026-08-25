@@ -36,7 +36,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </main>
       </div>
 
-      {/* Persistent Rankora Growth Copilot Assistant */}
+      {/* Persistent Scorankio Growth Copilot Assistant */}
       <GrowthCopilot />
 
       {/* Global Add Website / Workspace Project Modal */}

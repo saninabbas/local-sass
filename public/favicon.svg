@@ -1,15 +1,15 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Geometric Orange R Icon -->
+  <!-- Geometric Terracotta Scorankio S Icon -->
   <g transform="translate(4, 4) scale(0.875)">
-    <!-- Base Bar Left -->
-    <rect x="8" y="42" width="8" height="16" rx="2" fill="#D87555" />
-    <!-- Center Bar -->
-    <rect x="18" y="34" width="8" height="24" rx="2" fill="#C65A37" />
-    <!-- Upward Arrow Slash -->
-    <path d="M7 38L27 18L35 24L15 44Z" fill="#E88B6B" />
-    <!-- Loop Top Right -->
-    <path d="M22 8H40C49 8 56 15 56 24C56 32 49 38 40 38H30L22 30V8Z" fill="#D87555" />
-    <!-- Loop Leg Diagonal Right -->
-    <path d="M34 36L48 58H38L26 38Z" fill="#CC6D4D" />
+    <!-- Base Left Bar -->
+    <rect x="8" y="38" width="8" height="20" rx="2" fill="#C65A37" />
+    <!-- Center Growth Bar -->
+    <rect x="18" y="24" width="8" height="34" rx="2" fill="#D87555" />
+    <!-- Upward Trend Accent -->
+    <path d="M7 32L27 12L35 18L15 38Z" fill="#E88B6B" />
+    <!-- S Top Hook -->
+    <path d="M18 14H42C48 14 54 19 54 26C54 32 49 37 42 37H26L18 31V14Z" fill="#D87555" />
+    <!-- S Bottom Hook -->
+    <path d="M14 36H36C44 36 50 42 50 50C50 58 44 62 36 62H12L20 54H36C38 54 42 52 42 50C42 48 38 46 36 46H14V36Z" fill="#CC6D4D" />
   </g>
 </svg>

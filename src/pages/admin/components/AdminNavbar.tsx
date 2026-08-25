@@ -26,7 +26,7 @@ export function AdminNavbar({ onRefresh, isRefreshing }: AdminNavbarProps) {
             <Link to="/admin" className="flex items-center gap-2 group">
               <img 
                 src="/brand/logo.svg" 
-                alt="Rankora" 
+                alt="Scorankio" 
                 className="w-[105px] sm:w-[115px] h-auto object-contain" 
               />
               <span className="ml-2 px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider bg-[#cc785c]/15 text-[#cc785c] border border-[#cc785c]/30 rounded-md">
@@ -67,7 +67,7 @@ export function AdminNavbar({ onRefresh, isRefreshing }: AdminNavbarProps) {
                   {user?.name || 'Administrator'}
                 </span>
                 <span className="text-[10px] text-[#8e8b82] font-mono">
-                  {user?.email || 'admin@rankora.com'}
+                  {user?.email || 'admin@scorankio.site'}
                 </span>
               </div>
             </div>

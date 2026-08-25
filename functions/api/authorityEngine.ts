@@ -267,7 +267,7 @@ export async function generateAuthorityTasks(
   ).bind(business.id).first().catch(() => null);
   const auditScore = auditRow?.score || 70;
 
-  const prompt = `You are Rankora's AI Authority & Digital PR Engine.
+  const prompt = `You are Scorankio's AI Authority & Digital PR Engine.
 Generate 6 highly actionable, platform-specific growth tasks to build digital authority, brand search volume, and high-trust referral traffic for this local business:
 
 Business Name: "${bizName}"

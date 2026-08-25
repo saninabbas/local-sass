@@ -143,7 +143,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         <Link to="/dashboard" className="flex items-center">
           <img 
             src="/brand/logo.svg" 
-            alt="Rankora" 
+            alt="Scorankio" 
             className="w-[135px] h-auto object-contain transition-transform hover:scale-105" 
           />
         </Link>

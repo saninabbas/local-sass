@@ -15,7 +15,7 @@
   }
 
   if (!businessId) {
-    console.error('Rankora Widget: Missing business ID in script tag.');
+    console.error('Scorankio Widget: Missing business ID in script tag.');
     return;
   }
 

@@ -3603,9 +3603,9 @@ export const onRequest = async (context: any) => {
 
           // Concurrent robots / sitemap check
           const [robotsInfo, sitemapInfo] = await Promise.all([
-            fetch(`${origin}/robots.txt`, { headers: { 'User-Agent': 'Rankora-PublicAudit/2.0' } })
+            fetch(`${origin}/robots.txt`, { headers: { 'User-Agent': 'Scorankio-PublicAudit/2.0' } })
               .then(r => ({ exists: r.ok, status: r.status })).catch(() => ({ exists: false, status: 404 })),
-            fetch(`${origin}/sitemap.xml`, { headers: { 'User-Agent': 'Rankora-PublicAudit/2.0' } })
+            fetch(`${origin}/sitemap.xml`, { headers: { 'User-Agent': 'Scorankio-PublicAudit/2.0' } })
               .then(r => ({ exists: r.ok, status: r.status, url: `${origin}/sitemap.xml` })).catch(() => ({ exists: false, status: 404 }))
           ]);
 
@@ -7337,7 +7337,7 @@ export const onRequest = async (context: any) => {
 
         // Seed initial greeting message
         const greetingId = crypto.randomUUID();
-        const initialGreeting = "Hello! I am your **Rankora Growth Copilot**. I have access to your live website audit, keyword rankings, local competitors, and reputation telemetry. Ask me anything about how to outrank competitors, improve your score, or what actions to take this week!";
+        const initialGreeting = "Hello! I am your **Scorankio Growth Copilot**. I have access to your live website audit, keyword rankings, local competitors, and reputation telemetry. Ask me anything about how to outrank competitors, improve your score, or what actions to take this week!";
         
         await env.DB.prepare(
           "INSERT INTO copilot_messages (id, conversation_id, user_id, role, content) VALUES (?, ?, ?, 'assistant', ?)"
@@ -8171,7 +8171,7 @@ export const onRequest = async (context: any) => {
             payload.branch,
             payload.path,
             payload.content,
-            payload.commitMessage || 'Rankora SEO update',
+            payload.commitMessage || 'Scorankio SEO update',
             payload.previousSha
           );
           return jsonResponse({ success: true, data: updateRes });
@@ -9029,7 +9029,7 @@ export const onRequest = async (context: any) => {
         const result = await getNotificationsForUser(env.DB, user.id, targetBizId);
         return jsonResponse({
           success: true,
-          message: "Seeded 3 live Rankora notification events",
+          message: "Seeded 3 live Scorankio notification events",
           notifications: result.notifications,
           unreadCount: result.unreadCount
         });

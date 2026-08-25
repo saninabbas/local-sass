@@ -1,5 +1,5 @@
 /**
- * RANKORA 2.0 : CENTRALIZED PRICING & PLAN CONFIGURATION
+ * SCORANKIO 2.0 : CENTRALIZED PRICING & PLAN CONFIGURATION
  * 
  * Single source of truth for plans, pricing, website limits, and feature gating.
  */
@@ -29,7 +29,7 @@ export const PLANS: Record<string, PlanConfig> = {
     period: '/month',
     websiteLimit: 1,
     description: 'Basic Website SEO Audit, Technical checks, On-page SEO, Basic Local SEO & AI Recommendations.',
-    who: 'For small businesses starting with Rankora.',
+    who: 'For small businesses starting with Scorankio.',
     cta: 'Start Starter',
     features: [
       '1 Website',

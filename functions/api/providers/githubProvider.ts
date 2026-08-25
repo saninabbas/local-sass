@@ -6,7 +6,7 @@ export class GitHubProvider implements WebsiteProvider {
   private async fetchGitHub(url: string, token: string, options: RequestInit = {}) {
     const headers: Record<string, string> = {
       'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'Rankora-SEO-Operator/2.0',
+      'User-Agent': 'Scorankio-SEO-Operator/2.0',
       'Authorization': `Bearer ${token}`,
       ...(options.headers as Record<string, string> || {}),
     };

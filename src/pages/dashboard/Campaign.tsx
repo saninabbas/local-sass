@@ -54,8 +54,12 @@ export const Campaign: React.FC = () => {
 
   useEffect(() => {
     const handleBizSwitch = () => loadCampaign();
+    window.addEventListener('scorankio:business_switched', handleBizSwitch);
     window.addEventListener('rankora:business_switched', handleBizSwitch);
-    return () => window.removeEventListener('rankora:business_switched', handleBizSwitch);
+    return () => {
+      window.removeEventListener('scorankio:business_switched', handleBizSwitch);
+      window.removeEventListener('rankora:business_switched', handleBizSwitch);
+    };
   }, []);
 
   const handleExecuteTask = async (task: any) => {

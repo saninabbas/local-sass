@@ -12,7 +12,7 @@ export function Privacy() {
             <div>
               <h2 className="text-lg font-serif font-medium text-[#141413] mb-2">1. Introduction</h2>
               <p>
-                Welcome to Rankora. We respect your privacy and are committed to protecting your personal data. This privacy policy will inform you as to how we look after your personal data when you visit our website and tell you about your privacy rights and how the law protects you.
+                Welcome to Scorankio. We respect your privacy and are committed to protecting your personal data. This privacy policy will inform you as to how we look after your personal data when you visit our website and tell you about your privacy rights and how the law protects you.
               </p>
             </div>
 
@@ -44,7 +44,7 @@ export function Privacy() {
             <div>
               <h2 className="text-lg font-serif font-medium text-[#141413] mb-2">4. Contact Us</h2>
               <p>
-                If you have any questions about this privacy policy or our privacy practices, please contact us at <a href="mailto:support@rankora.com" className="text-[#cc785c] underline">support@rankora.com</a>.
+                If you have any questions about this privacy policy or our privacy practices, please contact us at <a href="mailto:support@scorankio.site" className="text-[#cc785c] underline">support@scorankio.site</a>.
               </p>
             </div>
           </div>

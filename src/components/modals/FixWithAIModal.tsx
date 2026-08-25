@@ -169,7 +169,7 @@ export function FixWithAIModal({
       const execRes = await executeUniversalFix(changeRecord.id, {
         targetFilePath: targetFilePath.trim() || 'index.html',
         customContent: editedContent,
-        customCommitMessage: `Rankora SEO Fix: ${normalizedChangeType} for ${context.businessName || 'website'}`
+        customCommitMessage: `Scorankio SEO Fix: ${normalizedChangeType} for ${context.businessName || 'website'}`
       });
 
       const execData = execRes?.data || execRes;
@@ -380,7 +380,7 @@ export function FixWithAIModal({
                       <div className="space-y-1">
                         <strong className="block font-bold text-xs text-[#141413]">Want 1-Click Automated Fix Deployment to Your Live Website?</strong>
                         <p className="text-[11px] text-amber-900 leading-relaxed">
-                          Rankora can push code patches, meta tags, and schema updates directly to your domain via <strong>GitHub (PR)</strong>, <strong>WordPress (REST API)</strong>, or <strong>Shopify (Admin API)</strong>.
+                          Scorankio can push code patches, meta tags, and schema updates directly to your domain via <strong>GitHub (PR)</strong>, <strong>WordPress (REST API)</strong>, or <strong>Shopify (Admin API)</strong>.
                         </p>
                       </div>
                     </div>
@@ -459,7 +459,7 @@ export function FixWithAIModal({
                 <CheckCheck size={36} className="text-emerald-600 mx-auto" />
                 <h4 className="font-serif font-bold text-base">Pull Request Created Successfully!</h4>
                 <p className="text-xs text-emerald-800 font-sans max-w-md mx-auto">
-                  Rankora created branch <strong className="font-mono">{executionResult.details?.branch || executionResult.branch}</strong> and submitted Pull Request #{executionResult.details?.pullRequestNumber || executionResult.pullRequestNumber}.
+                  Scorankio created branch <strong className="font-mono">{executionResult.details?.branch || executionResult.branch}</strong> and submitted Pull Request #{executionResult.details?.pullRequestNumber || executionResult.pullRequestNumber}.
                 </p>
               </div>
 
@@ -522,7 +522,7 @@ export function FixWithAIModal({
                   <CheckCircle2 size={32} className="text-emerald-600 mx-auto" />
                   <h4 className="font-serif font-bold text-sm">Live Verification Passed!</h4>
                   <p className="text-xs text-emerald-800 font-sans">
-                    Rankora crawled your live site and confirmed that the target element now satisfies the approved optimization.
+                    Scorankio crawled your live site and confirmed that the target element now satisfies the approved optimization.
                   </p>
                 </div>
               ) : (

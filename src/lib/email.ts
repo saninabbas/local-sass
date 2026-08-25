@@ -14,7 +14,7 @@ export interface SendEmailParams {
 
 export async function sendEmail({ to, subject, html, fromEmail, fromName, env }: SendEmailParams): Promise<{ success: boolean; error?: string }> {
   const senderEmail = fromEmail || env?.SENDER_EMAIL || env?.FROM_EMAIL || 'hi@seoranko.site';
-  const senderName = fromName || env?.SENDER_NAME || 'Rankora';
+  const senderName = fromName || env?.SENDER_NAME || 'Scorankio';
 
   // 1. Resend API (Recommended for Cloudflare Workers & Pages)
   const resendApiKey = env?.RESEND_API_KEY;
@@ -85,7 +85,7 @@ export async function sendEmail({ to, subject, html, fromEmail, fromName, env }:
  */
 export async function sendPasswordResetEmail(email: string, resetLink: string, env: any) {
   const senderEmail = env?.SENDER_EMAIL || env?.FROM_EMAIL || 'hi@seoranko.site';
-  const senderName = env?.SENDER_NAME || 'Rankora';
+  const senderName = env?.SENDER_NAME || 'Scorankio';
 
   const html = `
     <!DOCTYPE html>
@@ -98,13 +98,13 @@ export async function sendPasswordResetEmail(email: string, resetLink: string, e
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 30px 15px; color: #1e293b;">
         <div style="max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; padding: 36px 30px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
           <div style="text-align: center; margin-bottom: 28px;">
-            <h1 style="font-size: 24px; font-weight: 800; color: #0f172a; margin: 0;">Rankora</h1>
+            <h1 style="font-size: 24px; font-weight: 800; color: #0f172a; margin: 0;">Scorankio</h1>
             <p style="font-size: 13px; color: #64748b; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Local Business Growth Platform</p>
           </div>
           
           <h2 style="font-size: 18px; font-weight: 700; color: #1e293b; margin-top: 0;">Password Reset Request</h2>
           <p style="font-size: 15px; line-height: 1.6; color: #475569;">
-            We received a request to reset the password for your Rankora account associated with <strong>${email}</strong>.
+            We received a request to reset the password for your Scorankio account associated with <strong>${email}</strong>.
           </p>
           <p style="font-size: 15px; line-height: 1.6; color: #475569;">
             Click the button below to choose a new secure password. This link will expire in <strong>60 minutes</strong>.
@@ -126,7 +126,7 @@ export async function sendPasswordResetEmail(email: string, resetLink: string, e
           </p>
           
           <div style="text-align: center; margin-top: 28px; font-size: 12px; color: #94a3b8;">
-            &copy; ${new Date().getFullYear()} Rankora. All rights reserved.<br />
+            &copy; ${new Date().getFullYear()} Scorankio. All rights reserved.<br />
             Sent from <a href="mailto:${senderEmail}" style="color: #64748b;">${senderEmail}</a>
           </div>
         </div>
@@ -136,7 +136,7 @@ export async function sendPasswordResetEmail(email: string, resetLink: string, e
 
   return await sendEmail({
     to: email,
-    subject: 'Reset Your Rankora Password',
+    subject: 'Reset Your Scorankio Password',
     html,
     fromEmail: senderEmail,
     fromName: senderName,
@@ -149,7 +149,7 @@ export async function sendPasswordResetEmail(email: string, resetLink: string, e
  */
 export async function sendVerificationEmail(email: string, tokenOrLink: string, env: any) {
   const senderEmail = env?.SENDER_EMAIL || env?.FROM_EMAIL || 'hi@seoranko.site';
-  const senderName = env?.SENDER_NAME || 'Rankora';
+  const senderName = env?.SENDER_NAME || 'Scorankio';
   
   const baseUrl = env?.BASE_URL || 'https://local-sass.pages.dev';
   const verificationLink = tokenOrLink.startsWith('http') ? tokenOrLink : `${baseUrl}/verify?token=${tokenOrLink}`;
@@ -160,16 +160,16 @@ export async function sendVerificationEmail(email: string, tokenOrLink: string, 
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Verify Your Rankora Account</title>
+        <title>Verify Your Scorankio Account</title>
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 30px 15px; color: #1e293b;">
         <div style="max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; padding: 36px 30px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
           <div style="text-align: center; margin-bottom: 28px;">
-            <h1 style="font-size: 24px; font-weight: 800; color: #0f172a; margin: 0;">Rankora</h1>
+            <h1 style="font-size: 24px; font-weight: 800; color: #0f172a; margin: 0;">Scorankio</h1>
             <p style="font-size: 13px; color: #64748b; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Local Business Growth Platform</p>
           </div>
           
-          <h2 style="font-size: 18px; font-weight: 700; color: #1e293b; margin-top: 0;">Welcome to Rankora! 🚀</h2>
+          <h2 style="font-size: 18px; font-weight: 700; color: #1e293b; margin-top: 0;">Welcome to Scorankio! 🚀</h2>
           <p style="font-size: 15px; line-height: 1.6; color: #475569;">
             Thank you for creating an account. Please click the button below to verify your email address (<strong>${email}</strong>) and activate your business growth dashboard:
           </p>
@@ -179,7 +179,7 @@ export async function sendVerificationEmail(email: string, tokenOrLink: string, 
           </div>
           
           <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin-bottom: 24px;">
-            This link is valid for 7 days. If you did not create a Rankora account, you can disregard this message.
+            This link is valid for 7 days. If you did not create a Scorankio account, you can disregard this message.
           </p>
           
           <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
@@ -190,7 +190,7 @@ export async function sendVerificationEmail(email: string, tokenOrLink: string, 
           </p>
           
           <div style="text-align: center; margin-top: 28px; font-size: 12px; color: #94a3b8;">
-            &copy; ${new Date().getFullYear()} Rankora. All rights reserved.<br />
+            &copy; ${new Date().getFullYear()} Scorankio. All rights reserved.<br />
             Sent from <a href="mailto:${senderEmail}" style="color: #64748b;">${senderEmail}</a>
           </div>
         </div>
@@ -200,7 +200,7 @@ export async function sendVerificationEmail(email: string, tokenOrLink: string, 
 
   return await sendEmail({
     to: email,
-    subject: 'Verify your Rankora account',
+    subject: 'Verify your Scorankio account',
     html,
     fromEmail: senderEmail,
     fromName: senderName,

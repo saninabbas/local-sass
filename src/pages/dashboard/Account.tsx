@@ -315,7 +315,7 @@ export function Account() {
             <div className="bg-[#efe9de] rounded-2xl shadow-xs border border-[#e6dfd8] p-5">
               <h2 className="text-sm font-serif font-medium text-[#141413] flex items-center gap-2 mb-3">
                 <Shield className="text-[#cc785c]" size={16} />
-                Rankora Plan
+                Scorankio Plan
               </h2>
               <div className="flex items-center gap-2.5 mb-3">
                 <div className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wide bg-[#cc785c]/15 text-[#cc785c] border border-[#cc785c]/30">

@@ -103,7 +103,7 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
       {
         id: `welcome-${activeBusinessId || 'default'}`,
         role: 'assistant',
-        content: `**RANKORA GROWTH INTELLIGENCE** initialized for **${activeProjectName}**.\n\nLive signals synchronized with D1 database engine. Select an operation or enter a query below.`,
+        content: `**SCORANKIO GROWTH INTELLIGENCE** initialized for **${activeProjectName}**.\n\nLive signals synchronized with D1 database engine. Select an operation or enter a query below.`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         actions: [
           { type: 'view_module', label: 'View Action Roadmap', target: '/dashboard/actions' },
@@ -123,8 +123,12 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
         handleSendMessage(prompt);
       }
     };
+    window.addEventListener('scorankio:open-copilot' as any, handleOpenCopilot);
     window.addEventListener('rankora:open-copilot' as any, handleOpenCopilot);
-    return () => window.removeEventListener('rankora:open-copilot' as any, handleOpenCopilot);
+    return () => {
+      window.removeEventListener('scorankio:open-copilot' as any, handleOpenCopilot);
+      window.removeEventListener('rankora:open-copilot' as any, handleOpenCopilot);
+    };
   }, []);
 
   const scrollToBottom = () => {
@@ -236,11 +240,11 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
           <div className="p-4 bg-[#141413] text-[#faf9f5] border-b border-[#252320] flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-7 h-7 rounded-lg bg-[#cc785c] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
-                R
+                S
               </div>
               <div className="overflow-hidden">
                 <div className="flex items-center gap-2">
-                  <h2 className="font-sans text-xs font-bold tracking-wider uppercase text-[#faf9f5]">RANKORA</h2>
+                  <h2 className="font-sans text-xs font-bold tracking-wider uppercase text-[#faf9f5]">SCORANKIO</h2>
                   <span className="text-[10px] font-mono text-[#8e8b82]">Growth Intelligence</span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">

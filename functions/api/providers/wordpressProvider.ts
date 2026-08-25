@@ -55,7 +55,7 @@ export class WordPressProvider {
     return {
       'Authorization': `Basic ${base64Auth}`,
       'Accept': 'application/json',
-      'User-Agent': 'Rankora-WordPress-Operator/2.0'
+      'User-Agent': 'Scorankio-WordPress-Operator/2.0'
     };
   }
 

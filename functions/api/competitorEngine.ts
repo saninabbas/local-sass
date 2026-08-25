@@ -255,7 +255,7 @@ export async function analyzeCompetitorDeep(
   const myWords = myExtractor.bodyText.trim().split(/\s+/).filter(w => w.length > 1).length;
   const compWords = compExtractor.bodyText.trim().split(/\s+/).filter(w => w.length > 1).length;
 
-  const prompt = `You are Rankora's Lead Competitive SEO Intelligence Analyst.
+  const prompt = `You are Scorankio's Lead Competitive SEO Intelligence Analyst.
 Analyze the differences between the customer's website and their direct local competitor.
 
 CUSTOMER WEBSITE:

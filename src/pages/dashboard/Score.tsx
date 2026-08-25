@@ -81,8 +81,12 @@ export function Score() {
 
   useEffect(() => {
     const handleBizSwitch = () => loadData();
+    window.addEventListener('scorankio:business_switched', handleBizSwitch);
     window.addEventListener('rankora:business_switched', handleBizSwitch);
-    return () => window.removeEventListener('rankora:business_switched', handleBizSwitch);
+    return () => {
+      window.removeEventListener('scorankio:business_switched', handleBizSwitch);
+      window.removeEventListener('rankora:business_switched', handleBizSwitch);
+    };
   }, []);
 
   useEffect(() => {
@@ -550,7 +554,7 @@ export function Score() {
             <div className="bg-[#efe9de]/40 rounded-2xl p-5 border border-[#e6dfd8] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="space-y-1">
                 <span className="text-[10px] font-mono font-bold uppercase text-[#cc785c]">
-                  Rankora AI Recommendation
+                  Scorankio AI Recommendation
                 </span>
                 <p className="text-xs font-sans text-[#141413] leading-relaxed">
                   {currentCategory.recommendedFix}

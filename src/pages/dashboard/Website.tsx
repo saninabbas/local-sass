@@ -384,7 +384,7 @@ Referrer-Policy: strict-origin-when-cross-origin`;
                 </div>
                 <div>
                   <h3 className="font-serif font-medium text-lg text-[#141413]">
-                    Rankora AI Code & Content Fix
+                    Scorankio AI Code & Content Fix
                   </h3>
                   <p className="text-xs text-[#6c6a64] font-sans">
                     {activeFixProblem.title}

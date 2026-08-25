@@ -233,7 +233,7 @@ export function Reports() {
           <div className="flex justify-between items-start border-b border-[#e6dfd8] pb-6">
             <div>
               <div className="text-[10px] font-mono uppercase tracking-wider text-[#cc785c] font-bold">
-                RANKORA LOCAL SEARCH INTELLIGENCE
+                SCORANKIO LOCAL SEARCH INTELLIGENCE
               </div>
               <h2 className="text-2xl font-serif font-normal text-[#141413] mt-1">{business?.name || 'Local Business'}</h2>
               <p className="text-xs font-sans text-[#6c6a64] mt-0.5">{business?.website_url} • {business?.city || 'Local Market'}</p>

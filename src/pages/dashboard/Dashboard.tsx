@@ -171,7 +171,7 @@ export function Dashboard() {
             <Building size={28} />
           </div>
           <h2 className="text-2xl sm:text-3xl font-serif font-medium text-[#141413] mb-2">
-            Welcome to Rankora
+            Welcome to Scorankio
           </h2>
           <p className="text-xs sm:text-sm text-[#6c6a64] mb-6 max-w-md font-sans">
             Enter your business website URL to trigger real-time DOM extraction, local SERP benchmarking, and deterministic scoring.
@@ -300,7 +300,7 @@ export function Dashboard() {
       evidence: comp.gapSummary || `Competitor holds strong organic presence in ${business.city}.`,
       yourStatus: 'No dedicated landing page detected for this localized service query.',
       gap: comp.gapSummary || 'Dedicated service sub-page & localized schema markup.',
-      recommendedAction: 'Generate a specialized local service page using Rankora AI Content Studio.'
+      recommendedAction: 'Generate a specialized local service page using Scorankio AI Content Studio.'
     }
   }));
 

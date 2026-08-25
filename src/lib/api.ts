@@ -5,7 +5,7 @@ import type { DashboardData } from '../types';
 // -----------------------------------------------------------------------------
 export const getActiveBusinessId = (): string | null => {
   try {
-    return localStorage.getItem('rankora_active_business_id') || null;
+    return localStorage.getItem('scorankio_active_business_id') || localStorage.getItem('rankora_active_business_id') || null;
   } catch {
     return null;
   }
@@ -14,8 +14,9 @@ export const getActiveBusinessId = (): string | null => {
 export const setActiveBusinessId = (id: string | null): void => {
   try {
     if (id) {
-      localStorage.setItem('rankora_active_business_id', id);
+      localStorage.setItem('scorankio_active_business_id', id);
     } else {
+      localStorage.removeItem('scorankio_active_business_id');
       localStorage.removeItem('rankora_active_business_id');
     }
   } catch {}

@@ -6,9 +6,9 @@ export function About() {
       <div className="bg-[#faf9f5] py-24 sm:py-32 border-b border-[#e6dfd8]">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mx-auto max-w-2xl lg:mx-0">
-            <h2 className="text-4xl sm:text-5xl font-serif font-normal tracking-[-1.5px] text-[#141413]">About Rankora</h2>
+            <h2 className="text-4xl sm:text-5xl font-serif font-normal tracking-[-1.5px] text-[#141413]">About Scorankio</h2>
             <p className="mt-6 text-base sm:text-lg leading-relaxed text-[#3d3d3a] font-sans">
-              Rankora was founded on a simple premise: local businesses deserve access to the same high-end digital growth tools that large corporations use, but without the complexity and enterprise pricing.
+              Scorankio was founded on a simple premise: local businesses deserve access to the same high-end digital growth tools that large corporations use, but without the complexity and enterprise pricing.
             </p>
           </div>
           <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 md:max-w-none">
@@ -34,7 +34,7 @@ export function About() {
                   Action-Oriented
                 </dt>
                 <dd className="mt-3 flex flex-auto flex-col text-xs leading-relaxed text-[#3d3d3a] font-sans">
-                  <p className="flex-auto">An audit is useless if you don't know what to do next. That's why every Rankora audit comes with a prioritized, step-by-step AI Action Plan.</p>
+                  <p className="flex-auto">An audit is useless if you don't know what to do next. That's why every Scorankio audit comes with a prioritized, step-by-step AI Action Plan.</p>
                 </dd>
               </div>
             </dl>

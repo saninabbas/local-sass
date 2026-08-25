@@ -84,6 +84,6 @@ export function generateTOTPSecret(): string {
  * Helper for QR code URL
  */
 export function getTotpQrUrl(email: string, secret: string): string {
-  const otpauth = `otpauth://totp/Rankora:${encodeURIComponent(email)}?secret=${secret}&issuer=Rankora`;
+  const otpauth = `otpauth://totp/Scorankio:${encodeURIComponent(email)}?secret=${secret}&issuer=Scorankio`;
   return `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(otpauth)}&size=200x200`;
 }

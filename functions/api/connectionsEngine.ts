@@ -267,7 +267,7 @@ export async function executeGitHubSeoFix(
 
   // 4. Create safe deterministic feature branch
   const slug = (change.change_type || 'seo-fix').toLowerCase().replace(/[^a-z0-9]/g, '-');
-  const featureBranch = `rankora/seo-fix/${slug}-${changeId.substring(0, 8)}`;
+  const featureBranch = `scorankio/seo-fix/${slug}-${changeId.substring(0, 8)}`;
 
   await githubProvider.createBranch(token, owner, repo, baseBranch, featureBranch);
 
@@ -297,7 +297,7 @@ export async function executeGitHubSeoFix(
   }
 
   // 6. Commit the file update
-  const commitMsg = options.customCommitMessage || `Rankora SEO Fix: ${change.change_type} (${changeId.substring(0, 8)})`;
+  const commitMsg = options.customCommitMessage || `Scorankio SEO Fix: ${change.change_type} (${changeId.substring(0, 8)})`;
   const commitResult = await githubProvider.updateFile(
     token,
     owner,
@@ -310,8 +310,8 @@ export async function executeGitHubSeoFix(
   );
 
   // 7. Create Pull Request
-  const prTitle = `Rankora SEO Fix: ${change.change_type.replace(/_/g, ' ')}`;
-  const prBody = `## 🚀 Rankora SEO Fix
+  const prTitle = `Scorankio SEO Fix: ${change.change_type.replace(/_/g, ' ')}`;
+  const prBody = `## 🚀 Scorankio SEO Fix
 
 **Project:** ${projectId}
 **Change Type:** ${change.change_type}
@@ -328,7 +328,7 @@ ${afterVal}
 \`\`\`
 
 ---
-*Generated automatically by Rankora SEO Operating System.*
+*Generated automatically by Scorankio SEO Operating System.*
 *Live DOM verification will be triggered automatically upon merging this Pull Request.*`;
 
   const prResult = await githubProvider.createPullRequest(
@@ -658,7 +658,7 @@ export async function executeWordPressSeoFix(
   try {
     const liveTargetUrl = updatedItem.link || change.page_url || siteUrl;
     const fetchResp = await fetch(liveTargetUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Rankora Live SEO Crawler 2.0)' }
+      headers: { 'User-Agent': 'Mozilla/5.0 (Scorankio Live SEO Crawler 2.0)' }
     });
 
     if (fetchResp.ok) {
@@ -921,7 +921,7 @@ export async function executeShopifySeoFix(
 
   try {
     const fetchResp = await fetch(liveUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Rankora Live SEO Crawler 2.0)' }
+      headers: { 'User-Agent': 'Mozilla/5.0 (Scorankio Live SEO Crawler 2.0)' }
     });
 
     if (fetchResp.ok) {

@@ -51,7 +51,7 @@ export function Resources() {
                 </div>
                 <h3 className="font-serif font-medium text-lg text-[#141413]">Case Studies</h3>
                 <p className="text-xs text-[#3d3d3a] font-sans leading-relaxed">
-                  Learn how other local businesses used Rankora to double their foot traffic.
+                  Learn how other local businesses used Scorankio to double their foot traffic.
                 </p>
               </div>
               <Link to="/signup" className="mt-6 text-xs font-medium text-[#cc785c] hover:text-[#a9583e] inline-flex items-center gap-1">

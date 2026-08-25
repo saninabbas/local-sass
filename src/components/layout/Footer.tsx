@@ -32,7 +32,7 @@ export function Footer() {
             <Link to="/" className="inline-flex items-center">
               <img 
                 src="/brand/logo-light.svg" 
-                alt="Rankora" 
+                alt="Scorankio" 
                 className="w-[115px] sm:w-[130px] h-auto object-contain transition-transform hover:scale-105" 
               />
             </Link>
@@ -107,7 +107,7 @@ export function Footer() {
         </div>
 
         <div className="mt-12 pt-8 border-t border-[#252320] flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-sans text-[#6c6a64]">
-          <p>© {currentYear} Rankora. All rights reserved.</p>
+          <p>© {currentYear} Scorankio. All rights reserved.</p>
           <div className="flex space-x-6">
             <Link to="/terms" className="hover:text-[#a09d96] transition-colors">Terms of Service</Link>
             <Link to="/privacy" className="hover:text-[#a09d96] transition-colors">Privacy Policy</Link>

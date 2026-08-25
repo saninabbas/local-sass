@@ -8,7 +8,7 @@ export function Contact() {
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl sm:text-4xl font-serif font-normal tracking-tight text-[#141413]">Contact Us</h2>
             <p className="mt-3 text-base sm:text-lg leading-relaxed text-[#6c6a64] font-sans">
-              Have questions about Rankora? We're here to help.
+              Have questions about Scorankio? We're here to help.
             </p>
           </div>
           <div className="mx-auto mt-16 max-w-xl">
@@ -24,7 +24,7 @@ export function Contact() {
                 <div>
                   <h3 className="text-base font-serif font-medium text-[#141413]">Email Support</h3>
                   <p className="mt-2 text-xs leading-relaxed text-[#3d3d3a] font-sans">
-                    You can reach us anytime at <a href="mailto:support@rankora.com" className="text-[#cc785c] font-medium hover:underline">support@rankora.com</a>. We typically reply within 24 hours.
+                    You can reach us anytime at <a href="mailto:support@scorankio.site" className="text-[#cc785c] font-medium hover:underline">support@scorankio.site</a>. We typically reply within 24 hours.
                   </p>
                 </div>
               </div>

@@ -51,7 +51,7 @@ export function Copilot() {
     {
       id: 'welcome',
       role: 'assistant',
-      content: "**RANKORA GROWTH INTELLIGENCE CONSOLE**\n\nSynchronized with live website crawl, Growth Score dimensions, local competitors, tracked keywords, and reviews telemetry. Select an operational query below or enter a prompt.",
+      content: "**SCORANKIO GROWTH INTELLIGENCE CONSOLE**\n\nSynchronized with live website crawl, Growth Score dimensions, local competitors, tracked keywords, and reviews telemetry. Select an operational query below or enter a prompt.",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       actions: [
         { type: 'view_module', label: 'View Action Roadmap', target: '/dashboard/actions' },
@@ -146,7 +146,7 @@ export function Copilot() {
             <span className="text-[11px] font-mono text-[#5db872] uppercase font-bold tracking-wider">LIVE OPERATIONS CONSOLE</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-serif font-normal text-[#141413] tracking-tight flex items-center gap-2.5">
-            Rankora Growth Intelligence
+            Scorankio Growth Intelligence
           </h1>
           <p className="text-xs text-[#6c6a64] font-sans mt-1">
             Business intelligence and operational SEO console with real-time telemetry from D1 database engine.

@@ -544,7 +544,7 @@ export function AuthorityBuilder() {
                   Authority Score Factor Breakdown (0-100)
                 </h2>
                 <p className="text-xs text-[#6c6a64] font-sans leading-relaxed">
-                  Rankora’s algorithmic scoring model measures multi-vector online trust: domain diversity, authority link weight, local NAP citations, brand reach, and DOM technical health.
+                  Scorankio’s algorithmic scoring model measures multi-vector online trust: domain diversity, authority link weight, local NAP citations, brand reach, and DOM technical health.
                 </p>
               </div>
 

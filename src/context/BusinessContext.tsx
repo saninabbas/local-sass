@@ -110,6 +110,7 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }).catch(() => {});
 
       // Dispatch custom event so active pages can refetch without a hard page reload
+      window.dispatchEvent(new CustomEvent('scorankio:business_switched', { detail: { businessId: id } }));
       window.dispatchEvent(new CustomEvent('rankora:business_switched', { detail: { businessId: id } }));
 
       return true;
@@ -130,6 +131,7 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (data.setAsActive && createdBiz?.id) {
         setLocalActiveBizId(createdBiz.id);
         setActiveBusinessIdState(createdBiz.id);
+        window.dispatchEvent(new CustomEvent('scorankio:business_switched', { detail: { businessId: createdBiz.id } }));
         window.dispatchEvent(new CustomEvent('rankora:business_switched', { detail: { businessId: createdBiz.id } }));
       }
 
@@ -164,6 +166,7 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
 
       await refreshBusinesses();
+      window.dispatchEvent(new CustomEvent('scorankio:business_switched', { detail: { businessId: null } }));
       window.dispatchEvent(new CustomEvent('rankora:business_switched', { detail: { businessId: null } }));
       return true;
     } catch (err: any) {

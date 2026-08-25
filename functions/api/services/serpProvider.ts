@@ -460,7 +460,7 @@ export class BrightLocalSerpProvider implements ISerpProvider {
       success: false,
       status: 'NOT_CONFIGURED',
       latencyMs: 0,
-      message: 'BrightLocal provider is not configured on this Rankora instance.'
+      message: 'BrightLocal provider is not configured on this Scorankio instance.'
     };
   }
 
@@ -493,7 +493,7 @@ export class SemrushSerpProvider implements ISerpProvider {
       success: false,
       status: 'NOT_CONFIGURED',
       latencyMs: 0,
-      message: 'Semrush provider is not configured on this Rankora instance.'
+      message: 'Semrush provider is not configured on this Scorankio instance.'
     };
   }
 

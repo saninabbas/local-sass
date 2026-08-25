@@ -78,7 +78,7 @@ export function Login() {
           <Link to="/" className="flex items-center justify-center">
             <img 
               src="/brand/logo.svg" 
-              alt="Rankora" 
+              alt="Scorankio" 
               className="w-[130px] sm:w-[150px] h-auto object-contain transition-transform hover:scale-105" 
             />
           </Link>

@@ -23,7 +23,7 @@ export function HowItWorks() {
       num: "02",
       icon: Cpu,
       title: "7-Vector Diagnostic Audit",
-      desc: "Rankora tests your site across Local SEO, Technical hygiene, Content depth, Mobile UX, Performance, and Security protocols."
+      desc: "Scorankio tests your site across Local SEO, Technical hygiene, Content depth, Mobile UX, Performance, and Security protocols."
     },
     {
       num: "03",
@@ -47,10 +47,10 @@ export function HowItWorks() {
         <section className="py-20 px-6 sm:px-8 border-b border-[#e6dfd8] bg-[#efe9de]/40">
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#efe9de] border border-[#e6dfd8] text-xs font-mono uppercase tracking-wider text-[#cc785c] mb-6 shadow-2xs">
-              <Sparkles size={13} /> The Rankora Method
+              <Sparkles size={13} /> The Scorankio Method
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-serif font-normal text-[#141413] tracking-tight mb-6">
-              How Rankora turns local websites into <span className="italic text-[#cc785c]">search leaders</span>.
+              How Scorankio turns local websites into <span className="italic text-[#cc785c]">search leaders</span>.
             </h1>
             <p className="text-base sm:text-lg text-[#6c6a64] max-w-2xl mx-auto leading-relaxed mb-8">
               Four automated steps from raw URL input to actionable roadmap and Google Map Pack elevation.

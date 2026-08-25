@@ -41,7 +41,7 @@ export function AdminLogin() {
           <Link to="/" className="flex items-center justify-center">
             <img 
               src="/brand/logo.svg" 
-              alt="Rankora" 
+              alt="Scorankio" 
               className="w-[130px] sm:w-[150px] h-auto object-contain" 
             />
           </Link>
@@ -49,7 +49,7 @@ export function AdminLogin() {
 
         <div className="text-center">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#cc785c]/10 border border-[#cc785c]/25 text-[#cc785c] text-xs font-mono font-bold uppercase tracking-wider mb-2">
-            <Shield size={13} /> Rankora Control Center
+            <Shield size={13} /> Scorankio Control Center
           </div>
           <h2 className="text-center text-3xl font-serif font-normal text-[#141413] mb-2">
             Administrator Portal

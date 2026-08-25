@@ -278,7 +278,7 @@ export function NotificationDropdown({ isOpen, onClose }: NotificationDropdownPr
       {/* Footer */}
       {notifications.length > 0 && (
         <div className="px-4 py-2.5 bg-[#efe9de]/30 border-t border-[#e6dfd8] flex items-center justify-between text-[11px] font-mono text-[#8e8b82]">
-          <span>Rankora Telemetry Stream</span>
+          <span>Scorankio Telemetry Stream</span>
           <button
             onClick={() => refreshNotifications()}
             className="hover:text-[#141413] flex items-center gap-1 cursor-pointer transition-colors"

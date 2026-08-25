@@ -80,7 +80,7 @@ export function Leads() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", "rankora_inbound_leads.csv");
+    link.setAttribute("download", "scorankio_inbound_leads.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

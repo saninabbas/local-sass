@@ -148,8 +148,12 @@ export const Connections: React.FC = () => {
 
   useEffect(() => {
     const handleBizSwitch = () => loadConnections();
+    window.addEventListener('scorankio:business_switched', handleBizSwitch);
     window.addEventListener('rankora:business_switched', handleBizSwitch);
-    return () => window.removeEventListener('rankora:business_switched', handleBizSwitch);
+    return () => {
+      window.removeEventListener('scorankio:business_switched', handleBizSwitch);
+      window.removeEventListener('rankora:business_switched', handleBizSwitch);
+    };
   }, []);
 
   // Fetch Tree when active GitHub connection is present

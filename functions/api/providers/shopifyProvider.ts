@@ -38,7 +38,7 @@ export class ShopifyProvider {
       'X-Shopify-Access-Token': accessToken.trim(),
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'User-Agent': 'Rankora-Shopify-Operator/2.0',
+      'User-Agent': 'Scorankio-Shopify-Operator/2.0',
       ...(options.headers as Record<string, string> || {})
     };
 

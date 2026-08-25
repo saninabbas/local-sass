@@ -4,8 +4,8 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 export function FAQSection() {
   const faqs = [
     {
-      question: 'What is Rankora?',
-      answer: 'Rankora is an autonomous visual reasoning platform designed specifically for local enterprises. It audits your online footprint, tracks competitors, and deploys high-impact AI workflows to capture local market share.'
+      question: 'What is Scorankio?',
+      answer: 'Scorankio is an autonomous visual reasoning platform designed specifically for local enterprises. It audits your online footprint, tracks competitors, and deploys high-impact AI workflows to capture local market share.'
     },
     {
       question: 'Do I need technical SEO expertise?',

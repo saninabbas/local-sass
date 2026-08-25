@@ -73,7 +73,7 @@ export function Onboarding() {
         {/* Brand Header */}
         <div className="flex flex-col items-center mb-8">
           <div className="flex items-center gap-2 mb-2">
-            <img src="/brand/logo.svg" alt="Rankora" className="w-[140px] h-auto object-contain" />
+            <img src="/brand/logo.svg" alt="Scorankio" className="w-[140px] h-auto object-contain" />
           </div>
           <p className="text-xs text-[#6c6a64] font-sans text-center">
             AI Local Growth Operating System : Automated Business & Market Discovery
@@ -135,7 +135,7 @@ export function Onboarding() {
               <div className="text-center pb-2">
                 <h2 className="text-lg font-serif font-normal text-[#141413]">Enter Your Website URL</h2>
                 <p className="text-xs text-[#6c6a64] mt-0.5">
-                  Rankora will automatically crawl your site, detect your market, and benchmark competitors.
+                  Scorankio will automatically crawl your site, detect your market, and benchmark competitors.
                 </p>
               </div>
 

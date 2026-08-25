@@ -18,7 +18,7 @@ export function ProductPreviewSection() {
               <div className="flex items-center gap-3">
                 <img 
                   src="/brand/logo-light.svg" 
-                  alt="Rankora" 
+                  alt="Scorankio" 
                   className="w-[90px] h-auto object-contain" 
                 />
                 <div className="flex space-x-1.5 ml-1">
@@ -28,7 +28,7 @@ export function ProductPreviewSection() {
                 </div>
               </div>
               <div className="hidden sm:flex bg-[#141413] rounded-md px-3.5 py-1 border border-[#252320]">
-                <span className="text-xs font-mono text-[#a09d96]">app.rankora.com/dashboard</span>
+                <span className="text-xs font-mono text-[#a09d96]">scorankio.site/dashboard</span>
               </div>
               <div className="text-xs font-mono text-[#5db872] flex items-center gap-1.5 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#5db872] animate-pulse"></span>

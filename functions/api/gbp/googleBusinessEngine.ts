@@ -364,7 +364,7 @@ export async function generateLocalAiRecommendations(
   if (!apiKey) return defaultRecommendations;
 
   try {
-    const prompt = `You are an expert Local SEO Strategist for Rankora SaaS.
+    const prompt = `You are an expert Local SEO Strategist for Scorankio SaaS.
 Business: ${businessName} in ${city}
 Local SEO Visibility Score: ${localScore}/100
 Current Google Reviews: ${totalReviews} (Avg: ${averageRating}/5.0)

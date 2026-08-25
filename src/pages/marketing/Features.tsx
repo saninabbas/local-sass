@@ -61,7 +61,7 @@ export function Features() {
                 <div className="w-12 h-12 rounded-xl bg-[#faf9f5] border border-[#e6dfd8] flex items-center justify-center text-[#cc785c] mb-6 shadow-2xs">
                   <Bot size={22} />
                 </div>
-                <h3 className="text-xl font-serif font-medium text-[#141413] mb-3">Rankora Growth Copilot</h3>
+                <h3 className="text-xl font-serif font-medium text-[#141413] mb-3">Scorankio Growth Copilot</h3>
                 <p className="text-xs text-[#6c6a64] leading-relaxed">
                   Live, context-aware AI assistant equipped with your real-time ranking data to explain gaps and execute tasks with one click.
                 </p>

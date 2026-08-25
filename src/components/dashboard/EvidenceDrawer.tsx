@@ -143,7 +143,7 @@ export const EvidenceDrawer: React.FC<EvidenceDrawerProps> = ({
         {/* Bottom Drawer Footer */}
         <div className="p-4 border-t border-[#e6dfd8] bg-[#efe9de]/30 flex items-center justify-between">
           <span className="text-xs font-mono text-[#8e8b82]">
-            Audited via Rankora Deterministic Engine
+            Audited via Scorankio Deterministic Engine
           </span>
           <Button size="sm" onClick={onClose} variant="outline" className="text-xs">
             Close

@@ -35,7 +35,7 @@ export function ForgotPassword() {
         <Link to="/" className="flex justify-center mb-6">
           <img 
             src="/brand/logo.svg" 
-            alt="Rankora" 
+            alt="Scorankio" 
             className="w-[130px] sm:w-[150px] h-auto object-contain transition-transform hover:scale-105" 
           />
         </Link>

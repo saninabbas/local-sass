@@ -97,7 +97,7 @@ Include target audience, primary keywords, competitor angle, and 5-point outline
         messages: [
           { 
             role: 'system', 
-            content: 'You are the Rankora Technical & Local SEO Engineering Agent. Provide precise, actionable, and ready-to-deploy solutions.' 
+            content: 'You are the Scorankio Technical & Local SEO Engineering Agent. Provide precise, actionable, and ready-to-deploy solutions.' 
           },
           { role: 'user', content: prompt }
         ],

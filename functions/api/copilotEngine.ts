@@ -3,7 +3,7 @@
  * 
  * Scoped Telemetry & Intent Routing System:
  * - Scoped by user_id + project_id
- * - Persona: Native Rankora SEO Growth Operator (confident, concise 1-3 sentences, zero AI fluff)
+ * - Persona: Native Scorankio SEO Growth Operator (confident, concise 1-3 sentences, zero AI fluff)
  * - Zero Generic AI Language (Strictly Banned: "How can I help you today?", "I'd be happy to help", "As an AI...", "Based on my analysis...")
  * - Strict Response Structure: Finding (1 short statement) -> Evidence (1 verified data point) -> Action (1 direct next step)
  * - Zero Fabrication Rule (UNAVAILABLE / NOT_FOUND / NOT_CONNECTED)
@@ -140,7 +140,7 @@ export async function askGrowthCopilot(
     };
   }
 
-  const systemPrompt = `You are the "RANKORA GROWTH OPERATOR", a native, data-driven SEO operator inside Rankora.
+  const systemPrompt = `You are the "SCORANKIO GROWTH OPERATOR", a native, data-driven SEO operator inside Scorankio.
 
 STRICT PERSONALITY & LANGUAGE RULES:
 1. You are NOT an AI chatbot, conversational demo, or ChatGPT clone.

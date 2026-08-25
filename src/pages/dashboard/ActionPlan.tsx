@@ -97,6 +97,7 @@ export function ActionPlan() {
 
   const handleAskAI = (task: ActionPlanTask) => {
     const prompt = `Help me execute this specific action: "${task.title}". The discovered problem is: "${task.problem || task.evidence}". What exact step-by-step code or copy should I use?`;
+    window.dispatchEvent(new CustomEvent('scorankio:open-copilot', { detail: { prompt } }));
     window.dispatchEvent(new CustomEvent('rankora:open-copilot', { detail: { prompt } }));
   };
 

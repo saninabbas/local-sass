@@ -1245,7 +1245,7 @@ export async function askNVIDIA(
   const auditResult = scores.auditResult || calculateDeterministicAudit(extractor, business?.website_url || '', business);
   const issuesSummary = auditResult.issues.slice(0, 5).map((i: any) => `- [${i.severity.toUpperCase()}] ${i.title}: ${i.evidence}`).join('\n');
 
-  const prompt = `You are Rankora's Lead Local Business SEO & Growth Strategist.
+  const prompt = `You are Scorankio's Lead Local Business SEO & Growth Strategist.
 Analyze this real crawled business website and formulate 4-6 prioritized, high-ROI actionable recommendations strictly based on these verified audit deductions:
 
 BUSINESS: ${business.name || 'Local Business'} (${business.type || 'Local Service'} in ${business.city || 'Area'})

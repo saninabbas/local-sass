@@ -57,7 +57,7 @@ export function FreeAudit() {
       {/* Navigation Header */}
       <header className="px-6 py-4 border-b border-[#e6dfd8] flex items-center justify-between max-w-7xl mx-auto w-full">
         <Link to="/" className="flex items-center gap-2">
-          <img src="/brand/logo.svg" alt="Rankora" className="w-28 h-auto" />
+          <img src="/brand/logo.svg" alt="Scorankio" className="w-28 h-auto" />
         </Link>
         <div className="flex items-center gap-3">
           <Link to="/login" className="text-xs font-semibold text-[#6c6a64] hover:text-[#141413]">
@@ -261,7 +261,7 @@ export function FreeAudit() {
 
       {/* Footer */}
       <footer className="px-6 py-6 border-t border-[#e6dfd8] text-center text-xs text-[#8e8b82] font-mono">
-        &copy; {new Date().getFullYear()} Rankora &bull; Professional Local SEO Operating System
+        &copy; {new Date().getFullYear()} Scorankio &bull; Professional Local SEO Operating System
       </footer>
 
     </div>
