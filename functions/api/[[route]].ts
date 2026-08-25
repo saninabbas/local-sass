@@ -162,7 +162,26 @@ export const onRequest = async (context: any) => {
     const { request, env } = context;
     const url = new URL(request.url);
 
-    const requestOrigin = request.headers.get('Origin') || '*';
+    const rawOrigin = request.headers.get('Origin');
+    const allowedOrigins = [
+      'https://scorankio.com',
+      'https://app.scorankio.com',
+      'https://scorankio.site',
+      'https://app.scorankio.site',
+      'https://local-sass.pages.dev',
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'http://localhost:8788',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3000'
+    ];
+    const isAllowedOrigin = rawOrigin && (
+      allowedOrigins.includes(rawOrigin) || 
+      rawOrigin.endsWith('.local-sass.pages.dev') ||
+      rawOrigin.endsWith('.scorankio.com') ||
+      rawOrigin.endsWith('.scorankio.site')
+    );
+    const requestOrigin = isAllowedOrigin ? rawOrigin : (rawOrigin || '*');
 
     const jsonResponse = (data: any, status = 200, customHeaders: HeadersInit = {}) => {
       const headers = new Headers(customHeaders);
