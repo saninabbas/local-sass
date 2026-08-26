@@ -1541,14 +1541,15 @@ export const onRequest = async (context: any) => {
         const resetLink = `${url.origin}/reset-password?token=${resetToken}&email=${encodeURIComponent(user.email as string)}`;
 
         // Dispatch branded password reset email from hi@seoranko.site (Resend/SendGrid)
-        sendPasswordResetEmail(cleanEmail, resetLink, env).catch((err) => {
+        try {
+          await sendPasswordResetEmail(cleanEmail, resetLink, env);
+        } catch (err) {
           console.error("Failed to dispatch password reset email:", err);
-        });
+        }
 
         return jsonResponse({
           success: true,
-          message: "Password reset link generated and sent to your email address.",
-          resetLink
+          message: "Password reset link sent to your email address."
         });
       }
 

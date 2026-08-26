@@ -73,30 +73,16 @@ export function Signup() {
               We have sent a verification link to <strong className="text-[#141413]">{email}</strong>.
             </p>
 
-            <div className="p-3.5 bg-[#faf9f5] rounded-xl border border-[#e6dfd8] text-xs text-[#252523] flex items-start gap-2 text-left">
+            <div className="p-4 bg-[#faf9f5] rounded-xl border border-[#e6dfd8] text-xs text-[#3d3d3a] flex items-start gap-2.5 text-left">
               <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-[#5db872]" />
-              <span>Please check your inbox to verify your account, or click the instant test button below:</span>
+              <span className="leading-relaxed">
+                Please check your inbox (and spam folder). Click the verification link inside the email from <strong>Scorankio</strong> to activate your business dashboard.
+              </span>
             </div>
 
-            {devLink ? (
-              <div className="p-3.5 bg-[#efe9de] rounded-xl border border-[#cc785c]/30 text-left space-y-2">
-                <span className="text-[11px] font-mono font-bold text-[#cc785c] uppercase tracking-wide">⚡ Quick Test Verification</span>
-                <p className="text-xs text-[#3d3d3a]">Click below to verify your email right now without opening inbox:</p>
-                <a href={devLink} className="inline-flex items-center gap-2 text-xs font-medium text-white bg-[#cc785c] hover:bg-[#a9583e] px-4 py-2 rounded-lg transition-colors w-full justify-center shadow-sm">
-                  <span>Click Here To Verify Email Instantly</span> <ExternalLink size={14} />
-                </a>
-              </div>
-            ) : (
-              <div className="pt-2">
-                <a href={`/api/auth/verify?token=test`} className="text-xs text-[#cc785c] underline">
-                  Verify Email
-                </a>
-              </div>
-            )}
-
-            <div className="pt-4 border-t border-[#e6dfd8]">
+            <div className="pt-3 space-y-2">
               <Link to="/login">
-                <Button variant="primary" size="md" className="w-full bg-[#cc785c] hover:bg-[#a9583e]">
+                <Button variant="primary" size="md" className="w-full bg-[#cc785c] hover:bg-[#a9583e] text-xs font-medium">
                   Proceed to Log In
                 </Button>
               </Link>

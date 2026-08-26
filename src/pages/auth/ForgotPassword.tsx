@@ -58,33 +58,37 @@ export function ForgotPassword() {
           )}
 
           {successData ? (
-            <div className="space-y-4">
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-sans text-emerald-800 space-y-2">
-                <div className="flex items-center gap-2 font-bold text-emerald-900">
-                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                  <span>Reset Link Generated!</span>
-                </div>
-                <p className="leading-relaxed">
-                  {successData.message}
-                </p>
-                {successData.resetLink && (
-                  <div className="pt-2 border-t border-emerald-200/60">
-                    <p className="font-semibold text-emerald-950 mb-1.5">Direct Reset Link:</p>
-                    <Link
-                      to={successData.resetLink.replace(/^https?:\/\/[^\/]+/, '')}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-medium text-xs transition-colors"
-                    >
-                      <KeyRound size={13} />
-                      <span>Proceed to Reset Password Now</span>
-                    </Link>
-                  </div>
-                )}
+            <div className="space-y-5 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#5db872]/20 text-[#2b753e] mb-2">
+                <Mail size={28} />
+              </div>
+              <h2 className="text-2xl font-serif font-normal text-[#141413]">Check Your Email</h2>
+              <p className="text-xs text-[#6c6a64] font-sans leading-relaxed">
+                We have sent a secure password reset link to <strong className="text-[#141413]">{email}</strong>.
+              </p>
+              
+              <div className="p-4 bg-[#faf9f5] rounded-xl border border-[#e6dfd8] text-xs text-[#3d3d3a] flex items-start gap-2.5 text-left">
+                <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-[#5db872]" />
+                <span className="leading-relaxed">
+                  Please check your inbox (and spam folder). Click the link inside the email to choose a new password. The link expires in 60 minutes.
+                </span>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-3 space-y-2">
+                <Button
+                  variant="outline"
+                  size="md"
+                  onClick={() => {
+                    setSuccessData(null);
+                    setEmail('');
+                  }}
+                  className="w-full text-xs font-medium border-[#e6dfd8] text-[#141413] hover:bg-[#faf9f5]"
+                >
+                  Send to Another Email
+                </Button>
                 <Link
                   to="/login"
-                  className="w-full flex items-center justify-center gap-2 py-2 px-4 border border-[#e6dfd8] rounded-xl text-xs font-medium text-[#141413] hover:bg-[#faf9f5] transition-colors"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-medium text-[#6c6a64] hover:text-[#141413] transition-colors"
                 >
                   <ArrowLeft size={13} />
                   <span>Back to Login</span>
