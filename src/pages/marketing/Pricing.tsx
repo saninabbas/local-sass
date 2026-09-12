@@ -134,8 +134,10 @@ export function Pricing() {
                   <p className="text-xs text-[#6c6a64] font-sans mb-6 leading-relaxed">{plan.description}</p>
 
                   <div className="flex items-baseline gap-1 mb-6 pb-6 border-b border-[#e6dfd8]">
-                    <span className="font-semibold text-4xl text-[#141413] tracking-tight">${plan.price}</span>
-                    <span className="text-xs font-mono text-[#8e8b82]">{plan.period}</span>
+                    <span className="font-semibold text-4xl text-[#141413] tracking-tight">{plan.priceFormatted}</span>
+                    <span className="text-xs font-mono text-[#8e8b82]">
+                      {billingCycle === 'yearly' ? '/month (billed annually)' : plan.period}
+                    </span>
                   </div>
 
                   <ul className="space-y-3 mb-8">
