@@ -20,7 +20,6 @@ export function Home() {
       <HowItWorksSection />
       <FeaturesSection />
       <ProductPreviewSection />
-      <TrustSection />
       <PricingSection />
       <FAQSection />
       <CTASection />
