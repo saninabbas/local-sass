@@ -117,6 +117,11 @@ function App() {
                   <AdminRoute />
                 </ProtectedRoute>
               } />
+              <Route path="/admin/dashboard" element={
+                <ProtectedRoute>
+                  <AdminRoute />
+                </ProtectedRoute>
+              } />
 
               <Route path="/onboarding" element={
                 <ProtectedRoute>
@@ -127,6 +132,8 @@ function App() {
               <Route element={<ProtectedRoute />}>
                 <Route path="/dashboard" element={<DashboardSuspense><Dashboard /></DashboardSuspense>} />
                 <Route path="/dashboard/businesses" element={<DashboardSuspense><Businesses /></DashboardSuspense>} />
+                <Route path="/dashboard/websites" element={<DashboardSuspense><Businesses /></DashboardSuspense>} />
+                <Route path="/dashboard/projects" element={<DashboardSuspense><Businesses /></DashboardSuspense>} />
                 <Route path="/dashboard/score" element={<DashboardSuspense><Score /></DashboardSuspense>} />
                 <Route path="/dashboard/website" element={<DashboardSuspense><Website /></DashboardSuspense>} />
                 <Route path="/dashboard/competitors" element={<DashboardSuspense><Competitors /></DashboardSuspense>} />
