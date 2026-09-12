@@ -24,7 +24,7 @@ export function Contact() {
                 <div>
                   <h3 className="text-base font-serif font-medium text-[#141413]">Email Support</h3>
                   <p className="mt-2 text-xs leading-relaxed text-[#3d3d3a] font-sans">
-                    You can reach us anytime at <a href="mailto:support@scorankio.site" className="text-[#cc785c] font-medium hover:underline">support@scorankio.site</a>. We typically reply within 24 hours.
+                    You can reach us anytime at <a href="mailto:support@seoranko.site" className="text-[#cc785c] font-medium hover:underline">support@seoranko.site</a>. We typically reply within 24 hours.
                   </p>
                 </div>
               </div>
