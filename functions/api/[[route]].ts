@@ -24,6 +24,7 @@ import {
   normalizePlanKey,
   resolvePolarProductId,
   resolvePolarProductIdAsync,
+  resolvePolarProductAndPriceAsync,
   resolvePlanFromPolarProductId,
   fetchPolarProducts,
   getUserPlanLimit as getPlanLimitFromEngine,
@@ -161,6 +162,7 @@ const ensureDbAndAdminSingleton = (env: any): Promise<void> => {
 export const onRequest = async (context: any) => {
     const { request, env } = context;
     const url = new URL(request.url);
+    const ensureAdminUser = () => ensureDbAndAdminSingleton(env);
 
     const rawOrigin = request.headers.get('Origin');
     const allowedOrigins = [
@@ -3761,12 +3763,13 @@ export const onRequest = async (context: any) => {
         const payload = await request.json().catch(() => ({})) as any;
         const requestedPlan = payload.plan || payload.planType || 'growth';
         const normPlan = normalizePlanKey(requestedPlan);
-        const targetProductId = await resolvePolarProductIdAsync(normPlan, env, polarToken);
+        const { productId: targetProductId, productPriceId: targetPriceId } = await resolvePolarProductAndPriceAsync(normPlan, env, polarToken);
 
         const successUrl = `${url.origin}/dashboard/billing?checkout=success&plan=${normPlan}`;
         const checkoutRes = await createPolarCheckoutSession({
           polarToken,
           productId: targetProductId,
+          productPriceId: targetPriceId,
           customerEmail: user.email,
           customerName: user.name,
           userId: user.id,
