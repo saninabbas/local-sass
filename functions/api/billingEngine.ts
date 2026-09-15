@@ -14,6 +14,7 @@ export interface PolarPlanConfig {
   auditLimit: number;
   envVar: string;
   fallbackProductId: string;
+  fallbackPriceId: string;
 }
 
 export const POLAR_PLANS: Record<string, PolarPlanConfig> = {
@@ -25,7 +26,8 @@ export const POLAR_PLANS: Record<string, PolarPlanConfig> = {
     keywordsLimit: 25,
     auditLimit: 25,
     envVar: 'POLAR_STARTER_PRODUCT_ID',
-    fallbackProductId: 'f19a4c82-a816-47b3-b0ba-c72a6b2f46cc' // Rankora.Starter
+    fallbackProductId: 'f19a4c82-a816-47b3-b0ba-c72a6b2f46cc', // Rankora.Starter
+    fallbackPriceId: '194fcd66-f78a-4146-8aa1-8ff48a951db0'   // $15/mo USD
   },
   growth: {
     key: 'growth',
@@ -35,7 +37,8 @@ export const POLAR_PLANS: Record<string, PolarPlanConfig> = {
     keywordsLimit: 100,
     auditLimit: 100,
     envVar: 'POLAR_GROWTH_PRODUCT_ID',
-    fallbackProductId: '71c9c886-3ebb-4790-a87b-438694f22463' // Rankora.Growth
+    fallbackProductId: '71c9c886-3ebb-4790-a87b-438694f22463', // Rankora.Growth
+    fallbackPriceId: '2460532a-cae5-4b86-bf73-58ba04a6ec3a'   // $30/mo USD
   },
   agency_pro: {
     key: 'agency_pro',
@@ -45,7 +48,8 @@ export const POLAR_PLANS: Record<string, PolarPlanConfig> = {
     keywordsLimit: 1000,
     auditLimit: 500,
     envVar: 'POLAR_AGENCY_PRO_PRODUCT_ID',
-    fallbackProductId: '47bdc1ba-789c-4a0c-88de-b7a7b5e43d21' // Rankora.Agency Pro
+    fallbackProductId: '47bdc1ba-789c-4a0c-88de-b7a7b5e43d21', // Rankora.Agency Pro
+    fallbackPriceId: '687f2eb8-8286-4d01-90e8-de2df1909416'   // $80/mo USD
   }
 };
 
@@ -55,7 +59,7 @@ export interface PolarProductItem {
   description?: string;
   is_recurring?: boolean;
   is_archived?: boolean;
-  prices?: Array<{ id: string; price_amount: number; price_currency: string }>;
+  prices?: Array<{ id: string; price_amount?: number; price_currency?: string; amount?: number; currency?: string }>;
 }
 
 /**
@@ -94,61 +98,75 @@ export async function fetchPolarProducts(polarToken: string): Promise<PolarProdu
 }
 
 /**
- * Resolves the configured Polar Product ID for a given plan from Cloudflare environment variables
- * or dynamically from Polar's live product catalog.
+ * Resolves both Polar Product ID and USD Price ID for a plan
  */
-export async function resolvePolarProductIdAsync(planKey: string, env: any, polarToken?: string): Promise<string> {
+export async function resolvePolarProductAndPriceAsync(
+  planKey: string,
+  env: any,
+  polarToken?: string
+): Promise<{ productId: string; productPriceId?: string }> {
   const normKey = normalizePlanKey(planKey);
   const plan = POLAR_PLANS[normKey];
 
+  let productId = '';
+  let productPriceId = '';
+
   // 1. Explicit environment variable overrides
-  if (normKey === 'starter' && env.POLAR_STARTER_PRODUCT_ID) {
-    return env.POLAR_STARTER_PRODUCT_ID;
-  }
-  if (normKey === 'growth' && (env.POLAR_GROWTH_PRODUCT_ID || env.POLAR_PRODUCT_ID)) {
-    return env.POLAR_GROWTH_PRODUCT_ID || env.POLAR_PRODUCT_ID;
-  }
-  if (normKey === 'agency_pro' && env.POLAR_AGENCY_PRO_PRODUCT_ID) {
-    return env.POLAR_AGENCY_PRO_PRODUCT_ID;
+  if (normKey === 'starter') {
+    productId = env.POLAR_STARTER_PRODUCT_ID || '';
+    productPriceId = env.POLAR_STARTER_PRICE_ID || '';
+  } else if (normKey === 'growth') {
+    productId = env.POLAR_GROWTH_PRODUCT_ID || env.POLAR_PRODUCT_ID || '';
+    productPriceId = env.POLAR_GROWTH_PRICE_ID || env.POLAR_PRICE_ID || '';
+  } else if (normKey === 'agency_pro') {
+    productId = env.POLAR_AGENCY_PRO_PRODUCT_ID || '';
+    productPriceId = env.POLAR_AGENCY_PRO_PRICE_ID || '';
   }
 
-  // 2. Query Polar live product catalog for automatic discovery
+  // 2. Query Polar live product catalog for automatic discovery and USD price resolution
   const token = polarToken || env.POLAR_ACCESS_TOKEN || (env as any).POLAR_API_KEY || (env as any).POLAR_TOKEN;
-  if (token) {
+  if (token && (!productId || !productPriceId)) {
     const products = await fetchPolarProducts(token);
     if (products.length > 0) {
-      // Match by name keyword
       const matched = products.find(p => {
         const name = p.name.toLowerCase();
         if (normKey === 'starter') return name.includes('starter') || name.includes('basic') || name.includes('tier 1') || name.includes('small');
         if (normKey === 'growth') return name.includes('growth') || name.includes('standard') || name.includes('tier 2') || (name.includes('pro') && !name.includes('agency'));
         if (normKey === 'agency_pro') return name.includes('agency') || name.includes('enterprise') || name.includes('tier 3') || name.includes('unlimited');
         return false;
-      });
+      }) || (products.length === 1 ? products[0] : null);
 
       if (matched) {
-        return matched.id;
+        if (!productId) productId = matched.id;
+        if (!productPriceId && Array.isArray(matched.prices) && matched.prices.length > 0) {
+          // Prioritize USD price > 0 to prevent 0 PKR default tier
+          const usdPrice = matched.prices.find(pr => {
+            const curr = (pr.price_currency || pr.currency || '').toLowerCase();
+            const amt = pr.price_amount ?? pr.amount ?? 0;
+            return curr === 'usd' && amt > 0;
+          });
+          const nonZeroPrice = matched.prices.find(pr => {
+            const amt = pr.price_amount ?? pr.amount ?? 0;
+            return amt > 0;
+          });
+          productPriceId = usdPrice?.id || nonZeroPrice?.id || matched.prices[0].id;
+        }
       }
-
-      // If only 1 product exists in the Polar organization, use it
-      if (products.length === 1) {
-        return products[0].id;
-      }
-
-      // If multiple products exist, sort by price ascending and match tier
-      const sorted = [...products].sort((a, b) => {
-        const priceA = a.prices?.[0]?.price_amount ?? 0;
-        const priceB = b.prices?.[0]?.price_amount ?? 0;
-        return priceA - priceB;
-      });
-
-      if (normKey === 'starter') return sorted[0].id;
-      if (normKey === 'growth') return sorted[Math.min(1, sorted.length - 1)].id;
-      if (normKey === 'agency_pro') return sorted[sorted.length - 1].id;
     }
   }
 
-  return plan.fallbackProductId;
+  return {
+    productId: productId || plan.fallbackProductId,
+    productPriceId: productPriceId || plan.fallbackPriceId
+  };
+}
+
+/**
+ * Resolves the configured Polar Product ID for a given plan
+ */
+export async function resolvePolarProductIdAsync(planKey: string, env: any, polarToken?: string): Promise<string> {
+  const result = await resolvePolarProductAndPriceAsync(planKey, env, polarToken);
+  return result.productId;
 }
 
 /**
@@ -301,6 +319,7 @@ export async function verifyPolarWebhookSignature(
 export async function createPolarCheckoutSession(params: {
   polarToken: string;
   productId: string;
+  productPriceId?: string;
   customerEmail: string;
   customerName?: string;
   userId: string;
@@ -309,15 +328,18 @@ export async function createPolarCheckoutSession(params: {
 }): Promise<{ success: boolean; checkoutUrl?: string; error?: string; availableProducts?: PolarProductItem[] }> {
   try {
     let currentProductId = params.productId;
+    let currentProductPriceId = params.productPriceId;
 
-    let response = await fetch('https://api.polar.sh/v1/checkouts/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${params.polarToken}`
-      },
-      body: JSON.stringify({
-        product_id: currentProductId,
+    if (!currentProductPriceId) {
+      const normKey = normalizePlanKey(params.planKey);
+      if (POLAR_PLANS[normKey]?.fallbackPriceId) {
+        currentProductPriceId = POLAR_PLANS[normKey].fallbackPriceId;
+      }
+    }
+
+    const buildPayload = (prodId: string, priceId?: string) => {
+      const p: any = {
+        product_id: prodId,
         customer_email: params.customerEmail,
         customer_name: params.customerName || undefined,
         customer_external_id: params.userId,
@@ -326,56 +348,60 @@ export async function createPolarCheckoutSession(params: {
           plan: params.planKey
         },
         success_url: params.successUrl
-      })
+      };
+      if (priceId) {
+        p.product_price_id = priceId;
+      }
+      return p;
+    };
+
+    let response = await fetch('https://api.polar.sh/v1/checkouts/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${params.polarToken}`
+      },
+      body: JSON.stringify(buildPayload(currentProductId, currentProductPriceId))
     });
 
     let lastErrText = '';
-    // If product does not exist, attempt auto-discovery from live Polar catalog
+    // If checkout failed due to invalid price/product or 422, attempt auto-discovery from live Polar catalog
     if (!response.ok && response.status === 422) {
       lastErrText = await response.text();
-      if (lastErrText.includes("Product does not exist") || lastErrText.includes("product_id")) {
-        console.warn(`Polar Product ID '${currentProductId}' not found. Discovering active products in Polar account...`);
-        const liveProducts = await fetchPolarProducts(params.polarToken);
-        
-        if (liveProducts.length > 0) {
-          const normKey = normalizePlanKey(params.planKey);
-          let alternative = liveProducts.find(p => {
-            const name = p.name.toLowerCase();
-            if (normKey === 'starter') return name.includes('starter') || name.includes('basic');
-            if (normKey === 'growth') return name.includes('growth') || (name.includes('pro') && !name.includes('agency'));
-            if (normKey === 'agency_pro') return name.includes('agency') || name.includes('enterprise');
-            return false;
+      console.warn(`Polar checkout initial attempt failed (${response.status}): ${lastErrText}. Attempting auto-discovery...`);
+      const liveProducts = await fetchPolarProducts(params.polarToken);
+      
+      if (liveProducts.length > 0) {
+        const normKey = normalizePlanKey(params.planKey);
+        let alternative = liveProducts.find(p => {
+          const name = p.name.toLowerCase();
+          if (normKey === 'starter') return name.includes('starter') || name.includes('basic') || name.includes('tier 1');
+          if (normKey === 'growth') return name.includes('growth') || (name.includes('pro') && !name.includes('agency')) || name.includes('tier 2');
+          if (normKey === 'agency_pro') return name.includes('agency') || name.includes('enterprise') || name.includes('tier 3');
+          return false;
+        }) || (liveProducts.length === 1 ? liveProducts[0] : null);
+
+        if (alternative) {
+          currentProductId = alternative.id;
+          const usdPrice = alternative.prices?.find(pr => {
+            const curr = (pr.price_currency || pr.currency || '').toLowerCase();
+            const amt = pr.price_amount ?? pr.amount ?? 0;
+            return curr === 'usd' && amt > 0;
           });
+          const nonZeroPrice = alternative.prices?.find(pr => (pr.price_amount ?? pr.amount ?? 0) > 0);
+          currentProductPriceId = usdPrice?.id || nonZeroPrice?.id || alternative.prices?.[0]?.id;
 
-          if (!alternative) {
-            alternative = liveProducts[0];
-          }
+          console.log(`Auto-healing checkout with discovered Polar product: '${alternative.name}' (${currentProductId}), price: ${currentProductPriceId}`);
 
-          if (alternative && alternative.id !== currentProductId) {
-            console.log(`Auto-healing checkout with discovered Polar product: '${alternative.name}' (${alternative.id})`);
-            currentProductId = alternative.id;
-
-            response = await fetch('https://api.polar.sh/v1/checkouts/', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${params.polarToken}`
-              },
-              body: JSON.stringify({
-                product_id: currentProductId,
-                customer_email: params.customerEmail,
-                customer_name: params.customerName || undefined,
-                customer_external_id: params.userId,
-                metadata: {
-                  user_id: params.userId,
-                  plan: params.planKey
-                },
-                success_url: params.successUrl
-              })
-            });
-            // Reset lastErrText since we have a new response
-            lastErrText = '';
-          }
+          response = await fetch('https://api.polar.sh/v1/checkouts/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${params.polarToken}`
+            },
+            body: JSON.stringify(buildPayload(currentProductId, currentProductPriceId))
+          });
+          lastErrText = '';
         }
       }
     }
