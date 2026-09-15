@@ -43,6 +43,62 @@ export function calculatePositionChange(
   return { status: 'NOT_RANKING', positionChange: null };
 }
 
+export const calculateRankingMovement = calculatePositionChange;
+
+/**
+ * Executes a SERP keyword search against the configured provider (Serper, DataForSEO, etc.)
+ */
+export async function executeSERPSearch(
+  env: any,
+  params: {
+    keyword: string;
+    location?: string;
+    countryCode?: string;
+    languageCode?: string;
+    device?: 'desktop' | 'mobile';
+    targetDomain?: string;
+    targetUrl?: string;
+  }
+): Promise<{
+  success: boolean;
+  position: number | null;
+  rankingUrl: string | null;
+  localPackPosition: number | null;
+  competitors: Array<{ domain: string; position: number }>;
+  providerName: string;
+}> {
+  const provider = getSerpProvider(env);
+  if (provider.status === 'NOT_CONFIGURED') {
+    return {
+      success: false,
+      position: null,
+      rankingUrl: null,
+      localPackPosition: null,
+      competitors: [],
+      providerName: provider.name
+    };
+  }
+
+  const targetDomain = params.targetDomain ? normalizeDomain(params.targetDomain) : '';
+  const serpRes = await provider.getKeywordResults({
+    keyword: params.keyword,
+    location: params.location || 'United States',
+    countryCode: params.countryCode || 'US',
+    device: params.device || 'desktop',
+    targetDomain,
+    targetUrl: params.targetUrl
+  });
+
+  return {
+    success: true,
+    position: serpRes.targetPosition,
+    rankingUrl: serpRes.targetUrl || null,
+    localPackPosition: serpRes.targetLocalPosition || null,
+    competitors: (serpRes.competitorRankings || []).map(c => ({ domain: c.domain, position: c.position })),
+    providerName: provider.name
+  };
+}
+
 /**
  * Calculates organic search visibility index (0-100) based on weighted CTR distribution.
  */
