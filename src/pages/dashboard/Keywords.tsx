@@ -322,7 +322,7 @@ export function Keywords() {
         )}
 
         {/* KPI Metrics Overview Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
           <div className="p-3.5 rounded-2xl bg-white border border-[#e6dfd8] shadow-2xs">
             <span className="text-[10px] font-mono text-[#8e8b82] uppercase tracking-wider block mb-0.5">Tracked</span>
             <div className="text-2xl font-semibold text-[#141413] tracking-tight">{kpis.totalKeywords || keywords.length}</div>
