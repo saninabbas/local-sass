@@ -348,7 +348,7 @@ export function Competitors() {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           {/* Your Business Card */}
           <div className="p-4 rounded-xl border-2 border-[#cc785c] bg-[#faf9f5] shadow-xs flex flex-col justify-between">
             <div>
