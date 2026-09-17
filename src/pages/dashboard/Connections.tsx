@@ -533,7 +533,7 @@ export const Connections: React.FC = () => {
         )}
 
         {/* Provider Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
 
           {/* 1. GITHUB */}
           <div className={`rounded-2xl p-6 border transition-all flex flex-col justify-between ${
