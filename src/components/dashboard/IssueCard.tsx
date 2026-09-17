@@ -54,10 +54,10 @@ export const IssueCard: React.FC<IssueCardProps> = ({
   const Icon = config.icon;
 
   return (
-    <div className={`bg-[#efe9de] border ${config.border} rounded-2xl p-5 transition-all shadow-xs hover:border-[#cc785c]/40 flex flex-col justify-between gap-4`}>
-      <div className="space-y-3">
+    <div className={`bg-[#efe9de] border ${config.border} rounded-2xl p-4 sm:p-5 transition-all shadow-xs hover:border-[#cc785c]/40 flex flex-col justify-between gap-4 min-w-0 overflow-hidden`}>
+      <div className="space-y-3 min-w-0">
         {/* Header: Severity Badge + Category */}
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${config.badge}`}>
             {config.label}
           </span>
@@ -69,21 +69,21 @@ export const IssueCard: React.FC<IssueCardProps> = ({
         </div>
 
         {/* Title */}
-        <h4 className="text-base font-serif font-medium text-[#141413] leading-snug flex items-start gap-2">
+        <h4 className="text-sm sm:text-base font-serif font-medium text-[#141413] leading-snug flex items-start gap-2 break-words">
           <Icon size={18} className="text-[#cc785c] flex-shrink-0 mt-0.5" />
-          <span>{issue.title}</span>
+          <span className="min-w-0">{issue.title}</span>
         </h4>
 
         {/* 1-Line Impact Explanation */}
-        <p className="text-xs text-[#6c6a64] font-sans leading-relaxed">
+        <p className="text-xs text-[#6c6a64] font-sans leading-relaxed break-words">
           <strong className="text-[#141413] font-medium">Impact: </strong>
           {issue.impact}
         </p>
 
         {/* Evidence Box */}
         {issue.evidence && (
-          <div className="bg-[#efe9de]/50 border border-[#e6dfd8] rounded-xl p-3 text-xs font-mono text-[#4a4843] flex items-start justify-between gap-2">
-            <div className="space-y-1 overflow-hidden">
+          <div className="bg-[#efe9de]/50 border border-[#e6dfd8] rounded-xl p-3 text-xs font-mono text-[#4a4843] flex items-start justify-between gap-2 min-w-0">
+            <div className="space-y-1 min-w-0 overflow-hidden flex-1">
               <span className="text-[10px] font-mono text-[#8e8b82] uppercase block font-bold">
                 Observed Evidence:
               </span>
@@ -106,7 +106,7 @@ export const IssueCard: React.FC<IssueCardProps> = ({
       </div>
 
       {/* Footer Action Buttons */}
-      <div className="pt-3 border-t border-[#e6dfd8]/60 flex items-center justify-between gap-2">
+      <div className="pt-3 border-t border-[#e6dfd8]/60 flex flex-wrap items-center justify-between gap-2">
         {onViewEvidence && (
           <button
             onClick={() => onViewEvidence(issue)}
