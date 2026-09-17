@@ -54,32 +54,34 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   };
 
   return (
-    <div className="bg-white border border-[#e6dfd8] rounded-2xl p-6 shadow-2xs hover:border-[#cc785c]/40 transition-all flex flex-col justify-between">
-      <div>
+    <div className="bg-white border border-[#e6dfd8] rounded-2xl p-4 sm:p-5 shadow-2xs hover:border-[#cc785c]/40 transition-all flex flex-col justify-between min-w-0">
+      <div className="min-w-0">
         {/* Header: Title, Icon, Status */}
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#efe9de]/60 border border-[#e6dfd8]/60 flex items-center justify-center text-[#cc785c]">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-[#efe9de]/60 border border-[#e6dfd8]/60 flex items-center justify-center text-[#cc785c] shrink-0">
               <Icon size={15} />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-1">
-                <span className="text-[10px] font-mono font-bold tracking-wider text-[#8e8b82] uppercase">
+                <span className="text-[10px] font-mono font-bold tracking-wider text-[#8e8b82] uppercase truncate">
                   {title}
                 </span>
                 {tooltip && (
-                  <span title={tooltip} className="text-[#8e8b82] hover:text-[#141413] cursor-help">
+                  <span title={tooltip} className="text-[#8e8b82] hover:text-[#141413] cursor-help shrink-0">
                     <HelpCircle size={11} />
                   </span>
                 )}
               </div>
             </div>
           </div>
-          {getStatusBadge()}
+          <div className="shrink-0">
+            {getStatusBadge()}
+          </div>
         </div>
 
         {/* Primary Metric Value */}
-        <div className="my-2 flex items-baseline gap-2">
+        <div className="my-2 flex flex-wrap items-baseline gap-2">
           <span className="text-2xl sm:text-3xl font-semibold text-[#141413] tracking-tight">
             {value}
           </span>
@@ -108,15 +110,15 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 
         {/* Subtitle / 1-line note */}
         {subtitle && (
-          <p className="text-xs text-[#6c6a64] font-sans line-clamp-1 mb-3">
+          <p className="text-xs text-[#6c6a64] font-sans line-clamp-2 sm:line-clamp-1 mb-3">
             {subtitle}
           </p>
         )}
       </div>
 
       {/* Footer: Provenance (Source + Checked) & Action */}
-      <div className="mt-3 pt-3 border-t border-[#e6dfd8]/60 flex items-center justify-between text-[11px] font-mono text-[#8e8b82]">
-        <div className="flex items-center gap-1.5 truncate">
+      <div className="mt-3 pt-3 border-t border-[#e6dfd8]/60 flex flex-wrap items-center justify-between gap-1 text-[11px] font-mono text-[#8e8b82]">
+        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
           {source && (
             <span className="truncate">
               Src: <span className="text-[#141413] font-medium">{source}</span>
@@ -129,7 +131,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
         {action && (
           <button
             onClick={action.onClick}
-            className="text-[#cc785c] hover:text-[#b36248] font-sans font-semibold text-xs ml-2 hover:underline cursor-pointer flex-shrink-0"
+            className="text-[#cc785c] hover:text-[#b36248] font-sans font-semibold text-xs ml-auto hover:underline cursor-pointer flex-shrink-0"
           >
             {action.label}
           </button>
