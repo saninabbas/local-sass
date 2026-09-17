@@ -483,7 +483,7 @@ export function Dashboard() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             <MetricCard
               title="Growth Score"
               value={`${growthScore.overall || 0}/100`}
@@ -583,7 +583,7 @@ export function Dashboard() {
               <p className="mt-1">Your website passes all fundamental local technical and indexability checks.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {topProblems.map((prob) => (
                 <IssueCard
                   key={prob.id || prob.title}
@@ -624,7 +624,7 @@ export function Dashboard() {
               <p className="mt-1">Re-run the deep audit to discover organic and 3-pack competitors in {business.city}.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {competitorsList.map((comp) => (
                 <CompetitorCard
                   key={comp.id || comp.domain}
@@ -651,7 +651,7 @@ export function Dashboard() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {todaysActions.length === 0 ? (
               <div className="col-span-3 bg-[#faf9f5] border border-[#e6dfd8] rounded-2xl p-6 text-center text-xs font-sans text-[#6c6a64]">
                 <p className="font-serif font-medium text-base text-[#141413]">All Daily Actions Completed</p>
