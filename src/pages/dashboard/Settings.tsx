@@ -205,7 +205,7 @@ export function Settings() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 pt-2">
             {/* Google Business Profile */}
             <div className="bg-[#efe9de]/30 rounded-2xl p-4 border border-[#e6dfd8] flex flex-col justify-between gap-3">
               <div className="space-y-2">
