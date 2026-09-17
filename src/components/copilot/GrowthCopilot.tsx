@@ -220,18 +220,18 @@ export function GrowthCopilot({ businessName }: GrowthCopilotProps) {
           onClick={() => setIsOpen(true)}
           title="Growth Intelligence"
           aria-label="Open Growth Intelligence Console"
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 px-4 py-2.5 bg-[#141413] hover:bg-[#252320] text-[#faf9f5] rounded-full shadow-2xl border border-[#e6dfd8]/30 transition-all duration-200 hover:scale-105 cursor-pointer font-sans text-xs group"
+          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-[#141413] hover:bg-[#252320] text-[#faf9f5] rounded-full shadow-2xl border border-[#e6dfd8]/30 transition-all duration-200 hover:scale-105 cursor-pointer font-sans text-xs group"
         >
           <span className="w-2 h-2 rounded-full bg-[#5db872] animate-pulse" />
           <Radio size={14} className="text-[#cc785c]" />
-          <span className="font-semibold tracking-wide uppercase text-[11px]">Growth Intelligence</span>
+          <span className="font-semibold tracking-wide uppercase text-[10px] sm:text-[11px]">Growth Intelligence</span>
         </button>
       )}
 
       {/* Slide-out Console Drawer Panel */}
       {isOpen && (
         <div 
-          className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-[#faf9f5] shadow-2xl border-l border-[#e6dfd8] flex flex-col animate-in slide-in-from-right-8 duration-200"
+          className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] max-w-full bg-[#faf9f5] shadow-2xl border-l border-[#e6dfd8] flex flex-col animate-in slide-in-from-right-8 duration-200"
           role="dialog"
           aria-label="Growth Intelligence Console"
         >
