@@ -28,3 +28,5 @@ dist-ssr
 .env*
 test_serp_live.ts
 test_e2e.mjs
+scratch/
+scratch_temp_commit.json

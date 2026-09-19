@@ -2177,15 +2177,20 @@ export const onRequest = async (context: any) => {
         const user = await authenticate();
         if (!user) return errorResponse("Unauthorized", 401);
 
-        const { name, type, city, country, websiteUrl } = await request.json() as any;
+        const { name, type, city, country, websiteUrl } = await request.json().catch(() => ({})) as any;
         const normDomain = normalizeDomain(websiteUrl || '');
         const bizId = generateId('biz');
+        const cleanName = (name || '').trim() || (normDomain ? normDomain.split('.')[0] : 'My Business');
 
-        await env.DB.prepare(
-          "INSERT INTO businesses (id, user_id, name, type, city, country, website_url, normalized_domain, is_default, is_archived) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0)"
-        ).bind(bizId, user.id, name, type, city, country, websiteUrl, normDomain).run();
+        try {
+          await env.DB.prepare(
+            "INSERT INTO businesses (id, user_id, name, type, city, country, website_url, normalized_domain, is_default, is_archived) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0)"
+          ).bind(bizId, user.id, cleanName, type || '', city || '', country || '', websiteUrl || '', normDomain).run();
 
-        return jsonResponse({ success: true, data: { id: bizId } });
+          return jsonResponse({ success: true, data: { id: bizId } });
+        } catch (err: any) {
+          return errorResponse("Failed to create business: " + err.message, 400);
+        }
       }
 
       if (url.pathname === '/api/business' && request.method === 'PUT') {
@@ -2718,7 +2723,8 @@ export const onRequest = async (context: any) => {
 
         let body: any;
         try { body = await request.json(); } catch { return errorResponse("Invalid JSON", 400); }
-        if (!body.type) return errorResponse("Fix type is required", 400);
+        const fixType = body.type || body.fixType;
+        if (!fixType) return errorResponse("Fix type is required", 400);
 
         const targetBizId = body.business_id || url.searchParams.get('business_id') || request.headers.get('X-Business-Id');
         let business;
@@ -2745,7 +2751,7 @@ export const onRequest = async (context: any) => {
 
         const { generateAIFix } = await import('./aiFixEngine');
         const fixResult = await generateAIFix(env.NVIDIA_API_KEY, {
-          type: body.type,
+          type: fixType,
           context
         });
 
