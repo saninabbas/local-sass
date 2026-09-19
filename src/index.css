@@ -1,0 +1,177 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --claude-primary: #cc785c;
+    --claude-primary-active: #a9583e;
+    --claude-primary-disabled: #e6dfd8;
+    --claude-ink: #141413;
+    --claude-body: #3d3d3a;
+    --claude-body-strong: #252523;
+    --claude-muted: #6c6a64;
+    --claude-muted-soft: #8e8b82;
+    --claude-hairline: #e6dfd8;
+    --claude-hairline-soft: #ebe6df;
+    --claude-canvas: #faf9f5;
+    --claude-surface-soft: #f5f0e8;
+    --claude-surface-card: #efe9de;
+    --claude-surface-cream-strong: #e8e0d2;
+    --claude-surface-dark: #181715;
+    --claude-surface-dark-elevated: #252320;
+    --claude-surface-dark-soft: #1f1e1b;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  body {
+    background-color: #faf9f5;
+    color: #141413;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 400;
+    line-height: 1.5;
+    letter-spacing: -0.011em;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  /* Plus Jakarta Sans for major headings, page titles, and section headers */
+  h1, h2, h3, h4, h5, h6, .font-heading, .font-display, .font-serif {
+    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    letter-spacing: -0.025em;
+  }
+
+  h1 {
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  h2 {
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  h3, h4 {
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  /* Inter for body text, navigation, buttons, tables, labels, metrics, and form elements */
+  p, span, label, input, textarea, select, table, th, td {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  p {
+    line-height: 1.6;
+  }
+
+  /* Navigation & Sidebar: Inter 500 */
+  nav, aside, .sidebar, [role="navigation"] {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  /* Buttons: Inter 500-600 */
+  button, .btn {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  /* Tables: Inter with tabular numbers */
+  table, .tabular-nums, .font-tabular {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+
+  th {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  td {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 400;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Custom animations for Claude Agentic Computer Use Chrome */
+@keyframes claudePulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.3;
+  }
+}
+
+@keyframes clickRipple {
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+@keyframes scanLine {
+  0% {
+    top: 0%;
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0.2;
+  }
+}
+
+.animate-claude-pulse {
+  animation: claudePulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-click-ripple {
+  animation: clickRipple 0.6s cubic-bezier(0, 0, 0.2, 1) forwards;
+}
+
+.animate-scan-line {
+  animation: scanLine 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Custom scrollbars for code & simulated browser */
+.custom-claude-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-claude-scrollbar::-webkit-scrollbar-track {
+  background: #181715;
+}
+.custom-claude-scrollbar::-webkit-scrollbar-thumb {
+  background: #2e2c28;
+  border-radius: 4px;
+}
+.custom-claude-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #423f39;
+}
+
