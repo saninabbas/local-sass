@@ -179,13 +179,13 @@ Allow: /
             <FileText className="w-4 h-4 text-blue-500" />
           </div>
           <div className="text-3xl font-extrabold font-heading text-slate-900 dark:text-white">
-            {geoAudit?.direct_answers_score ?? 78}%
+            {geoAudit ? `${geoAudit.direct_answers_score}%` : '—'}
           </div>
           <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-            <div className="bg-blue-600 h-full rounded-full" style={{ width: `${geoAudit?.direct_answers_score ?? 78}%` }} />
+            <div className="bg-blue-600 h-full rounded-full" style={{ width: `${geoAudit?.direct_answers_score ?? 0}%` }} />
           </div>
           <p className="text-[11px] text-slate-400">
-            Clear, concise answers directly below question headings
+            {geoAudit ? 'Clear, concise answers directly below question headings' : 'Click Run Full GEO Audit to test'}
           </p>
         </div>
 
@@ -195,13 +195,13 @@ Allow: /
             <Sparkles className="w-4 h-4 text-indigo-500" />
           </div>
           <div className="text-3xl font-extrabold font-heading text-slate-900 dark:text-white">
-            {geoAudit?.information_gain_score ?? 82}%
+            {geoAudit ? `${geoAudit.information_gain_score}%` : '—'}
           </div>
           <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-            <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${geoAudit?.information_gain_score ?? 82}%` }} />
+            <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${geoAudit?.information_gain_score ?? 0}%` }} />
           </div>
           <p className="text-[11px] text-slate-400">
-            Unique metrics, case proof, and original insights
+            {geoAudit ? 'Unique metrics, case proof, and original insights' : 'Click Run Full GEO Audit to test'}
           </p>
         </div>
 
@@ -211,13 +211,13 @@ Allow: /
             <Layers className="w-4 h-4 text-emerald-500" />
           </div>
           <div className="text-3xl font-extrabold font-heading text-slate-900 dark:text-white">
-            {geoAudit?.structured_data_health ?? 85}%
+            {geoAudit ? `${geoAudit.structured_data_health}%` : '—'}
           </div>
           <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-            <div className="bg-emerald-600 h-full rounded-full" style={{ width: `${geoAudit?.structured_data_health ?? 85}%` }} />
+            <div className="bg-emerald-600 h-full rounded-full" style={{ width: `${geoAudit?.structured_data_health ?? 0}%` }} />
           </div>
           <p className="text-[11px] text-slate-400">
-            Organization, LocalBusiness, FAQPage JSON-LD
+            {geoAudit ? 'Organization, LocalBusiness, FAQPage JSON-LD' : 'Click Run Full GEO Audit to test'}
           </p>
         </div>
 
@@ -227,16 +227,62 @@ Allow: /
             <Globe className="w-4 h-4 text-purple-500" />
           </div>
           <div className="text-3xl font-extrabold font-heading text-slate-900 dark:text-white">
-            {geoAudit?.entity_clarity_score ?? 90}%
+            {geoAudit ? `${geoAudit.entity_clarity_score}%` : '—'}
           </div>
           <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-            <div className="bg-purple-600 h-full rounded-full" style={{ width: `${geoAudit?.entity_clarity_score ?? 90}%` }} />
+            <div className="bg-purple-600 h-full rounded-full" style={{ width: `${geoAudit?.entity_clarity_score ?? 0}%` }} />
           </div>
           <p className="text-[11px] text-slate-400">
-            Consistent brand name, addresses, and social links
+            {geoAudit ? 'Consistent brand name, addresses, and social links' : 'Click Run Full GEO Audit to test'}
           </p>
         </div>
       </div>
+
+      {/* GEO Detailed Findings & Recommendations if audit exists */}
+      {geoAudit && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="p-6 bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-sm space-y-4">
+            <h3 className="text-base font-semibold font-heading text-slate-900 dark:text-white flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              GEO Audit Aspect Findings ({geoAudit.page_url})
+            </h3>
+            <div className="space-y-3">
+              {(geoAudit.findings || []).map((f, i) => (
+                <div key={i} className="p-3.5 rounded-xl border border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-800/50 space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-900 dark:text-white">{f.aspect}</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      f.status === 'optimal' || f.status === 'good' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300' :
+                      f.status === 'needs_work' || f.status === 'partial' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300' :
+                      'bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300'
+                    }`}>
+                      {f.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">{f.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-6 bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-sm space-y-4">
+            <h3 className="text-base font-semibold font-heading text-slate-900 dark:text-white flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              Prioritized Optimization Action Plan
+            </h3>
+            <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-300">
+              {(geoAudit.recommendations || []).map((rec, i) => (
+                <li key={i} className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/60">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-[10px]">
+                    {i + 1}
+                  </span>
+                  <span className="leading-relaxed">{rec}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* AI Crawlers & Robots.txt Directives Table */}
       <div className="bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-sm overflow-hidden">

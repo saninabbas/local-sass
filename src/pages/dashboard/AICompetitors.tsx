@@ -149,23 +149,26 @@ export function AICompetitors() {
             </div>
 
             {/* Competitor Bars */}
-            {(data?.competitors && data.competitors.length > 0 ? data.competitors : [
-              { id: '1', name: 'Competitor A', domain: 'competitora.com', mentionsCount: 4, citationsCount: 2, shareOfVoicePercent: 45 },
-              { id: '2', name: 'Competitor B', domain: 'competitorb.com', mentionsCount: 2, citationsCount: 1, shareOfVoicePercent: 30 }
-            ]).map((c) => (
-              <div key={c.id}>
-                <div className="flex justify-between text-xs font-medium mb-1 text-slate-700 dark:text-slate-300">
-                  <span>{c.name}</span>
-                  <span className="font-bold text-slate-900 dark:text-white">{c.shareOfVoicePercent}%</span>
+            {data?.competitors && data.competitors.length > 0 ? (
+              data.competitors.map((c) => (
+                <div key={c.id}>
+                  <div className="flex justify-between text-xs font-medium mb-1 text-slate-700 dark:text-slate-300">
+                    <span>{c.name}</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{c.shareOfVoicePercent}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-slate-400 dark:bg-slate-500 h-full rounded-full transition-all duration-500"
+                      style={{ width: `${Math.max(5, c.shareOfVoicePercent)}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full bg-slate-100 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
-                  <div
-                    className="bg-slate-400 dark:bg-slate-500 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${Math.max(5, c.shareOfVoicePercent)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-xs text-slate-500 dark:text-slate-400 italic py-2">
+                No competitor mentions detected yet. Add competitors in Competitors module and execute AI search query runs.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -181,43 +184,46 @@ export function AICompetitors() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-100 dark:border-slate-700/60 bg-slate-50/75 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 font-semibold">
-                <th className="py-3 px-4">Competitor Name</th>
-                <th className="py-3 px-4">Domain</th>
-                <th className="py-3 px-4 text-center">AI Mentions</th>
-                <th className="py-3 px-4 text-center">AI Citations</th>
-                <th className="py-3 px-4 text-right">Share of Voice</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
-              {(data?.competitors && data.competitors.length > 0 ? data.competitors : [
-                { id: '1', name: 'Competitor A', domain: 'competitora.com', mentionsCount: 4, citationsCount: 2, shareOfVoicePercent: 45 },
-                { id: '2', name: 'Competitor B', domain: 'competitorb.com', mentionsCount: 2, citationsCount: 1, shareOfVoicePercent: 30 }
-              ]).map((c) => (
-                <tr key={c.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
-                  <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
-                    {c.name}
-                  </td>
-                  <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 font-mono">
-                    {c.domain || 'N/A'}
-                  </td>
-                  <td className="py-3.5 px-4 text-center font-bold text-slate-700 dark:text-slate-300">
-                    {c.mentionsCount}
-                  </td>
-                  <td className="py-3.5 px-4 text-center font-bold text-indigo-600 dark:text-indigo-400">
-                    {c.citationsCount}
-                  </td>
-                  <td className="py-3.5 px-4 text-right font-bold text-slate-900 dark:text-white">
-                    {c.shareOfVoicePercent}%
-                  </td>
+        {data?.competitors && data.competitors.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-slate-700/60 bg-slate-50/75 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 font-semibold">
+                  <th className="py-3 px-4">Competitor Name</th>
+                  <th className="py-3 px-4">Domain</th>
+                  <th className="py-3 px-4 text-center">AI Mentions</th>
+                  <th className="py-3 px-4 text-center">AI Citations</th>
+                  <th className="py-3 px-4 text-right">Share of Voice</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
+                {data.competitors.map((c) => (
+                  <tr key={c.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
+                    <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
+                      {c.name}
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 font-mono">
+                      {c.domain || 'N/A'}
+                    </td>
+                    <td className="py-3.5 px-4 text-center font-bold text-slate-700 dark:text-slate-300">
+                      {c.mentionsCount}
+                    </td>
+                    <td className="py-3.5 px-4 text-center font-bold text-indigo-600 dark:text-indigo-400">
+                      {c.citationsCount}
+                    </td>
+                    <td className="py-3.5 px-4 text-right font-bold text-slate-900 dark:text-white">
+                      {c.shareOfVoicePercent}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center text-xs text-slate-500 dark:text-slate-400">
+            No competitor mentions or citations recorded in AI search engine snapshots yet.
+          </div>
+        )}
       </div>
     </div>
   );

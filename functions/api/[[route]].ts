@@ -9581,24 +9581,10 @@ export const onRequest = async (context: any) => {
             });
           }
 
-          // Return default baseline if not audited yet
+          // Return null if not audited yet (no fake numbers)
           return jsonResponse({
             success: true,
-            audit: {
-              page_url: business.website_url || 'https://example.com',
-              direct_answers_score: 75,
-              information_gain_score: 70,
-              structured_data_health: 80,
-              entity_clarity_score: 85,
-              overall_readiness_score: 77,
-              findings: [
-                { aspect: 'Direct Answers', status: 'good', detail: 'Heading structure supports direct answer indexing.' },
-                { aspect: 'Schema.org Markup', status: 'good', detail: 'Primary organization schema is active.' }
-              ],
-              recommendations: [
-                'Audit page content to generate explicit GEO score and actionable optimizations.'
-              ]
-            }
+            audit: null
           });
         } catch (err: any) {
           return errorResponse(err.message || "Failed to fetch content readiness audit", 500);

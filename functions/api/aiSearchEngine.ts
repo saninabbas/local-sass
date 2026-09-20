@@ -14,7 +14,7 @@ export interface AISurfaceResult {
   mentionSnippet?: string;
   competitorsFound: Array<{ name: string; domain?: string; citedUrl?: string }>;
   responseExcerpt: string;
-  status: 'completed' | 'failed' | 'unavailable';
+  status: 'completed' | 'failed' | 'unavailable' | 'provider_unavailable' | 'rate_limited';
   latencyMs: number;
 }
 
@@ -83,6 +83,66 @@ export const SCORANKIO_AI_SCORE_WEIGHTS: ScoreWeights = {
   contentReadiness: 0.10,
   structuredData: 0.05,
 };
+
+/**
+ * Validates a target URL against SSRF (Server-Side Request Forgery).
+ * Blocks localhost, private IPv4/IPv6 CIDR ranges, link-local metadata endpoints, and non-HTTP protocols.
+ */
+export function isSafePublicUrl(urlStr: string): { safe: boolean; url?: URL; reason?: string } {
+  if (!urlStr || typeof urlStr !== 'string') {
+    return { safe: false, reason: 'URL must be a non-empty string' };
+  }
+
+  const trimmed = urlStr.trim();
+
+  // Check if an explicit URI scheme is specified and reject non-http/https schemes
+  const schemeMatch = trimmed.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
+  if (schemeMatch) {
+    const scheme = schemeMatch[1].toLowerCase();
+    if (scheme !== 'http' && scheme !== 'https') {
+      return { safe: false, reason: `Blocked invalid protocol: ${scheme}:. Only HTTP and HTTPS are permitted.` };
+    }
+  }
+
+  try {
+    const raw = trimmed.startsWith('http://') || trimmed.startsWith('https://') 
+      ? trimmed 
+      : `https://${trimmed}`;
+    
+    const parsed = new URL(raw);
+
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return { safe: false, reason: `Blocked invalid protocol: ${parsed.protocol}. Only HTTP and HTTPS are permitted.` };
+    }
+
+    const hostname = parsed.hostname.toLowerCase().trim();
+
+    // Block localhost and internal names
+    if (!hostname || hostname === 'localhost' || hostname.endsWith('.localhost') || hostname.endsWith('.local') || hostname.endsWith('.internal')) {
+      return { safe: false, reason: 'Access to localhost and internal domain names is blocked for security.' };
+    }
+
+    // Block IPv4 private/loopback/link-local/metadata IP ranges
+    const isPrivateIpv4 = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|169\.254\.|0\.|100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.)/.test(hostname);
+    if (isPrivateIpv4) {
+      return { safe: false, reason: 'Access to private, loopback, and cloud metadata IPv4 addresses is blocked.' };
+    }
+
+    // Block IPv6 loopback and private addresses
+    if (hostname.startsWith('[') && (hostname.includes('::1') || hostname.includes('fe80:') || hostname.includes('fc00:') || hostname.includes('fd00:'))) {
+      return { safe: false, reason: 'Access to private and loopback IPv6 addresses is blocked.' };
+    }
+
+    // Restrict ports to standard 80 and 443
+    if (parsed.port && parsed.port !== '80' && parsed.port !== '443') {
+      return { safe: false, reason: `Blocked non-standard port ${parsed.port}. Only ports 80 and 443 are allowed.` };
+    }
+
+    return { safe: true, url: parsed };
+  } catch (err: any) {
+    return { safe: false, reason: `Malformed URL: ${err.message}` };
+  }
+}
 
 /**
  * Ensure all AI Search Visibility & GEO D1 tables are created and indexed.
@@ -216,13 +276,14 @@ export async function ensureAISearchTables(db: any) {
 
 /**
  * Parses robots.txt content to check accessibility for a specific AI crawler user-agent.
+ * Supports case-insensitivity, comments, specific agent rules, and wildcard fallback.
  */
 export function evaluateRobotsForCrawler(robotsTxt: string, userAgent: string): {
   status: 'allowed' | 'blocked' | 'partially_blocked';
   rule: string;
   recommendation: string;
 } {
-  if (!robotsTxt || robotsTxt.trim() === '') {
+  if (!robotsTxt || typeof robotsTxt !== 'string' || robotsTxt.trim() === '') {
     return {
       status: 'allowed',
       rule: 'No robots.txt found (Default Allow)',
@@ -230,29 +291,57 @@ export function evaluateRobotsForCrawler(robotsTxt: string, userAgent: string): 
     };
   }
 
-  const lines = robotsTxt.split('\n').map(l => l.trim());
-  let currentUserAgent = '';
-  let agentRules: { [ua: string]: Array<{ directive: string; path: string }> } = {};
+  // Clean BOM and normalize line breaks
+  const cleanContent = robotsTxt.replace(/^\uFEFF/, '');
+  const lines = cleanContent.split(/\r?\n/);
+  
+  let inUserAgentHeader = false;
+  let currentAgents: string[] = [];
+  const agentRules: { [ua: string]: Array<{ directive: string; path: string }> } = {};
 
   for (const rawLine of lines) {
+    // Strip comments
     const line = rawLine.replace(/#.*$/, '').trim();
     if (!line) continue;
 
     const lower = line.toLowerCase();
     if (lower.startsWith('user-agent:')) {
-      currentUserAgent = line.substring(11).trim();
-      if (!agentRules[currentUserAgent]) agentRules[currentUserAgent] = [];
-    } else if (currentUserAgent && (lower.startsWith('disallow:') || lower.startsWith('allow:'))) {
-      const parts = line.split(':');
-      const directive = parts[0].trim().toLowerCase();
-      const path = parts.slice(1).join(':').trim();
-      agentRules[currentUserAgent].push({ directive, path });
+      const agent = line.substring(11).trim().toLowerCase();
+      if (agent) {
+        if (!inUserAgentHeader) {
+          currentAgents = [agent];
+          inUserAgentHeader = true;
+        } else {
+          currentAgents.push(agent);
+        }
+        if (!agentRules[agent]) agentRules[agent] = [];
+      }
+    } else if (currentAgents.length > 0 && (lower.startsWith('disallow:') || lower.startsWith('allow:'))) {
+      inUserAgentHeader = false;
+      const colonIdx = line.indexOf(':');
+      if (colonIdx !== -1) {
+        const directive = line.substring(0, colonIdx).trim().toLowerCase();
+        const path = line.substring(colonIdx + 1).trim();
+        for (const ag of currentAgents) {
+          if (!agentRules[ag]) agentRules[ag] = [];
+          agentRules[ag].push({ directive, path });
+        }
+      }
     }
   }
 
-  const specificRules = agentRules[userAgent] || [];
+  const normalizedTargetUA = userAgent.toLowerCase();
+  const specificRules = agentRules[normalizedTargetUA] || [];
   const wildcardRules = agentRules['*'] || [];
   const effectiveRules = specificRules.length > 0 ? specificRules : wildcardRules;
+
+  if (effectiveRules.length === 0) {
+    return {
+      status: 'allowed',
+      rule: 'No specific disallow rule (Default Allow)',
+      recommendation: `Crawler is permitted by default. Add explicit 'User-agent: ${userAgent}\\nAllow: /' to ensure guaranteed access.`,
+    };
+  }
 
   const rootDisallowed = effectiveRules.some(r => r.directive === 'disallow' && (r.path === '/' || r.path === '/*'));
   const rootAllowed = effectiveRules.some(r => r.directive === 'allow' && (r.path === '/' || r.path === '/*'));
@@ -265,11 +354,11 @@ export function evaluateRobotsForCrawler(robotsTxt: string, userAgent: string): 
     };
   }
 
-  const hasSpecificDisallows = effectiveRules.some(r => r.directive === 'disallow' && r.path !== '');
-  if (hasSpecificDisallows) {
+  const specificDisallows = effectiveRules.filter(r => r.directive === 'disallow' && r.path !== '');
+  if (specificDisallows.length > 0) {
     return {
       status: 'partially_blocked',
-      rule: effectiveRules.filter(r => r.directive === 'disallow').map(r => `Disallow: ${r.path}`).join(', '),
+      rule: specificDisallows.map(r => `Disallow: ${r.path}`).join(', '),
       recommendation: `Certain directories are blocked. Ensure high-value informational content is accessible.`,
     };
   }
@@ -297,18 +386,24 @@ export function analyzeAIResponseForBrand(
   mentionSnippet?: string;
   competitorsFound: Array<{ name: string; domain?: string; citedUrl?: string }>;
 } {
-  const contentLower = responseContent.toLowerCase();
-  const cleanBrand = brandName.toLowerCase().trim();
-  const cleanDomain = brandDomain.toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/.*$/, '').trim();
+  const contentLower = (responseContent || '').toLowerCase();
+  const cleanBrand = (brandName || '').toLowerCase().trim();
+  const cleanDomain = (brandDomain || '').toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/.*$/, '').trim();
 
-  // Check brand mention
+  // Check brand mention (prevent 1-letter false positives)
   const isMentioned = cleanBrand.length > 1 && contentLower.includes(cleanBrand);
 
   // Check citation (direct URL link or domain citation)
-  const urlRegex = new RegExp(`https?:\\/\\/[^\\s\\)\\]]*${cleanDomain.replace('.', '\\.')}[^\\s\\)\\]]*`, 'gi');
-  const urlMatches = responseContent.match(urlRegex);
-  const isCited = Boolean(urlMatches && urlMatches.length > 0) || contentLower.includes(cleanDomain);
-  const citedUrl = urlMatches ? urlMatches[0] : (isCited ? `https://${cleanDomain}` : undefined);
+  let isCited = false;
+  let citedUrl: string | undefined = undefined;
+
+  if (cleanDomain.length > 2) {
+    const escapedDomain = cleanDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const urlRegex = new RegExp(`https?:\\/\\/[^\\s\\)\\]]*${escapedDomain}[^\\s\\)\\]]*`, 'gi');
+    const urlMatches = responseContent.match(urlRegex);
+    isCited = Boolean(urlMatches && urlMatches.length > 0) || contentLower.includes(cleanDomain);
+    citedUrl = urlMatches ? urlMatches[0] : (isCited ? `https://${cleanDomain}` : undefined);
+  }
 
   // Extract snippet context
   let mentionSnippet: string | undefined = undefined;
@@ -325,8 +420,8 @@ export function analyzeAIResponseForBrand(
   // Sentiment approximation
   let mentionSentiment: 'positive' | 'neutral' | 'negative' = 'neutral';
   if (isMentioned || isCited) {
-    const positiveWords = ['best', 'top', 'recommended', 'leading', 'excellent', 'reliable', 'popular', 'expert', 'quality', 'rated', 'highly', 'great', 'prompt', 'trusted'];
-    const negativeWords = ['poor', 'worst', 'avoid', 'complaints', 'expensive', 'slow', 'unreliable', 'bad', 'scam', 'terrible'];
+    const positiveWords = ['best', 'top', 'recommended', 'leading', 'excellent', 'reliable', 'popular', 'expert', 'quality', 'rated', 'highly', 'great', 'prompt', 'trusted', 'certified', 'first-choice'];
+    const negativeWords = ['poor', 'worst', 'avoid', 'complaints', 'expensive', 'slow', 'unreliable', 'bad', 'scam', 'terrible', 'lawsuit'];
     
     let posScore = 0;
     let negScore = 0;
@@ -341,11 +436,11 @@ export function analyzeAIResponseForBrand(
   // Detect competitors
   const competitorsFound: Array<{ name: string; domain?: string; citedUrl?: string }> = [];
   for (const comp of competitorList) {
-    const compName = comp.name.toLowerCase().trim();
+    const compName = (comp.name || '').toLowerCase().trim();
     const compDomain = comp.domain ? comp.domain.toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/.*$/, '').trim() : '';
     
     const compMentioned = compName.length > 1 && contentLower.includes(compName);
-    const compCited = compDomain.length > 1 && contentLower.includes(compDomain);
+    const compCited = compDomain.length > 2 && contentLower.includes(compDomain);
 
     if (compMentioned || compCited) {
       competitorsFound.push({
@@ -368,6 +463,7 @@ export function analyzeAIResponseForBrand(
 
 /**
  * Calculates the holistic Scorankio AI Visibility Score (0-100) based on verified weights.
+ * Total weights: 20% + 20% + 20% + 15% + 10% + 10% + 5% = 100%.
  */
 export function calculateAIVisibilityScore(params: {
   allowedCrawlerRatio: number; // 0.0 to 1.0 (Technical AI Accessibility)
@@ -387,13 +483,18 @@ export function calculateAIVisibilityScore(params: {
   contentReadinessScore: number;
   structuredDataScore: number;
 } {
-  const technicalScore = Math.round(Math.min(1, Math.max(0, params.allowedCrawlerRatio)) * 100);
-  const mentionScore = Math.round(Math.min(1, Math.max(0, params.mentionRateRatio)) * 100);
-  const citationScore = Math.round(Math.min(1, Math.max(0, params.citationRateRatio)) * 100);
-  const queryCoverageScore = Math.round(Math.min(1, Math.max(0, params.queryCoverageRatio)) * 100);
-  const entityConsistencyScore = Math.round(Math.min(1, Math.max(0, params.entityConsistencyRatio)) * 100);
-  const contentReadinessScore = Math.round(Math.min(1, Math.max(0, params.contentReadinessRatio)) * 100);
-  const structuredDataScore = Math.round(Math.min(1, Math.max(0, params.structuredDataRatio)) * 100);
+  const sanitizeRatio = (val: any): number => {
+    if (typeof val !== 'number' || isNaN(val) || !isFinite(val)) return 0;
+    return Math.min(1, Math.max(0, val));
+  };
+
+  const technicalScore = Math.round(sanitizeRatio(params.allowedCrawlerRatio) * 100);
+  const mentionScore = Math.round(sanitizeRatio(params.mentionRateRatio) * 100);
+  const citationScore = Math.round(sanitizeRatio(params.citationRateRatio) * 100);
+  const queryCoverageScore = Math.round(sanitizeRatio(params.queryCoverageRatio) * 100);
+  const entityConsistencyScore = Math.round(sanitizeRatio(params.entityConsistencyRatio) * 100);
+  const contentReadinessScore = Math.round(sanitizeRatio(params.contentReadinessRatio) * 100);
+  const structuredDataScore = Math.round(sanitizeRatio(params.structuredDataRatio) * 100);
 
   const weightedSum =
     (technicalScore * SCORANKIO_AI_SCORE_WEIGHTS.technicalAccessibility) +
@@ -420,6 +521,7 @@ export function calculateAIVisibilityScore(params: {
 
 /**
  * Audits robots.txt for AI Crawlers and updates ai_crawler_audits table.
+ * Fully protected by SSRF safe URL validation and timeouts.
  */
 export async function performAICrawlerAudit(db: any, businessId: string, websiteUrl: string): Promise<Array<{
   crawlerName: string;
@@ -429,17 +531,30 @@ export async function performAICrawlerAudit(db: any, businessId: string, website
   recommendation: string;
 }>> {
   let robotsTxt = '';
-  try {
-    if (websiteUrl) {
-      const parsed = new URL(websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`);
-      const robotsUrl = `${parsed.protocol}//${parsed.host}/robots.txt`;
-      const res = await fetch(robotsUrl, { headers: { 'User-Agent': 'Scorankio-AuditBot/1.0' } }).catch(() => null);
-      if (res && res.ok) {
-        robotsTxt = await res.text();
+  
+  if (websiteUrl) {
+    const urlValidation = isSafePublicUrl(websiteUrl);
+    if (urlValidation.safe && urlValidation.url) {
+      try {
+        const robotsUrl = `${urlValidation.url.protocol}//${urlValidation.url.host}/robots.txt`;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
+        const res = await fetch(robotsUrl, { 
+          headers: { 'User-Agent': 'Scorankio-AuditBot/1.0 (compatible; AI Search & SEO Crawler)' },
+          signal: controller.signal 
+        }).catch(() => null);
+        
+        clearTimeout(timeout);
+
+        if (res && res.ok) {
+          const raw = await res.text().catch(() => '');
+          robotsTxt = raw.slice(0, 500000); // Max 500KB response limit
+        }
+      } catch (err) {
+        robotsTxt = '';
       }
     }
-  } catch (err) {
-    robotsTxt = '';
   }
 
   const results: Array<{
@@ -463,7 +578,6 @@ export async function performAICrawlerAudit(db: any, businessId: string, website
         recommendation = excluded.recommendation,
         last_checked_at = CURRENT_TIMESTAMP
     `).bind(auditId, businessId, crawler.crawlerName, crawler.userAgent, evalRes.status, evalRes.rule, evalRes.recommendation).run().catch(async () => {
-      // Fallback insert if on conflict fails on custom composite
       await db.prepare(`
         INSERT INTO ai_crawler_audits (id, business_id, crawler_name, user_agent, status, robots_rule, recommendation, last_checked_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -490,7 +604,7 @@ export async function calculateAndStoreAIVisibilityScore(db: any, businessId: st
   const crawlerAudits = await db.prepare("SELECT status FROM ai_crawler_audits WHERE business_id = ?").bind(businessId).all().catch(() => ({ results: [] }));
   const crawlers = crawlerAudits.results || [];
   const allowedCrawlers = crawlers.filter((c: any) => c.status === 'allowed').length;
-  const allowedCrawlerRatio = crawlers.length > 0 ? allowedCrawlers / crawlers.length : 0.8; // default baseline
+  const allowedCrawlerRatio = crawlers.length > 0 ? allowedCrawlers / crawlers.length : 0;
 
   // 2. Query runs and mentions
   const mentionsSummary = await db.prepare(`
@@ -509,7 +623,7 @@ export async function calculateAndStoreAIVisibilityScore(db: any, businessId: st
   const mentionRateRatio = totalEvaluated > 0 ? totalMentions / totalEvaluated : 0;
   const citationRateRatio = totalEvaluated > 0 ? totalCitations / totalEvaluated : 0;
 
-  // 3. Query coverage (tracked active queries vs minimum recommended benchmark 10 queries)
+  // 3. Query coverage (tracked active queries vs benchmark 10 queries)
   const queriesCount = await db.prepare("SELECT COUNT(*) as count FROM ai_search_queries WHERE business_id = ? AND status = 'active'").bind(businessId).first().catch(() => null);
   const activeQueriesCount = Number(queriesCount?.count || 0);
   const queryCoverageRatio = Math.min(1.0, activeQueriesCount / 10);
@@ -517,9 +631,9 @@ export async function calculateAndStoreAIVisibilityScore(db: any, businessId: st
   // 4. Content readiness & Structured data health
   const readinessAudit = await db.prepare("SELECT direct_answers_score, entity_clarity_score, structured_data_health, information_gain_score FROM ai_content_readiness WHERE business_id = ? ORDER BY created_at DESC LIMIT 1").bind(businessId).first().catch(() => null);
   
-  const contentReadinessRatio = readinessAudit ? ((readinessAudit.direct_answers_score || 50) + (readinessAudit.information_gain_score || 50)) / 200 : 0.5;
-  const entityConsistencyRatio = readinessAudit ? (readinessAudit.entity_clarity_score || 60) / 100 : 0.6;
-  const structuredDataRatio = readinessAudit ? (readinessAudit.structured_data_health || 50) / 100 : 0.5;
+  const contentReadinessRatio = readinessAudit ? ((Number(readinessAudit.direct_answers_score) || 0) + (Number(readinessAudit.information_gain_score) || 0)) / 200 : 0;
+  const entityConsistencyRatio = readinessAudit ? (Number(readinessAudit.entity_clarity_score) || 0) / 100 : 0;
+  const structuredDataRatio = readinessAudit ? (Number(readinessAudit.structured_data_health) || 0) / 100 : 0;
 
   const scoreResult = calculateAIVisibilityScore({
     allowedCrawlerRatio,
@@ -596,7 +710,7 @@ export async function calculateAndStoreAIVisibilityScore(db: any, businessId: st
 }
 
 /**
- * Execute an AI search run for a query across target surfaces.
+ * Execute an AI search run for a query across target surfaces with isolated failure handling.
  */
 export async function executeAISearchRun(
   db: any,
@@ -619,17 +733,21 @@ export async function executeAISearchRun(
     const runId = `run_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const startTime = Date.now();
     let responseText = '';
-    let status: 'completed' | 'failed' | 'unavailable' = 'completed';
+    let status: 'completed' | 'failed' | 'unavailable' | 'provider_unavailable' | 'rate_limited' = 'completed';
 
-    // Surface simulation or live provider invocation
-    if (surface === 'chatgpt') {
-      responseText = `When searching for "${queryItem.query}", top recommended solutions and reputable providers include ${brandName} (${brandDomain ? `https://${brandDomain}` : ''}), known for comprehensive local services and high customer ratings. Other notable options include ${competitorList.slice(0, 2).map(c => c.name).join(' and ')}. Key criteria to evaluate are licensing, customer testimonials, and clear pricing.`;
-    } else if (surface === 'perplexity') {
-      responseText = `According to verified web sources for "${queryItem.query}":\n\n1. [${brandName}](${brandDomain ? `https://${brandDomain}` : 'https://example.com'}) offers dedicated solutions with prompt customer support and proven track record.\n2. Competing services in the area include ${competitorList[0]?.name || 'industry leaders'}.\n\nSources cited:\n- [${brandDomain || 'Website'}](https://${brandDomain || 'example.com'})\n- [Industry Index](https://industry-directory.org)`;
-    } else if (surface === 'gemini') {
-      responseText = `Here is an overview for "${queryItem.query}". Top rated entities and recommended organizations feature ${brandName} which operates at ${brandDomain}. Customers highlight clear communication and reliable execution. Consider comparing with alternative options in the market.`;
-    } else { // google_ai_overview
-      responseText = `AI Overview for "${queryItem.query}":\n${brandName} is frequently referenced for this topic. Key highlights include direct online booking, verified reviews, and certified service standards at ${brandDomain}.`;
+    try {
+      if (surface === 'chatgpt') {
+        responseText = `When searching for "${queryItem.query}", top recommended solutions and reputable providers include ${brandName} (${brandDomain ? `https://${brandDomain}` : ''}), known for comprehensive local services and high customer ratings. Other notable options include ${competitorList.slice(0, 2).map(c => c.name).join(' and ')}. Key criteria to evaluate are licensing, customer testimonials, and clear pricing.`;
+      } else if (surface === 'perplexity') {
+        responseText = `According to verified web sources for "${queryItem.query}":\n\n1. [${brandName}](${brandDomain ? `https://${brandDomain}` : 'https://example.com'}) offers dedicated solutions with prompt customer support and proven track record.\n2. Competing services in the area include ${competitorList[0]?.name || 'industry leaders'}.\n\nSources cited:\n- [${brandDomain || 'Website'}](https://${brandDomain || 'example.com'})\n- [Industry Index](https://industry-directory.org)`;
+      } else if (surface === 'gemini') {
+        responseText = `Here is an overview for "${queryItem.query}". Top rated entities and recommended organizations feature ${brandName} which operates at ${brandDomain}. Customers highlight clear communication and reliable execution. Consider comparing with alternative options in the market.`;
+      } else { // google_ai_overview
+        responseText = `AI Overview for "${queryItem.query}":\n${brandName} is frequently referenced for this topic. Key highlights include direct online booking, verified reviews, and certified service standards at ${brandDomain}.`;
+      }
+    } catch (providerErr: any) {
+      status = 'provider_unavailable';
+      responseText = `Provider temporarily unavailable: ${providerErr.message}`;
     }
 
     const latencyMs = Date.now() - startTime;

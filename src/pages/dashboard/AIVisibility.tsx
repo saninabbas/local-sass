@@ -145,7 +145,8 @@ export function AIVisibility() {
     );
   }
 
-  const score = data?.score?.overall_score ?? 68;
+  const score = data?.score?.overall_score ?? 0;
+  const hasEvaluations = (data?.metrics?.totalEvaluations ?? 0) > 0;
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -212,10 +213,10 @@ export function AIVisibility() {
               <span className="text-2xl font-normal text-indigo-300">/100</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1">
-                <TrendingUp className="w-3.5 h-3.5" /> High Readiness
+              <span className={`text-xs font-semibold flex items-center gap-1 ${hasEvaluations ? 'text-emerald-400' : 'text-slate-400'}`}>
+                <TrendingUp className="w-3.5 h-3.5" /> {hasEvaluations ? 'Measured Live' : 'Pending Queries'}
               </span>
-              <span className="text-[11px] text-slate-400">Updated today</span>
+              <span className="text-[11px] text-slate-400">{hasEvaluations ? 'Updated today' : 'No queries run yet'}</span>
             </div>
           </div>
 
@@ -256,11 +257,11 @@ export function AIVisibility() {
                     <ShieldCheck className="w-3.5 h-3.5 text-blue-500" /> Technical AI Crawlers (20%)
                   </span>
                   <span className="font-bold text-slate-900 dark:text-white">
-                    {data?.score?.technical_accessibility_score ?? 80}%
+                    {data?.score?.technical_accessibility_score ?? 0}%
                   </span>
                 </div>
                 <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                  <div className="bg-blue-600 h-full rounded-full" style={{ width: `${data?.score?.technical_accessibility_score ?? 80}%` }} />
+                  <div className="bg-blue-600 h-full rounded-full" style={{ width: `${data?.score?.technical_accessibility_score ?? 0}%` }} />
                 </div>
               </div>
 
@@ -271,11 +272,11 @@ export function AIVisibility() {
                     <Bot className="w-3.5 h-3.5 text-emerald-500" /> Brand Mention Rate (20%)
                   </span>
                   <span className="font-bold text-slate-900 dark:text-white">
-                    {data?.score?.mention_rate_score ?? 60}%
+                    {data?.score?.mention_rate_score ?? 0}%
                   </span>
                 </div>
                 <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                  <div className="bg-emerald-600 h-full rounded-full" style={{ width: `${data?.score?.mention_rate_score ?? 60}%` }} />
+                  <div className="bg-emerald-600 h-full rounded-full" style={{ width: `${data?.score?.mention_rate_score ?? 0}%` }} />
                 </div>
               </div>
 
@@ -286,11 +287,11 @@ export function AIVisibility() {
                     <Link2 className="w-3.5 h-3.5 text-indigo-500" /> Link Citation Rate (20%)
                   </span>
                   <span className="font-bold text-slate-900 dark:text-white">
-                    {data?.score?.citation_rate_score ?? 55}%
+                    {data?.score?.citation_rate_score ?? 0}%
                   </span>
                 </div>
                 <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                  <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${data?.score?.citation_rate_score ?? 55}%` }} />
+                  <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${data?.score?.citation_rate_score ?? 0}%` }} />
                 </div>
               </div>
 
@@ -301,11 +302,11 @@ export function AIVisibility() {
                     <Search className="w-3.5 h-3.5 text-purple-500" /> Query Coverage (15%)
                   </span>
                   <span className="font-bold text-slate-900 dark:text-white">
-                    {data?.score?.query_coverage_score ?? 70}%
+                    {data?.score?.query_coverage_score ?? 0}%
                   </span>
                 </div>
                 <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                  <div className="bg-purple-600 h-full rounded-full" style={{ width: `${data?.score?.query_coverage_score ?? 70}%` }} />
+                  <div className="bg-purple-600 h-full rounded-full" style={{ width: `${data?.score?.query_coverage_score ?? 0}%` }} />
                 </div>
               </div>
 
@@ -316,11 +317,11 @@ export function AIVisibility() {
                     <Globe className="w-3.5 h-3.5 text-amber-500" /> Entity Consistency (10%)
                   </span>
                   <span className="font-bold text-slate-900 dark:text-white">
-                    {data?.score?.entity_consistency_score ?? 85}%
+                    {data?.score?.entity_consistency_score ?? 0}%
                   </span>
                 </div>
                 <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                  <div className="bg-amber-600 h-full rounded-full" style={{ width: `${data?.score?.entity_consistency_score ?? 85}%` }} />
+                  <div className="bg-amber-600 h-full rounded-full" style={{ width: `${data?.score?.entity_consistency_score ?? 0}%` }} />
                 </div>
               </div>
 
@@ -331,11 +332,11 @@ export function AIVisibility() {
                     <Sparkles className="w-3.5 h-3.5 text-rose-500" /> Content & Schema (15%)
                   </span>
                   <span className="font-bold text-slate-900 dark:text-white">
-                    {data?.score?.content_readiness_score ?? 75}%
+                    {data?.score?.content_readiness_score ?? 0}%
                   </span>
                 </div>
                 <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                  <div className="bg-rose-600 h-full rounded-full" style={{ width: `${data?.score?.content_readiness_score ?? 75}%` }} />
+                  <div className="bg-rose-600 h-full rounded-full" style={{ width: `${data?.score?.content_readiness_score ?? 0}%` }} />
                 </div>
               </div>
             </div>
@@ -366,11 +367,13 @@ export function AIVisibility() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {['chatgpt', 'perplexity', 'gemini', 'google_ai_overview'].map((surfaceKey) => {
             const surfaceStat = data?.surfaceBreakdown?.[surfaceKey] || {
-              runs: 4,
-              mentions: 3,
-              citations: 2,
-              visibilityRate: 65
+              runs: 0,
+              mentions: 0,
+              citations: 0,
+              visibilityRate: 0
             };
+
+            const isMeasured = surfaceStat.runs > 0;
 
             return (
               <div
@@ -391,8 +394,8 @@ export function AIVisibility() {
                       </span>
                     </div>
                   </div>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${getScoreColor(surfaceStat.visibilityRate)}`}>
-                    {surfaceStat.visibilityRate}%
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${isMeasured ? getScoreColor(surfaceStat.visibilityRate) : 'text-slate-400 bg-slate-50 border-slate-200'}`}>
+                    {isMeasured ? `${surfaceStat.visibilityRate}%` : 'No data'}
                   </span>
                 </div>
 
@@ -409,9 +412,15 @@ export function AIVisibility() {
 
                 <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/50 flex justify-between items-center text-xs">
                   <span className="text-slate-500 dark:text-slate-400">Status</span>
-                  <span className="inline-flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Measured
-                  </span>
+                  {isMeasured ? (
+                    <span className="inline-flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Measured
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 font-medium text-slate-400">
+                      Not Measured
+                    </span>
+                  )}
                 </div>
               </div>
             );
