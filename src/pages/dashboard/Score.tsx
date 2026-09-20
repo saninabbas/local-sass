@@ -138,8 +138,8 @@ export function Score() {
   }
 
   const { scores, audit, recommendations, auditResult } = (data || {}) as any;
-  const overall = auditResult?.overallScore ?? scores?.overall_score ?? scores?.overall ?? 78;
-  const dataCoverage = auditResult?.dataCoverage ?? 100;
+  const overall = auditResult?.overallScore ?? scores?.overall_score ?? scores?.overall ?? 0;
+  const dataCoverage = auditResult?.dataCoverage ?? (overall > 0 ? 100 : 0);
 
   // Derive 7 authoritative vectors from auditResult or scores fallback
   const categories = [
@@ -150,17 +150,17 @@ export function Score() {
       score: overall,
       weight: 100,
       description: 'Unified composite score calculated across all 7 technical, local, on-page, performance, and authority signals.',
-      status: 'VERIFIED',
+      status: overall >= 75 ? 'PASS' : overall > 0 ? 'WARNING' : 'PENDING',
       checks: auditResult?.checks || []
     },
     {
       key: 'local',
       name: 'Local SEO & Schema',
       icon: MapPin,
-      score: auditResult?.vectors?.local?.score ?? scores?.local_score ?? 69,
+      score: auditResult?.vectors?.local?.score ?? scores?.local_score ?? 0,
       weight: 20,
       description: 'LocalBusiness JSON-LD schema, address consistency, and NAP matching.',
-      status: (auditResult?.vectors?.local?.score ?? 69) >= 75 ? 'PASS' : 'WARNING',
+      status: (auditResult?.vectors?.local?.score ?? scores?.local_score ?? 0) >= 75 ? 'PASS' : (auditResult?.vectors?.local?.score ?? scores?.local_score ?? 0) > 0 ? 'WARNING' : 'PENDING',
       mainProblems: auditResult?.vectors?.local?.checks?.filter((c: any) => c.status !== 'PASS')?.map((c: any) => c.title) || [
         !audit?.has_schema ? 'Missing LocalBusiness structured data (Schema.org).' : null,
         !audit?.phone ? 'No click-to-call telephone number detected on landing page.' : null
@@ -172,10 +172,10 @@ export function Score() {
       key: 'technical',
       name: 'Technical SEO',
       icon: Layers,
-      score: auditResult?.vectors?.technical?.score ?? scores?.technical_score ?? 86,
+      score: auditResult?.vectors?.technical?.score ?? scores?.technical_score ?? 0,
       weight: 20,
       description: 'HTTPS, canonical URLs, robots.txt, and sitemap indexability.',
-      status: (auditResult?.vectors?.technical?.score ?? 86) >= 75 ? 'PASS' : 'WARNING',
+      status: (auditResult?.vectors?.technical?.score ?? scores?.technical_score ?? 0) >= 75 ? 'PASS' : (auditResult?.vectors?.technical?.score ?? scores?.technical_score ?? 0) > 0 ? 'WARNING' : 'PENDING',
       mainProblems: auditResult?.vectors?.technical?.checks?.filter((c: any) => c.status !== 'PASS')?.map((c: any) => c.title) || [
         audit?.sitemap_present === 0 ? 'Missing XML sitemap in root domain.' : null,
         audit?.canonical_url ? null : 'Canonical URL tag missing.',
@@ -187,10 +187,10 @@ export function Score() {
       key: 'onpage',
       name: 'On Page SEO',
       icon: FileText,
-      score: auditResult?.vectors?.onpage?.score ?? scores?.onpage_score ?? 82,
+      score: auditResult?.vectors?.onpage?.score ?? scores?.onpage_score ?? 0,
       weight: 20,
       description: 'Title tags, meta descriptions, and semantic H1/H2 heading hierarchy.',
-      status: (auditResult?.vectors?.onpage?.score ?? 82) >= 75 ? 'PASS' : 'WARNING',
+      status: (auditResult?.vectors?.onpage?.score ?? scores?.onpage_score ?? 0) >= 75 ? 'PASS' : (auditResult?.vectors?.onpage?.score ?? scores?.onpage_score ?? 0) > 0 ? 'WARNING' : 'PENDING',
       mainProblems: auditResult?.vectors?.onpage?.checks?.filter((c: any) => c.status !== 'PASS')?.map((c: any) => c.title) || [
         !audit?.meta_description ? 'Meta description is empty or missing.' : null,
         audit?.title && audit.title.length < 20 ? 'Title tag is too short for local search.' : null,
@@ -202,10 +202,10 @@ export function Score() {
       key: 'content',
       name: 'Content Depth',
       icon: Zap,
-      score: auditResult?.vectors?.content?.score ?? scores?.content_score ?? 75,
+      score: auditResult?.vectors?.content?.score ?? scores?.content_score ?? 0,
       weight: 15,
       description: 'Visible text volume, service coverage terms, and internal link structure.',
-      status: (auditResult?.vectors?.content?.score ?? 75) >= 75 ? 'PASS' : 'WARNING',
+      status: (auditResult?.vectors?.content?.score ?? scores?.content_score ?? 0) >= 75 ? 'PASS' : (auditResult?.vectors?.content?.score ?? scores?.content_score ?? 0) > 0 ? 'WARNING' : 'PENDING',
       mainProblems: auditResult?.vectors?.content?.checks?.filter((c: any) => c.status !== 'PASS')?.map((c: any) => c.title) || [
         'Expand homepage content to at least 500 words with dedicated service descriptions.'
       ],
@@ -216,10 +216,10 @@ export function Score() {
       key: 'performance',
       name: 'Performance & Speed',
       icon: Smartphone,
-      score: auditResult?.vectors?.performance?.score ?? scores?.performance_score ?? 85,
+      score: auditResult?.vectors?.performance?.score ?? scores?.performance_score ?? 0,
       weight: 10,
       description: 'Server response latency (TTFB), script tag weight, and asset optimization.',
-      status: (auditResult?.vectors?.performance?.score ?? 85) >= 75 ? 'PASS' : 'WARNING',
+      status: (auditResult?.vectors?.performance?.score ?? scores?.performance_score ?? 0) >= 75 ? 'PASS' : (auditResult?.vectors?.performance?.score ?? scores?.performance_score ?? 0) > 0 ? 'WARNING' : 'PENDING',
       mainProblems: auditResult?.vectors?.performance?.checks?.filter((c: any) => c.status !== 'PASS')?.map((c: any) => c.title) || [],
       checks: auditResult?.vectors?.performance?.checks || [],
       recommendedFix: 'Enable edge caching and compress image assets to reduce TTFB below 600ms.'
@@ -228,10 +228,10 @@ export function Score() {
       key: 'mobile',
       name: 'Mobile Readiness',
       icon: Smartphone,
-      score: auditResult?.vectors?.mobile?.score ?? scores?.mobile_score ?? 90,
+      score: auditResult?.vectors?.mobile?.score ?? scores?.mobile_score ?? 0,
       weight: 10,
       description: 'Responsive viewport meta tags and mobile call-to-action signals.',
-      status: (auditResult?.vectors?.mobile?.score ?? 90) >= 75 ? 'PASS' : 'WARNING',
+      status: (auditResult?.vectors?.mobile?.score ?? scores?.mobile_score ?? 0) >= 75 ? 'PASS' : (auditResult?.vectors?.mobile?.score ?? scores?.mobile_score ?? 0) > 0 ? 'WARNING' : 'PENDING',
       mainProblems: auditResult?.vectors?.mobile?.checks?.filter((c: any) => c.status !== 'PASS')?.map((c: any) => c.title) || [],
       checks: auditResult?.vectors?.mobile?.checks || [],
       recommendedFix: 'Ensure viewport is configured for device width and add mobile click-to-call CTAs.'
@@ -240,10 +240,10 @@ export function Score() {
       key: 'security',
       name: 'Security Signals',
       icon: Shield,
-      score: auditResult?.vectors?.security?.score ?? scores?.security_score ?? 80,
+      score: auditResult?.vectors?.security?.score ?? scores?.security_score ?? 0,
       weight: 5,
       description: 'HTTPS encryption, HSTS headers, and clickjacking protection.',
-      status: (auditResult?.vectors?.security?.score ?? 80) >= 75 ? 'PASS' : 'WARNING',
+      status: (auditResult?.vectors?.security?.score ?? scores?.security_score ?? 0) >= 75 ? 'PASS' : (auditResult?.vectors?.security?.score ?? scores?.security_score ?? 0) > 0 ? 'WARNING' : 'PENDING',
       mainProblems: auditResult?.vectors?.security?.checks?.filter((c: any) => c.status !== 'PASS')?.map((c: any) => c.title) || [],
       checks: auditResult?.vectors?.security?.checks || [],
       recommendedFix: 'Configure Strict-Transport-Security (HSTS) and X-Frame-Options response headers.'
@@ -399,10 +399,10 @@ export function Score() {
                 
                 <div className="space-y-3 pt-2 border-t border-[#252320]">
                   {[
-                    { label: 'SEO', score: scores?.seo_score ?? scores?.onpage_score ?? 82, color: 'bg-[#5db872]' },
-                    { label: 'Reviews', score: scores?.reviews_score ?? scores?.reputation_score ?? 74, color: 'bg-[#e8a55a]' },
-                    { label: 'Website', score: scores?.technical_score ?? 86, color: 'bg-[#5db872]' },
-                    { label: 'Visibility', score: scores?.local_score ?? 69, color: 'bg-[#e8a55a]' },
+                    { label: 'SEO', score: scores?.seo_score ?? scores?.onpage_score ?? auditResult?.vectors?.onpage?.score ?? 0, color: 'bg-[#5db872]' },
+                    { label: 'Reviews', score: scores?.reviews_score ?? scores?.reputation_score ?? 0, color: 'bg-[#e8a55a]' },
+                    { label: 'Website', score: scores?.technical_score ?? auditResult?.vectors?.technical?.score ?? 0, color: 'bg-[#5db872]' },
+                    { label: 'Visibility', score: scores?.local_score ?? auditResult?.vectors?.local?.score ?? 0, color: 'bg-[#e8a55a]' },
                   ].map(metric => (
                     <div key={metric.label}>
                       <div className="flex justify-between text-xs font-mono mb-1 text-[#a09d96]">

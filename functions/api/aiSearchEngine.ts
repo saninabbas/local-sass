@@ -399,10 +399,18 @@ export function analyzeAIResponseForBrand(
 
   if (cleanDomain.length > 2) {
     const escapedDomain = cleanDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const urlRegex = new RegExp(`https?:\\/\\/[^\\s\\)\\]]*${escapedDomain}[^\\s\\)\\]]*`, 'gi');
+    const urlRegex = new RegExp(`https?:\\/\\/[^\\s\\)\\]\\>\\,\\'\\"]*${escapedDomain}[^\\s\\)\\]\\>\\,\\'\\"]*`, 'gi');
     const urlMatches = responseContent.match(urlRegex);
-    isCited = Boolean(urlMatches && urlMatches.length > 0) || contentLower.includes(cleanDomain);
-    citedUrl = urlMatches ? urlMatches[0] : (isCited ? `https://${cleanDomain}` : undefined);
+    if (urlMatches && urlMatches.length > 0) {
+      isCited = true;
+      let rawUrl = urlMatches[0].trim();
+      // Strip any trailing sentence punctuation
+      rawUrl = rawUrl.replace(/[.,;:!?)]+$/, '');
+      citedUrl = rawUrl;
+    } else if (contentLower.includes(cleanDomain)) {
+      isCited = true;
+      citedUrl = `https://${cleanDomain}`;
+    }
   }
 
   // Extract snippet context
@@ -440,13 +448,24 @@ export function analyzeAIResponseForBrand(
     const compDomain = comp.domain ? comp.domain.toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/.*$/, '').trim() : '';
     
     const compMentioned = compName.length > 1 && contentLower.includes(compName);
-    const compCited = compDomain.length > 2 && contentLower.includes(compDomain);
+    
+    let compCitedUrl: string | undefined = undefined;
+    if (compDomain.length > 2) {
+      const escapedComp = compDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const compRegex = new RegExp(`https?:\\/\\/[^\\s\\)\\]\\>\\,\\'\\"]*${escapedComp}[^\\s\\)\\]\\>\\,\\'\\"]*`, 'gi');
+      const compMatches = responseContent.match(compRegex);
+      if (compMatches && compMatches.length > 0) {
+        compCitedUrl = compMatches[0].trim().replace(/[.,;:!?)]+$/, '');
+      } else if (contentLower.includes(compDomain)) {
+        compCitedUrl = `https://${compDomain}`;
+      }
+    }
 
-    if (compMentioned || compCited) {
+    if (compMentioned || compCitedUrl) {
       competitorsFound.push({
         name: comp.name,
         domain: comp.domain,
-        citedUrl: compCited ? `https://${compDomain}` : undefined
+        citedUrl: compCitedUrl
       });
     }
   }
