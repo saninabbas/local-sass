@@ -41,6 +41,9 @@ interface AIVisibilityOverview {
     totalCitations: number;
     allowedCrawlersCount: number;
     totalCrawlersCount: number;
+    methodology?: 'live_api' | 'simulated' | 'mixed' | 'none';
+    liveRunsCount?: number;
+    simulatedRunsCount?: number;
   };
   surfaceBreakdown: Record<string, {
     runs: number;
@@ -213,10 +216,25 @@ export function AIVisibility() {
               <span className="text-2xl font-normal text-indigo-300">/100</span>
             </div>
             <div className="flex flex-col">
-              <span className={`text-xs font-semibold flex items-center gap-1 ${hasEvaluations ? 'text-emerald-400' : 'text-slate-400'}`}>
-                <TrendingUp className="w-3.5 h-3.5" /> {hasEvaluations ? 'Measured Live' : 'Pending Queries'}
+              <span className={`text-xs font-semibold flex items-center gap-1 ${
+                data?.metrics.methodology === 'live_api' ? 'text-emerald-400' :
+                data?.metrics.methodology === 'simulated' ? 'text-amber-400' :
+                data?.metrics.methodology === 'mixed' ? 'text-blue-400' :
+                'text-slate-400'
+              }`}>
+                <TrendingUp className="w-3.5 h-3.5" /> 
+                {data?.metrics.methodology === 'live_api' ? 'Live Provider API' :
+                 data?.metrics.methodology === 'simulated' ? 'Simulated Engine' :
+                 data?.metrics.methodology === 'mixed' ? 'Mixed Live & Simulated' :
+                 'Pending Queries'}
               </span>
-              <span className="text-[11px] text-slate-400">{hasEvaluations ? 'Updated today' : 'No queries run yet'}</span>
+              <span className="text-[11px] text-slate-400">
+                {hasEvaluations 
+                  ? (data?.metrics.methodology === 'simulated' 
+                      ? 'Contextual Fallback Engine' 
+                      : 'Live Provider Responses') 
+                  : 'No queries run yet'}
+              </span>
             </div>
           </div>
 

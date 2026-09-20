@@ -9129,6 +9129,14 @@ export const onRequest = async (context: any) => {
             LIMIT 5
           `).bind(business.id).all().catch(() => ({ results: [] }));
 
+          const methodologyCounts = await env.DB.prepare(`
+            SELECT methodology, COUNT(*) as count FROM ai_search_runs WHERE business_id = ? GROUP BY methodology
+          `).bind(business.id).all().catch(() => ({ results: [] }));
+          
+          const liveCount = Number((methodologyCounts.results || []).find((m: any) => m.methodology === 'live_api')?.count || 0);
+          const simCount = Number((methodologyCounts.results || []).find((m: any) => m.methodology === 'simulated')?.count || 0);
+          const overallMethodology = (liveCount > 0 && simCount > 0) ? 'mixed' : (liveCount > 0 ? 'live_api' : (simCount > 0 ? 'simulated' : 'none'));
+
           return jsonResponse({
             success: true,
             business: { id: business.id, name: business.name, website_url: business.website_url },
@@ -9140,7 +9148,10 @@ export const onRequest = async (context: any) => {
               totalMentions: Number(mentionsSummary?.total_mentions || 0),
               totalCitations: Number(mentionsSummary?.total_citations || 0),
               allowedCrawlersCount: (crawlerAudits.results || []).filter((c: any) => c.status === 'allowed').length,
-              totalCrawlersCount: (crawlerAudits.results || []).length || KNOWN_AI_CRAWLERS.length
+              totalCrawlersCount: (crawlerAudits.results || []).length || KNOWN_AI_CRAWLERS.length,
+              methodology: overallMethodology,
+              liveRunsCount: liveCount,
+              simulatedRunsCount: simCount
             },
             surfaceBreakdown,
             crawlerAudits: crawlerAudits.results || [],

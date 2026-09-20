@@ -89,7 +89,7 @@ export function AICitations() {
             AI Citations & Mentions
           </h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Audit direct URL sources, citation links, and brand references extracted by LLMs during live query runs.
+            Audit direct URL sources, citation links, and brand references extracted across generative search query runs.
           </p>
         </div>
         <div className="flex items-center gap-3">

@@ -409,7 +409,7 @@ export function AIQueries() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700">
               <div>
                 <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold uppercase tracking-wider">
-                  Live AI Search Execution Snapshot
+                  AI Search Execution Snapshot
                 </span>
                 <h3 className="text-base font-bold font-heading text-slate-900 dark:text-white mt-0.5">
                   "{activeRunDetails.query}"
@@ -438,7 +438,11 @@ export function AIQueries() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {r.isClientMentioned ? (
+                      {r.status === 'provider_unavailable' ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                          <AlertCircle className="w-3 h-3" /> Provider Unavailable
+                        </span>
+                      ) : r.isClientMentioned ? (
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                           <CheckCircle2 className="w-3 h-3" /> Mentioned
                         </span>
@@ -448,7 +452,7 @@ export function AIQueries() {
                         </span>
                       )}
 
-                      {r.isClientCited ? (
+                      {r.status !== 'provider_unavailable' && r.isClientCited ? (
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
                           <CheckCircle2 className="w-3 h-3" /> Cited URL
                         </span>
