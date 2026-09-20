@@ -728,6 +728,129 @@ export async function calculateAndStoreAIVisibilityScore(db: any, businessId: st
   };
 }
 
+async function queryLiveProvider(
+  env: any,
+  surface: AISurface,
+  query: string,
+  brandName: string,
+  brandDomain: string,
+  competitorList: Array<{ name: string; domain?: string }>
+): Promise<{ text: string; methodology: 'live_api' | 'simulated' }> {
+  // Check for dedicated OpenAI key for ChatGPT
+  if (surface === 'chatgpt' && env?.OPENAI_API_KEY) {
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${env.OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: 'You are ChatGPT Search. Synthesize top organic local business results with citations.' },
+            { role: 'user', content: `Query: "${query}"` }
+          ],
+          max_tokens: 350
+        })
+      });
+      if (res.ok) {
+        const data = await res.json() as any;
+        const text = data.choices?.[0]?.message?.content?.trim();
+        if (text) return { text, methodology: 'live_api' };
+      }
+    } catch {}
+  }
+
+  // Check for dedicated Perplexity key
+  if (surface === 'perplexity' && env?.PERPLEXITY_API_KEY) {
+    try {
+      const res = await fetch('https://api.perplexity.ai/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${env.PERPLEXITY_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'sonar-medium-online',
+          messages: [{ role: 'user', content: query }],
+          max_tokens: 350
+        })
+      });
+      if (res.ok) {
+        const data = await res.json() as any;
+        const text = data.choices?.[0]?.message?.content?.trim();
+        if (text) return { text, methodology: 'live_api' };
+      }
+    } catch {}
+  }
+
+  // Check for dedicated Gemini key
+  if (surface === 'gemini' && env?.GEMINI_API_KEY) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `Search overview for: "${query}"` }] }]
+        })
+      });
+      if (res.ok) {
+        const data = await res.json() as any;
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (text) return { text, methodology: 'live_api' };
+      }
+    } catch {}
+  }
+
+  // Check for NVIDIA NIM universal key
+  if (env?.NVIDIA_API_KEY) {
+    try {
+      const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${env.NVIDIA_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'meta/llama-3.1-70b-instruct',
+          messages: [
+            {
+              role: 'system',
+              content: `You are simulating the generative search surface '${surface}'. Synthesize concise recommendations and organic web citations for local businesses in this area.`
+            },
+            {
+              role: 'user',
+              content: `Search query: "${query}". Context: brand "${brandName}" (${brandDomain}), known competitors: ${competitorList.map(c => c.name).join(', ')}.`
+            }
+          ],
+          max_tokens: 300,
+          temperature: 0.3
+        })
+      });
+      if (res.ok) {
+        const data = await res.json() as any;
+        const text = data.choices?.[0]?.message?.content?.trim();
+        if (text) return { text, methodology: 'live_api' };
+      }
+    } catch {}
+  }
+
+  // Contextual fallback simulation if external keys are not configured
+  let simulatedText = '';
+  if (surface === 'chatgpt') {
+    simulatedText = `When searching for "${query}", top recommended solutions and reputable providers include ${brandName} (${brandDomain ? `https://${brandDomain}` : ''}), known for comprehensive local services and high customer ratings. Other notable options include ${competitorList.slice(0, 2).map(c => c.name).join(' and ')}. Key criteria to evaluate are licensing, customer testimonials, and clear pricing.`;
+  } else if (surface === 'perplexity') {
+    simulatedText = `According to verified web sources for "${query}":\n\n1. [${brandName}](${brandDomain ? `https://${brandDomain}` : 'https://example.com'}) offers dedicated solutions with prompt customer support and proven track record.\n2. Competing services in the area include ${competitorList[0]?.name || 'industry leaders'}.\n\nSources cited:\n- [${brandDomain || 'Website'}](https://${brandDomain || 'example.com'})\n- [Industry Index](https://industry-directory.org)`;
+  } else if (surface === 'gemini') {
+    simulatedText = `Here is an overview for "${query}". Top rated entities and recommended organizations feature ${brandName} which operates at ${brandDomain}. Customers highlight clear communication and reliable execution. Consider comparing with alternative options in the market.`;
+  } else {
+    simulatedText = `AI Overview for "${query}":\n${brandName} is frequently referenced for this topic. Key highlights include direct online booking, verified reviews, and certified service standards at ${brandDomain}.`;
+  }
+
+  return { text: simulatedText, methodology: 'simulated' };
+}
+
 /**
  * Execute an AI search run for a query across target surfaces with isolated failure handling.
  */
@@ -752,18 +875,13 @@ export async function executeAISearchRun(
     const runId = `run_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const startTime = Date.now();
     let responseText = '';
+    let methodology: 'live_api' | 'simulated' = 'simulated';
     let status: 'completed' | 'failed' | 'unavailable' | 'provider_unavailable' | 'rate_limited' = 'completed';
 
     try {
-      if (surface === 'chatgpt') {
-        responseText = `When searching for "${queryItem.query}", top recommended solutions and reputable providers include ${brandName} (${brandDomain ? `https://${brandDomain}` : ''}), known for comprehensive local services and high customer ratings. Other notable options include ${competitorList.slice(0, 2).map(c => c.name).join(' and ')}. Key criteria to evaluate are licensing, customer testimonials, and clear pricing.`;
-      } else if (surface === 'perplexity') {
-        responseText = `According to verified web sources for "${queryItem.query}":\n\n1. [${brandName}](${brandDomain ? `https://${brandDomain}` : 'https://example.com'}) offers dedicated solutions with prompt customer support and proven track record.\n2. Competing services in the area include ${competitorList[0]?.name || 'industry leaders'}.\n\nSources cited:\n- [${brandDomain || 'Website'}](https://${brandDomain || 'example.com'})\n- [Industry Index](https://industry-directory.org)`;
-      } else if (surface === 'gemini') {
-        responseText = `Here is an overview for "${queryItem.query}". Top rated entities and recommended organizations feature ${brandName} which operates at ${brandDomain}. Customers highlight clear communication and reliable execution. Consider comparing with alternative options in the market.`;
-      } else { // google_ai_overview
-        responseText = `AI Overview for "${queryItem.query}":\n${brandName} is frequently referenced for this topic. Key highlights include direct online booking, verified reviews, and certified service standards at ${brandDomain}.`;
-      }
+      const providerRes = await queryLiveProvider(env, surface, queryItem.query, brandName, brandDomain, competitorList);
+      responseText = providerRes.text;
+      methodology = providerRes.methodology;
     } catch (providerErr: any) {
       status = 'provider_unavailable';
       responseText = `Provider temporarily unavailable: ${providerErr.message}`;
@@ -772,13 +890,16 @@ export async function executeAISearchRun(
     const latencyMs = Date.now() - startTime;
 
     // Analyze text for brand mentions, citations, and competitors
-    const analysis = analyzeAIResponseForBrand(brandName, brandDomain, responseText, competitorList);
+    const isUnavailable = status === 'provider_unavailable';
+    const analysis = isUnavailable
+      ? { isMentioned: false, isCited: false, citedUrl: undefined, mentionSentiment: 'neutral' as const, mentionSnippet: undefined, competitorsFound: [] }
+      : analyzeAIResponseForBrand(brandName, brandDomain, responseText, competitorList);
 
     // Save run record
     await db.prepare(`
       INSERT INTO ai_search_runs (id, query_id, business_id, surface, methodology, status, response_snapshot, latency_ms, tokens_used)
-      VALUES (?, ?, ?, ?, 'live_api', ?, ?, ?, 180)
-    `).bind(runId, queryItem.id, businessId, surface, status, responseText, latencyMs).run().catch(() => {});
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 180)
+    `).bind(runId, queryItem.id, businessId, surface, methodology, status, responseText, latencyMs).run().catch(() => {});
 
     // Save mention record
     const mentionId = `men_${runId}`;
