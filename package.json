@@ -12,6 +12,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@rolldown/binding-wasm32-wasi": "^1.2.9",
+    "@rolldown/binding-win32-x64-msvc": "^1.2.9",
     "@sendgrid/mail": "^8.1.6",
     "clsx": "^2.1.1",
     "lucide-react": "^1.31.0",

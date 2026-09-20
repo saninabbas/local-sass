@@ -10,15 +10,15 @@ export function HeroSection() {
           {/* Left Column: Copy & CTA */}
           <div className="xl:col-span-5 max-w-2xl mx-auto xl:mx-0 text-center xl:text-left">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#efe9de] border border-[#e6dfd8] text-[#cc785c] text-xs font-semibold uppercase tracking-wider mb-8">
-              AI Local Growth Operating System
+              SEO &bull; Local SEO &bull; AI Search (GEO) Platform
             </div>
             
             <h1 className="text-4xl sm:text-5xl lg:text-[64px] font-serif font-normal tracking-[-1.5px] text-[#141413] leading-[1.05] mb-8">
-              Find Out Why Your Local Business Isn't Ranking.
+              Rank in Google & Get Cited Across AI Search Engines.
             </h1>
             
             <p className="text-lg sm:text-xl text-[#3d3d3a] leading-relaxed mb-10 max-w-lg mx-auto xl:mx-0 font-sans">
-              Scorankio audits your website, analyzes your competitors, tracks local visibility, and gives you an AI-powered plan to grow, all from one dashboard.
+              Scorankio audits your traditional SEO, optimizes your Local Google visibility, and tracks your brand citations across ChatGPT, Perplexity, Gemini, and Google AI Overviews.
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center xl:justify-start gap-4 mb-5">

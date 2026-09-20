@@ -25,7 +25,12 @@ import {
   Check,
   Flag,
   History,
-  GitBranch
+  GitBranch,
+  Quote,
+  Lightbulb,
+  ShieldCheck,
+  PieChart,
+  Layers
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBusiness } from '../../context/BusinessContext';
@@ -72,37 +77,48 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       ]
     },
     {
-      title: 'GROWTH',
-      items: [
-        { name: 'Campaign', href: '/dashboard/campaign', icon: Flag },
-        { name: 'Keywords', href: '/dashboard/keywords', icon: Search },
-        { name: 'Competitors', href: '/dashboard/competitors', icon: Users },
-        { name: 'Reviews', href: '/dashboard/reviews', icon: Star },
-        { name: 'Local Geo-Grid', href: '/dashboard/geogrid', icon: Navigation },
-        { name: 'Backlinks', href: '/dashboard/backlinks', icon: Link2 },
-      ]
-    },
-    {
-      title: 'WEBSITE',
+      title: 'TRADITIONAL SEO',
       items: [
         { name: 'Website Audit', href: '/dashboard/website', icon: Globe },
-        { name: 'Content Studio', href: '/dashboard/content', icon: Sparkles },
+        { name: 'Keywords', href: '/dashboard/keywords', icon: Search },
+        { name: 'Competitors', href: '/dashboard/competitors', icon: Users },
+        { name: 'Backlinks', href: '/dashboard/backlinks', icon: Link2 },
         { name: 'Internal Links', href: '/dashboard/internal-links', icon: Link2 },
-        { name: 'Connections', href: '/dashboard/connections', icon: GitBranch },
-        { name: 'Websites & Projects', href: '/dashboard/websites', icon: FolderKanban },
+        { name: 'Content Studio', href: '/dashboard/content', icon: Sparkles },
       ]
     },
     {
-      title: 'ACTIVITY',
+      title: 'LOCAL SEO',
       items: [
-        { name: 'Change History', href: '/dashboard/changes', icon: History },
+        { name: 'Reviews & Reputation', href: '/dashboard/reviews', icon: Star },
+        { name: 'Local Geo-Grid', href: '/dashboard/geogrid', icon: Navigation },
+      ]
+    },
+    {
+      title: 'AI SEARCH & GEO',
+      items: [
+        { name: 'AI Visibility Score', href: '/dashboard/ai-visibility', icon: Bot },
+        { name: 'AI Search Queries', href: '/dashboard/ai-queries', icon: Search },
+        { name: 'AI Citations & Sources', href: '/dashboard/ai-citations', icon: Quote },
+        { name: 'AI Competitor Share', href: '/dashboard/ai-competitors', icon: PieChart },
+        { name: 'AI Search Opportunities', href: '/dashboard/ai-opportunities', icon: Lightbulb },
+        { name: 'GEO & AI Crawlers', href: '/dashboard/ai-content-readiness', icon: ShieldCheck },
+      ]
+    },
+    {
+      title: 'ACTIVITY & GROWTH',
+      items: [
+        { name: 'Campaign', href: '/dashboard/campaign', icon: Flag },
         { name: 'Leads & CRM', href: '/dashboard/leads', icon: Building },
+        { name: 'Change History', href: '/dashboard/changes', icon: History },
         { name: 'Reports & Audits', href: '/dashboard/reports', icon: FileText },
       ]
     },
     {
-      title: 'ACCOUNT',
+      title: 'ACCOUNT & SETTINGS',
       items: [
+        { name: 'Connections', href: '/dashboard/connections', icon: GitBranch },
+        { name: 'Websites & Projects', href: '/dashboard/websites', icon: FolderKanban },
         { name: 'Plan & Billing', href: '/dashboard/billing', icon: ShieldAlert },
         { name: 'Settings', href: '/dashboard/settings', icon: Settings },
         { name: 'Account Profile', href: '/dashboard/account', icon: User },

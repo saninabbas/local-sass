@@ -50,6 +50,12 @@ const ChangeHistory = lazy(() => import('./pages/dashboard/ChangeHistory').then(
 const Billing = lazy(() => import('./pages/dashboard/Billing').then(m => ({ default: m.Billing })));
 const FreeAudit = lazy(() => import('./pages/FreeAudit').then(m => ({ default: m.FreeAudit })));
 const Connections = lazy(() => import('./pages/dashboard/Connections').then(m => ({ default: m.Connections })));
+const AIVisibility = lazy(() => import('./pages/dashboard/AIVisibility').then(m => ({ default: m.AIVisibility })));
+const AIQueries = lazy(() => import('./pages/dashboard/AIQueries').then(m => ({ default: m.AIQueries })));
+const AICitations = lazy(() => import('./pages/dashboard/AICitations').then(m => ({ default: m.AICitations })));
+const AICompetitors = lazy(() => import('./pages/dashboard/AICompetitors').then(m => ({ default: m.AICompetitors })));
+const AIOpportunities = lazy(() => import('./pages/dashboard/AIOpportunities').then(m => ({ default: m.AIOpportunities })));
+const AIContentReadiness = lazy(() => import('./pages/dashboard/AIContentReadiness').then(m => ({ default: m.AIContentReadiness })));
 
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -158,6 +164,14 @@ function App() {
                 <Route path="/dashboard/connections" element={<DashboardSuspense><Connections /></DashboardSuspense>} />
                 <Route path="/dashboard/geogrid" element={<DashboardSuspense><GeoGrid /></DashboardSuspense>} />
                 
+                {/* AI Search & Generative Engine Optimization (GEO) Routes */}
+                <Route path="/dashboard/ai-visibility" element={<DashboardSuspense><AIVisibility /></DashboardSuspense>} />
+                <Route path="/dashboard/ai-queries" element={<DashboardSuspense><AIQueries /></DashboardSuspense>} />
+                <Route path="/dashboard/ai-citations" element={<DashboardSuspense><AICitations /></DashboardSuspense>} />
+                <Route path="/dashboard/ai-competitors" element={<DashboardSuspense><AICompetitors /></DashboardSuspense>} />
+                <Route path="/dashboard/ai-opportunities" element={<DashboardSuspense><AIOpportunities /></DashboardSuspense>} />
+                <Route path="/dashboard/ai-content-readiness" element={<DashboardSuspense><AIContentReadiness /></DashboardSuspense>} />
+
                 <Route path="/dashboard/*" element={<DashboardPlaceholder title="Page Not Found" />} />
               </Route>
             </Routes>
